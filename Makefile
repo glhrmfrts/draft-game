@@ -27,6 +27,7 @@ $(OUT): $(OBJ)
 	@printf "%s\n" $@
 
 run: $(OUT)
+	./map_convert.py
 	@cd build && ./../$(OUT)
 
 clean:

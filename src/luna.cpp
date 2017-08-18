@@ -6,14 +6,14 @@
 #include <SDL2/SDL.h>
 #include <AL/alc.h>
 #include "luna.h"
-#include "luna_world_mode.h"
+#include "luna_level_mode.h"
 
 #undef main
 
-static void RegisterInputActions(game_input *Input)
+static void RegisterInputActions(game_input &Input)
 {
-    Input->Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
-    Input->Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
+    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
+    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
 }
 
 int main(int argc, char **argv)
@@ -56,11 +56,15 @@ int main(int argc, char **argv)
         std::cerr << "Error setting audio context" << std::endl;
 
     game_state GameState = {};
-    game_input *Input = &GameState.Input;
+    GameState.Width = Width;
+    GameState.Height = Height;
+
+    auto &Input = GameState.Input;
     RegisterInputActions(Input);
-    InitGUI(&GameState.GUI, Input);
-    MakeCameraOrthographic(&GameState.GUICamera, 0, Width, 0, Height);
-    StartWorld(&GameState);
+    InitGUI(GameState.GUI, Input);
+    MakeCameraOrthographic(GameState.GUICamera, 0, Width, 0, Height);
+    InitRenderState(GameState.RenderState);
+    StartLevel(GameState, GameState.LevelMode);
 
     clock_t PreviousTime = clock();
     float DeltaTime = 0.016f;
@@ -79,15 +83,15 @@ int main(int argc, char **argv)
             case SDL_KEYDOWN: {
                 SDL_Keycode Key = Event.key.keysym.sym;
                 for (int i = 0; i < Action_count; i++) {
-                    auto Action = &Input->Actions[i];
-                    if (Action->Positive == Key || Action->Negative == Key) {
-                        Action->Pressed++;
+                    auto &Action = Input.Actions[i];
+                    if (Action.Positive == Key || Action.Negative == Key) {
+                        Action.Pressed++;
 
-                        if (Action->Positive == Key) {
-                            Action->AxisValue = 1;
+                        if (Action.Positive == Key) {
+                            Action.AxisValue = 1;
                         }
-                        else if (Action->Negative == Key) {
-                            Action->AxisValue = -1;
+                        else if (Action.Negative == Key) {
+                            Action.AxisValue = -1;
                         }
                     }
                 }
@@ -97,47 +101,47 @@ int main(int argc, char **argv)
             case SDL_KEYUP: {
                 SDL_Keycode Key = Event.key.keysym.sym;
                 for (int i = 0; i < Action_count; i++) {
-                    auto Action = &Input->Actions[i];
-                    if (Action->Positive == Key && Action->AxisValue == 1) {
-                        Action->Pressed = 0;
-                        Action->AxisValue = 0;
+                    auto &Action = Input.Actions[i];
+                    if (Action.Positive == Key && Action.AxisValue == 1) {
+                        Action.Pressed = 0;
+                        Action.AxisValue = 0;
                         break;
                     }
-                    else if (Action->Negative == Key && Action->AxisValue == -1) {
-                        Action->Pressed = 0;
-                        Action->AxisValue = 0;
+                    else if (Action.Negative == Key && Action.AxisValue == -1) {
+                        Action.Pressed = 0;
+                        Action.AxisValue = 0;
                     }
                 }
                 break;
             }
 
             case SDL_MOUSEMOTION: {
-                auto Motion = &Event.motion;
-                Input->MouseState.X = Motion->x;
-                Input->MouseState.Y = Motion->y;
-                Input->MouseState.dX = Motion->xrel;
-                Input->MouseState.dY = Motion->yrel;
+                auto &Motion = Event.motion;
+                Input.MouseState.X = Motion.x;
+                Input.MouseState.Y = Motion.y;
+                Input.MouseState.dX = Motion.xrel;
+                Input.MouseState.dY = Motion.yrel;
                 break;
             }
 
             case SDL_MOUSEWHEEL: {
-                auto Wheel = &Event.wheel;
-                Input->MouseState.ScrollY = Wheel->y;
+                auto &Wheel = Event.wheel;
+                Input.MouseState.ScrollY = Wheel.y;
                 break;
             }
             }
         }
 
         switch (GameState.GameMode) {
-        case GameMode_world:
-            UpdateWorld(&GameState, DeltaTime);
-            RenderWorld(&GameState);
+        case GameMode_level:
+            UpdateLevel(GameState, GameState.LevelMode, DeltaTime);
+            RenderLevel(GameState, GameState.LevelMode);
             break;
         }
 
         memcpy(&GameState.PrevInput, &GameState.Input, sizeof(game_input));
-        Input->MouseState.dX = 0;
-        Input->MouseState.dY = 0;
+        Input.MouseState.dX = 0;
+        Input.MouseState.dY = 0;
 
         if (Elapsed < DeltaTimeMS) {
             SDL_Delay(DeltaTimeMS - Elapsed);
@@ -153,6 +157,7 @@ int main(int argc, char **argv)
 
     SDL_GL_DeleteContext(Context);
     SDL_DestroyWindow(Window);
+    SDL_Quit();
 
     return 0;
 }

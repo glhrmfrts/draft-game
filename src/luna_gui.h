@@ -36,19 +36,19 @@ struct gui
 };
 
 // Prototypes.
-void InitGUI(gui *GUI, game_input *Input);
-void Begin(gui *GUI, camera *Camera);
+void InitGUI(gui &GUI, game_input &Input);
+void Begin(gui &GUI, camera &Camera);
 
-uint32 PushRect(gui *GUI, rect Rect, color vColor, color DiffuseColor, texture *Texture, texture_rect TexRect, float TexWeight = 0.0f, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
+uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *Texture, texture_rect TexRect, float TexWeight = 0.0f, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
 
-uint32 PushRect(gui *GUI, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
+uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
 
-uint32 PushTexture(gui *GUI, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
+uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true);
 
 #if 0
-uint32 PushText(gui *GUI, font *Font, const string &Text, rect R, color C, bool CheckState = true);
+uint32 PushText(gui &GUI, font &Font, const string &Text, rect R, color C, bool CheckState = true);
 #endif
 
-void End(gui *GUI);
+void End(gui &GUI);
 
 #endif

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -29,7 +30,8 @@ using std::string;
 using std::vector;
 using std::unordered_map;
 
-#define Colors_white color(1, 1, 1, 1)
+#define Color_white color(1, 1, 1, 1)
+#define Color_blue  color(0, 0, 1, 1)
 
 struct rect
 {

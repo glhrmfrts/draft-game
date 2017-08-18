@@ -85,6 +85,7 @@ struct camera
     float Near;
     float Far;
     camera_type Type;
+    bool Updated = false;
 
     union
     {
@@ -93,28 +94,70 @@ struct camera
     };
 };
 
-void InitBuffer(vertex_buffer *Buffer, size_t VertexSize, size_t AttrCount, ...);
-void ResetBuffer(vertex_buffer *Buffer);
-void PushVertex(vertex_buffer *Buffer, ...);
-void UploadVertices(vertex_buffer *Buffer, GLenum Usage);
+struct material
+{
+    color DiffuseColor = Color_white;
+    float Emission;
+    float TexWeight;
+    texture *Texture;
+};
 
-void CompileShaderProgram(shader_program *Prog, const char *VertexSource, const char *FragmentSource);
+struct mesh_part
+{
+    material Material;
+    size_t Offset;
+    size_t Count;
+    GLuint PrimitiveType;
+};
+
+struct mesh
+{
+    vertex_buffer Buffer;
+    vector<mesh_part> Parts;
+};
+
+struct model_program
+{
+    shader_program ShaderProgram;
+    int ProjectionView;
+    int Transform;
+    int DiffuseColor;
+    int TexWeight;
+    int Sampler;
+};
+
+struct render_state
+{
+    model_program ModelProgram;
+};
+
+void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...);
+void ResetBuffer(vertex_buffer &Buffer);
+void PushVertex(vertex_buffer &Buffer, const vector<float> &Verts);
+void UploadVertices(vertex_buffer &Buffer, GLenum Usage);
+
+void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const char *FragmentSource);
 void SetUniform(GLuint Location, int Value);
 void SetUniform(GLuint Location, float Value);
 void SetUniform(GLuint Location, const vec2 &Value);
 void SetUniform(GLuint Location, const vec3 &Value);
 void SetUniform(GLuint Location, const vec4 &Value);
 void SetUniform(GLuint Location, const mat4 &Value);
-void Bind(shader_program *Prog);
+void Bind(shader_program &Prog);
 void UnbindShaderProgram();
 
-void Bind(texture *Texture, int TextureUnit);
-void Unbind(texture *Texture, int TextureUnit);
-void ApplyTextureParameters(texture *Texture, int TextureUnit);
-void UploadTexture(texture *Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data);
+void Bind(texture &Texture, int TextureUnit);
+void Unbind(texture &Texture, int TextureUnit);
+void ApplyTextureParameters(texture &Texture, int TextureUnit);
+void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data);
 
-void MakeCameraOrthographic(camera *Camera, float Left, float Right, float Bottom, float Top, float Near = -1, float Far = 1);
-void MakeCameraPerspective(camera *Camera, float Width, float Height, float Fov, float Near, float Far);
-void UpdateProjectionView(camera *Camera);
+void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near = -1, float Far = 1);
+void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov, float Near, float Far);
+void UpdateProjectionView(camera &Camera);
+
+void InitMeshBuffer(vertex_buffer &Buffer);
+
+void InitRenderState(render_state &RenderState);
+void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh);
 
 #endif

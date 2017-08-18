@@ -3,7 +3,7 @@
 
 #include "luna_asset.h"
 #include "luna_gui.h"
-#include "luna_world_mode.h"
+#include "luna_level_mode.h"
 
 enum action_type
 {
@@ -14,7 +14,7 @@ enum action_type
 
 enum game_mode
 {
-    GameMode_world,
+    GameMode_level,
 };
 
 struct action_state
@@ -52,8 +52,13 @@ struct game_state
     asset_cache AssetCache;
     gui GUI;
     camera GUICamera;
+    render_state RenderState;
 
+    level_mode LevelMode;
     game_mode GameMode;
+
+    int Width;
+    int Height;
     bool Running = true;
 };
 

@@ -1,18 +1,22 @@
 #include "luna_render.h"
 
+// forward declarations of shaders
+extern string ModelVertexShader;
+extern string ModelFragmentShader;
+
 static void EnableVertexAttribute(vertex_attribute Attr)
 {
   glEnableVertexAttribArray(Attr.Location);
   glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
-static void vInitBuffer(vertex_buffer *Buffer, size_t AttrCount, va_list Args)
+static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 {
-    glGenVertexArrays(1, &Buffer->VAO);
-    glGenBuffers(1, &Buffer->VBO);
+    glGenVertexArrays(1, &Buffer.VAO);
+    glGenBuffers(1, &Buffer.VBO);
 
-    glBindVertexArray(Buffer->VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, Buffer->VBO);
+    glBindVertexArray(Buffer.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
     for (size_t i = 0; i < AttrCount; i++) {
         vertex_attribute Attr = va_arg(Args, vertex_attribute);
         EnableVertexAttribute(Attr);
@@ -23,21 +27,23 @@ static void vInitBuffer(vertex_buffer *Buffer, size_t AttrCount, va_list Args)
 }
 
 #define InitialVertexBufferSize 16
-static void EnsureCapacity(vertex_buffer *Buffer, size_t Size)
+static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 {
-    if (Buffer->RawIndex + Size > Buffer->Vertices.size()) {
-        if (Buffer->Vertices.size() == 0) {
-            Buffer->Vertices.resize(InitialVertexBufferSize * Buffer->VertexSize);
+    if (Buffer.RawIndex + Size > Buffer.Vertices.size()) {
+        if (Buffer.Vertices.size() == 0) {
+            Buffer.Vertices.resize(InitialVertexBufferSize * Buffer.VertexSize);
         }
         else {
-            Buffer->Vertices.resize(Buffer->Vertices.size() * 2);
+            Buffer.Vertices.resize(Buffer.Vertices.size() * 2);
         }
     }
 }
 
-void InitBuffer(vertex_buffer *Buffer, size_t VertexSize, size_t AttrCount, ...)
+// InitBuffer accepts a variadic number of vertex_attributes, it
+// initializes the buffer and enable the passed attributes
+void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
 {
-    Buffer->VertexSize = VertexSize;
+    Buffer.VertexSize = VertexSize;
     ResetBuffer(Buffer);
 
     va_list Args;
@@ -46,33 +52,31 @@ void InitBuffer(vertex_buffer *Buffer, size_t VertexSize, size_t AttrCount, ...)
     va_end(Args);
 }
 
-void ResetBuffer(vertex_buffer *Buffer)
+void ResetBuffer(vertex_buffer &Buffer)
 {
-    Buffer->VertexCount = 0;
-    Buffer->RawIndex = 0;
+    Buffer.VertexCount = 0;
+    Buffer.RawIndex = 0;
 }
 
-void PushVertex(vertex_buffer *Buffer, ...)
+// PushVertex pushes a single vertex to the buffer, the vertex size
+// is known by the VertexSize field
+void PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
 {
-    EnsureCapacity(Buffer, Buffer->VertexSize);
+    EnsureCapacity(Buffer, Buffer.VertexSize);
 
-    va_list Args;
-    va_start(Args, Buffer);
-
-    size_t Idx = Buffer->RawIndex;
-    for (size_t i = 0; i < Buffer->VertexSize; i++) {
-        Buffer->Vertices[Idx+i] = (float)va_arg(Args, double);
+    size_t Idx = Buffer.RawIndex;
+    for (size_t i = 0; i < Buffer.VertexSize; i++) {
+        Buffer.Vertices[Idx+i] = Verts[i];
     }
-    Buffer->RawIndex += Buffer->VertexSize;
-    Buffer->VertexCount++;
-
-    va_end(Args);
+    Buffer.RawIndex += Buffer.VertexSize;
+    Buffer.VertexCount++;
 }
 
-void UploadVertices(vertex_buffer *Buffer, GLenum Usage)
+void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, Buffer->VBO);
-    glBufferData(GL_ARRAY_BUFFER, Buffer->VertexCount * Buffer->VertexSize * sizeof(float), &Buffer->Vertices[0], Usage);
+    glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
+    glBufferData(GL_ARRAY_BUFFER, Buffer.VertexCount * Buffer.VertexSize * sizeof(float), &Buffer.Vertices[0], Usage);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 static GLuint CompileShader(const char *Source, GLint Type)
@@ -97,24 +101,24 @@ static GLuint CompileShader(const char *Source, GLint Type)
     return Shader;
 }
 
-void CompileShaderProgram(shader_program *Prog, const char *VertexSource, const char *FragmentSource)
+void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const char *FragmentSource)
 {
     GLuint VertexShader = CompileShader(VertexSource, GL_VERTEX_SHADER);
     GLuint FragmentShader = CompileShader(FragmentSource, GL_FRAGMENT_SHADER);
 
-    Prog->ID = glCreateProgram();
-    glAttachShader(Prog->ID, VertexShader);
-    glAttachShader(Prog->ID, FragmentShader);
-    glLinkProgram(Prog->ID);
+    Prog.ID = glCreateProgram();
+    glAttachShader(Prog.ID, VertexShader);
+    glAttachShader(Prog.ID, FragmentShader);
+    glLinkProgram(Prog.ID);
 
     int Status;
-    glGetProgramiv(Prog->ID, GL_LINK_STATUS, &Status);
+    glGetProgramiv(Prog.ID, GL_LINK_STATUS, &Status);
     if (Status == GL_FALSE) {
       int LogLength = 0;
-      glGetProgramiv(Prog->ID, GL_INFO_LOG_LENGTH, &LogLength);
+      glGetProgramiv(Prog.ID, GL_INFO_LOG_LENGTH, &LogLength);
 
       char *InfoLog = new char[LogLength + 1];
-      glGetProgramInfoLog(Prog->ID, LogLength, NULL, InfoLog);
+      glGetProgramInfoLog(Prog.ID, LogLength, NULL, InfoLog);
       InfoLog[LogLength] = '\0';
 
       printf("failed to link program: %s\n", InfoLog);
@@ -156,9 +160,9 @@ void SetUniform(GLuint Location, const mat4 &Value)
     glUniformMatrix4fv(Location, 1, MatrixRowMajor, (float *)&Value);
 }
 
-void Bind(shader_program *Prog)
+void Bind(shader_program &Prog)
 {
-    glUseProgram(Prog->ID);
+    glUseProgram(Prog.ID);
 }
 
 void UnbindShaderProgram()
@@ -166,80 +170,204 @@ void UnbindShaderProgram()
     glUseProgram(0);
 }
 
-void Bind(texture *Texture, int TextureUnit)
+void Bind(texture &Texture, int TextureUnit)
 {
     glActiveTexture(GL_TEXTURE0 + TextureUnit);
-    glBindTexture(Texture->Target, Texture->ID);
+    glBindTexture(Texture.Target, Texture.ID);
 }
 
-void Unbind(texture *Texture, int TextureUnit)
+void Unbind(texture &Texture, int TextureUnit)
 {
     glActiveTexture(GL_TEXTURE0 + TextureUnit);
-    glBindTexture(Texture->Target, 0);
+    glBindTexture(Texture.Target, 0);
 }
 
-void ApplyTextureParameters(texture *Texture, int TextureUnit)
+void ApplyTextureParameters(texture &Texture, int TextureUnit)
 {
-    if (!Texture->ID) {
-        glGenTextures(1, &Texture->ID);
+    if (!Texture.ID) {
+        glGenTextures(1, &Texture.ID);
     }
 
     Bind(Texture, TextureUnit);
-    glTexParameteri(Texture->Target, GL_TEXTURE_MIN_FILTER, Texture->Filters.Min);
-    glTexParameteri(Texture->Target, GL_TEXTURE_MAG_FILTER, Texture->Filters.Mag);
-    glTexParameteri(Texture->Target, GL_TEXTURE_WRAP_S, Texture->Wrap.WrapS);
-    glTexParameteri(Texture->Target, GL_TEXTURE_WRAP_T, Texture->Wrap.WrapT);
+    glTexParameteri(Texture.Target, GL_TEXTURE_MIN_FILTER, Texture.Filters.Min);
+    glTexParameteri(Texture.Target, GL_TEXTURE_MAG_FILTER, Texture.Filters.Mag);
+    glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_S, Texture.Wrap.WrapS);
+    glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_T, Texture.Wrap.WrapT);
 
-    if (Texture->Mipmap) {
-        glGenerateMipmap(Texture->Target);
+    if (Texture.Mipmap) {
+        glGenerateMipmap(Texture.Target);
     }
 
     Unbind(Texture, TextureUnit);
 }
 
-void UploadTexture(texture *Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data)
+void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data)
 {
-    glTexImage2D(Texture->Target, 0, SrcFormat, Texture->Width, Texture->Height, 0, DstFormat, Type, Data);
+    glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
 }
 
 #include <iostream>
 
-void MakeCameraOrthographic(camera *Camera, float Left, float Right, float Bottom, float Top, float Near, float Far)
+void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near, float Far)
 {
-    Camera->Type = Camera_orthographic;
-    Camera->Near = Near;
-    Camera->Far = Far;
-    Camera->Ortho = {Left, Right, Bottom, Top};
+    Camera.Type = Camera_orthographic;
+    Camera.Near = Near;
+    Camera.Far = Far;
+    Camera.Ortho = {Left, Right, Bottom, Top};
 }
 
-void MakeCameraPerspective(camera *Camera, float Width, float Height, float Fov, float Near, float Far)
+void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov, float Near, float Far)
 {
-    Camera->Type = Camera_perspective;
-    Camera->Near = Near;
-    Camera->Far = Far;
-    Camera->Perspective = {Width, Height, Fov};
+    Camera.Type = Camera_perspective;
+    Camera.Near = Near;
+    Camera.Far = Far;
+    Camera.Perspective = {Width, Height, Fov};
 }
 
-void UpdateProjectionView(camera *Camera)
+void UpdateProjectionView(camera &Camera)
 {
-    Camera->Up = vec3(0, 1, 0);
-    switch (Camera->Type) {
+    Camera.Updated = true;
+    Camera.Up = vec3(0, 1, 0);
+
+    switch (Camera.Type) {
     case Camera_orthographic: {
-        Camera->ProjectionView = glm::ortho(Camera->Ortho.Left,
-                                            Camera->Ortho.Right,
-                                            Camera->Ortho.Bottom,
-                                            Camera->Ortho.Top,
-                                            Camera->Near,
-                                            Camera->Far);
+        Camera.ProjectionView = glm::ortho(Camera.Ortho.Left,
+                                            Camera.Ortho.Right,
+                                            Camera.Ortho.Bottom,
+                                            Camera.Ortho.Top,
+                                            Camera.Near,
+                                            Camera.Far);
         break;
     }
 
     case Camera_perspective: {
-        auto Persp = &Camera->Perspective;
-        Camera->Projection = glm::perspective(Persp->Fov, (float)Persp->Width / (float)Persp->Height, Camera->Near, Camera->Far);
-        Camera->View = glm::lookAt(Camera->Position, Camera->LookAt, Camera->Up);
-        Camera->ProjectionView = Camera->Projection * Camera->View;
+        auto &Persp = Camera.Perspective;
+        Camera.Projection = glm::perspective(glm::radians(Persp.Fov), Persp.Width / Persp.Height, Camera.Near, Camera.Far);
+        Camera.View = glm::lookAt(Camera.Position, Camera.LookAt, Camera.Up);
+        Camera.ProjectionView = Camera.Projection * Camera.View;
         break;
     }
     }
 }
+
+// InitMeshBuffer initializes a vertex_buffer with the common attributes
+// used by all meshes in the game
+void InitMeshBuffer(vertex_buffer &Buffer)
+{
+    size_t Stride = 12*sizeof(float);
+    InitBuffer(Buffer, 12, 4,
+               (vertex_attribute){0, 3, GL_FLOAT, Stride, 0}, // position
+               (vertex_attribute){1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
+               (vertex_attribute){2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
+               (vertex_attribute){3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
+}
+
+static void CompileModelProgram(model_program &Program)
+{
+    CompileShaderProgram(Program.ShaderProgram, ModelVertexShader.c_str(), ModelFragmentShader.c_str());
+    Program.ProjectionView = glGetUniformLocation(Program.ShaderProgram.ID, "u_ProjectionView");
+    Program.Transform = glGetUniformLocation(Program.ShaderProgram.ID, "u_Transform");
+    Program.DiffuseColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_DiffuseColor");
+    Program.TexWeight = glGetUniformLocation(Program.ShaderProgram.ID, "u_TexWeight");
+    Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
+
+    Bind(Program.ShaderProgram);
+    SetUniform(Program.Sampler, 0);
+    UnbindShaderProgram();
+}
+
+static void BindCamera(model_program &Program, camera &Camera)
+{
+    SetUniform(Program.ProjectionView, Camera.ProjectionView);
+}
+
+void InitRenderState(render_state &RenderState)
+{
+    CompileModelProgram(RenderState.ModelProgram);
+}
+
+void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh)
+{
+    assert(RenderState.ModelProgram.ShaderProgram.ID);
+    assert(Camera.Updated);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glBindVertexArray(Mesh.Buffer.VAO);
+
+    auto &Program = RenderState.ModelProgram;
+    Bind(Program.ShaderProgram);
+    BindCamera(Program, Camera);
+
+    SetUniform(Program.Transform, mat4(1.0));
+    for (const auto &Part : Mesh.Parts) {
+        auto &Material = Part.Material;
+        if (Material.Texture) {
+            Bind(*Material.Texture, 0);
+        }
+
+        SetUniform(Program.DiffuseColor, Material.DiffuseColor);
+        SetUniform(Program.TexWeight, Material.TexWeight);
+        glDrawArrays(Part.PrimitiveType, Part.Offset, Part.Count);
+
+        if (Material.Texture) {
+            Unbind(*Material.Texture, 0);
+        }
+    }
+
+    glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
+}
+
+string ModelVertexShader = R"FOO(
+#version 330
+
+    layout (location = 0) in vec3  a_Position;
+    layout (location = 1) in vec2  a_Uv;
+    layout (location = 2) in vec4  a_Color;
+    layout (location = 3) in vec3  a_Normal;
+
+    uniform mat4 u_ProjectionView;
+    uniform mat4 u_Transform;
+    uniform mat4 u_NormalTransform;
+
+    smooth out vec2  v_Uv;
+    smooth out vec4  v_Color;
+
+    void main() {
+      vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
+      gl_Position = u_ProjectionView * WorldPos;
+
+      v_Uv = a_Uv;
+      v_Color = a_Color;// * clamp(lighting, 0, 1);
+    }
+)FOO";
+
+string ModelFragmentShader = R"FOO(
+#version 330
+
+    uniform sampler2D u_Sampler;
+    uniform vec4 u_DiffuseColor;
+    uniform float u_Emission;
+    uniform float u_TexWeight;
+
+    smooth in vec2  v_Uv;
+    smooth in vec4  v_Color;
+
+    out vec4 BlendUnitColor;
+
+    void main() {
+      vec4 TexColor = texture(u_Sampler, v_Uv);
+      vec4 Color = mix(v_Color, TexColor, u_TexWeight);
+      Color *= u_DiffuseColor;
+
+      //float fog = abs(v_worldPos.z - u_camPos.z);
+      //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
+      //fog = clamp(fog, 0.0, 1.0);
+
+      //float emitSpread = 1.0f;
+      //vec3 emit = (color * u_emission).rgb;
+
+      BlendUnitColor = Color;//mix(color, u_fogColor, 1.0 - fog);
+    }
+)FOO";

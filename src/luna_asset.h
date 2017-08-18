@@ -9,6 +9,6 @@ struct asset_cache
     unordered_map<string, texture *> Textures;
 };
 
-texture *LoadTextureFile(asset_cache *AssetCache, const string &Filename);
+texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename);
 
 #endif
