@@ -53,6 +53,17 @@ struct texture_rect
     float U2, V2;
 };
 
+struct animated_sprite
+{
+    vector<texture_rect> Frames;
+    vector<int> Indices;
+    float Interval = 0;
+    float Timer = 0;
+    int CurrentIndex = 0;
+    texture_rect *CurrentFrame;
+    texture *Texture;
+};
+
 struct projection_orthographic
 {
     float Left;

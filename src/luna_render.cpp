@@ -206,6 +206,56 @@ void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum 
     glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
 }
 
+vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height)
+{
+    vector<texture_rect> Result;
+    float tw = 1.0f / float(Texture.Width / Width);
+    float th = 1.0f / float(Texture.Height / Height);
+    for (int x = 0; x < Width; x++) {
+        for (int y = 0; y < Height; y++) {
+            float u = x * Width / (float)Texture.Width;
+            float v = y * Height / (float)Texture.Height;
+
+            texture_rect Rect;
+            Rect.U = u;
+            Rect.V = v;
+            Rect.U2 = u + tw;
+            Rect.V2 = v + th;
+            if (FlipV) {
+                Rect.V = v + th;
+                Rect.V2 = v;
+            }
+            Result.push_back(Rect);
+        }
+    }
+    return Result;
+}
+
+void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset = false)
+{
+    Sprite.Indices = Indices;
+    Sprite.Interval = Interval;
+    if (Reset) {
+        Sprite.CurrentIndex = 0;
+    }
+}
+
+void UpdateAnimation(animated_sprite &Sprite, float DeltaTime)
+{
+    Sprite.Timer += DeltaTime;
+    if (Sprite.Timer >= Sprite.Interval) {
+        Sprite.Timer = 0;
+
+        int NextIndex = Sprite.CurrentIndex + 1;
+        if (NextIndex >= (int)Sprite.Indices.size()) {
+            NextIndex = 0;
+        }
+        Sprite.CurrentIndex = NextIndex;
+    }
+
+    Sprite.CurrentFrame = &Sprite.Frames[Sprite.Indices[Sprite.CurrentIndex]];
+}
+
 #include <iostream>
 
 void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near, float Far)

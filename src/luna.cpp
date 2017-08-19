@@ -12,6 +12,8 @@
 
 static void RegisterInputActions(game_input &Input)
 {
+    Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
+    Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
     Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
     Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
 }

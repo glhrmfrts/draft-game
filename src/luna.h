@@ -7,6 +7,8 @@
 
 enum action_type
 {
+    Action_camHorizontal,
+    Action_camVertical,
     Action_horizontal,
     Action_vertical,
     Action_count,
