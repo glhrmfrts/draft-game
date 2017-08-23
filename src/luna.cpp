@@ -1,3 +1,10 @@
+/*
+  Current TODO:
+  - Render entity sprites
+  - Create a render command buffer
+  - Create some kind of alpha map where it follows the player, so we can see behind the walls
+ */
+
 #include <iostream>
 #include <cstdint>
 #include <cstdlib>
@@ -14,6 +21,7 @@ static void RegisterInputActions(game_input &Input)
 {
     Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
     Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
+    Input.Actions[Action_debugFreeCam] = {SDLK_SPACE, 0, 0, 0};
     Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
     Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
 }
@@ -131,13 +139,48 @@ int main(int argc, char **argv)
                 Input.MouseState.ScrollY = Wheel.y;
                 break;
             }
+
+            case SDL_MOUSEBUTTONDOWN: {
+                auto &Button = Event.button;
+                switch (Button.button) {
+                case SDL_BUTTON_LEFT:
+                    Input.MouseState.Buttons |= MouseButton_left;
+                    break;
+
+                case SDL_BUTTON_MIDDLE:
+                    Input.MouseState.Buttons |= MouseButton_middle;
+                    break;
+
+                case SDL_BUTTON_RIGHT:
+                    Input.MouseState.Buttons |= MouseButton_right;
+                    break;
+                }
+                break;
+            }
+
+            case SDL_MOUSEBUTTONUP: {
+                auto &Button = Event.button;
+                switch (Button.button) {
+                case SDL_BUTTON_LEFT:
+                    Input.MouseState.Buttons &= ~MouseButton_left;
+                    break;
+
+                case SDL_BUTTON_MIDDLE:
+                    Input.MouseState.Buttons &= ~MouseButton_middle;
+                    break;
+
+                case SDL_BUTTON_RIGHT:
+                    Input.MouseState.Buttons &= ~MouseButton_right;
+                    break;
+                }
+                break;
+            }
             }
         }
 
         switch (GameState.GameMode) {
         case GameMode_level:
-            UpdateLevel(GameState, GameState.LevelMode, DeltaTime);
-            RenderLevel(GameState, GameState.LevelMode);
+            UpdateAndRenderLevel(GameState, GameState.LevelMode, DeltaTime);
             break;
         }
 

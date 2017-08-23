@@ -206,7 +206,7 @@ void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum 
     glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
 }
 
-vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height)
+vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV)
 {
     vector<texture_rect> Result;
     float tw = 1.0f / float(Texture.Width / Width);
@@ -217,13 +217,13 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height)
             float v = y * Height / (float)Texture.Height;
 
             texture_rect Rect;
-            Rect.U = u;
-            Rect.V = v;
-            Rect.U2 = u + tw;
-            Rect.V2 = v + th;
+            Rect.u = u + tw*0.01f; // bleeding correction
+            Rect.v = v + th*0.01f;
+            Rect.u2 = u + tw + tw*0.01f;
+            Rect.v2 = v + th + th*0.01f;
             if (FlipV) {
-                Rect.V = v + th;
-                Rect.V2 = v;
+                Rect.v = v + th;
+                Rect.v2 = v;
             }
             Result.push_back(Rect);
         }
@@ -231,7 +231,7 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height)
     return Result;
 }
 
-void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset = false)
+void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset)
 {
     Sprite.Indices = Indices;
     Sprite.Interval = Interval;
@@ -255,8 +255,6 @@ void UpdateAnimation(animated_sprite &Sprite, float DeltaTime)
 
     Sprite.CurrentFrame = &Sprite.Frames[Sprite.Indices[Sprite.CurrentIndex]];
 }
-
-#include <iostream>
 
 void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near, float Far)
 {
@@ -317,6 +315,7 @@ static void CompileModelProgram(model_program &Program)
     CompileShaderProgram(Program.ShaderProgram, ModelVertexShader.c_str(), ModelFragmentShader.c_str());
     Program.ProjectionView = glGetUniformLocation(Program.ShaderProgram.ID, "u_ProjectionView");
     Program.Transform = glGetUniformLocation(Program.ShaderProgram.ID, "u_Transform");
+    Program.NormalTransform = glGetUniformLocation(Program.ShaderProgram.ID, "u_NormalTransform");
     Program.DiffuseColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_DiffuseColor");
     Program.TexWeight = glGetUniformLocation(Program.ShaderProgram.ID, "u_TexWeight");
     Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
@@ -334,9 +333,10 @@ static void BindCamera(model_program &Program, camera &Camera)
 void InitRenderState(render_state &RenderState)
 {
     CompileModelProgram(RenderState.ModelProgram);
+    InitMeshBuffer(RenderState.SpriteBuffer);
 }
 
-void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh)
+void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix)
 {
     assert(RenderState.ModelProgram.ShaderProgram.ID);
     assert(Camera.Updated);
@@ -349,10 +349,12 @@ void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh)
     Bind(Program.ShaderProgram);
     BindCamera(Program, Camera);
 
-    SetUniform(Program.Transform, mat4(1.0));
+    SetUniform(Program.Transform, TransformMatrix);
+    SetUniform(Program.NormalTransform, mat4(1.0f));
     for (const auto &Part : Mesh.Parts) {
         auto &Material = Part.Material;
         if (Material.Texture) {
+            //Println(Material.Texture->Filename);
             Bind(*Material.Texture, 0);
         }
 
@@ -369,8 +371,69 @@ void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh)
     glDisable(GL_DEPTH_TEST);
 }
 
+void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position)
+{
+    assert(Camera.Updated);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindVertexArray(RenderState.SpriteBuffer.VAO);
+
+    auto &Program = RenderState.ModelProgram;
+    Bind(*Sprite.Texture, 0);
+    Bind(Program.ShaderProgram);
+    BindCamera(Program, Camera);
+    SetUniform(Program.Transform, mat4(1.0));
+    SetUniform(Program.TexWeight, 1.0f);
+    SetUniform(Program.DiffuseColor, Color_white);
+
+    auto Frame = Sprite.CurrentFrame;
+    assert(Frame);
+
+    vec3 Scale = vec3(0.75f);
+    mat4 InverseViewMatrix = glm::inverse(Camera.View);
+    vec4 Right4 = InverseViewMatrix * vec4(1, 0, 0, 0);
+    vec4 Up4 = InverseViewMatrix * vec4(0, 1, 0, 0);
+    vec3 Right = vec3(Right4);
+    vec3 Up = vec3(Up4);
+
+    vec3 a = Position - ((Right + Up) * Scale);
+    vec3 b = Position + ((Right - Up) * Scale);
+    vec3 c = Position + ((Right + Up) * Scale);
+    vec3 d = Position - ((Right - Up) * Scale);
+
+    float u = Frame->u;
+    float v = Frame->v;
+    float u2 = Frame->u2;
+    float v2 = Frame->v2;
+    ResetBuffer(RenderState.SpriteBuffer);
+    PushVertex(RenderState.SpriteBuffer, {a.x, a.y, a.z, u, v2,  1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.SpriteBuffer, {b.x, b.y, b.z, u2, v2,  1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.SpriteBuffer, {d.x, d.y, d.z, u, v,  1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.SpriteBuffer, {b.x, b.y, b.z, u2, v2,  1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.SpriteBuffer, {c.x, c.y, c.z, u2, v,  1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.SpriteBuffer, {d.x, d.y, d.z, u, v,  1, 1, 1, 1, 0, 0, 0});
+    UploadVertices(RenderState.SpriteBuffer, GL_DYNAMIC_DRAW);
+
+    glDrawArrays(GL_TRIANGLES, 0, RenderState.SpriteBuffer.VertexCount);
+
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    Unbind(*Sprite.Texture, 0);
+    UnbindShaderProgram();
+}
+
 string ModelVertexShader = R"FOO(
 #version 330
+
+// In this game we use only one forward directional light
+// so these simple defines will do the job
+#define AmbientLight vec4(0.5f)
+#define LightColor vec4(1.0f)
+#define LightIntensity 1
 
     layout (location = 0) in vec3  a_Position;
     layout (location = 1) in vec2  a_Uv;
@@ -388,8 +451,14 @@ string ModelVertexShader = R"FOO(
       vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
       gl_Position = u_ProjectionView * WorldPos;
 
+      vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
+
+      vec4 Lighting = AmbientLight;
+      Lighting += LightColor * dot(-vec3(0, -1, 0), Normal) * LightIntensity;
+      Lighting.a = 1.0f;
+
       v_Uv = a_Uv;
-      v_Color = a_Color;// * clamp(lighting, 0, 1);
+      v_Color = a_Color * clamp(Lighting, 0, 1);
     }
 )FOO";
 
@@ -408,7 +477,8 @@ string ModelFragmentShader = R"FOO(
 
     void main() {
       vec4 TexColor = texture(u_Sampler, v_Uv);
-      vec4 Color = mix(v_Color, TexColor, u_TexWeight);
+      vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
+      Color *= v_Color;
       Color *= u_DiffuseColor;
 
       //float fog = abs(v_worldPos.z - u_camPos.z);

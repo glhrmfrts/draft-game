@@ -90,35 +90,35 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *
         GUI.CurrentDrawCommand = NextDrawCommand(GUI, PrimType, TexWeight, DiffuseColor, Texture);
     }
 
-    float X = Rect.X;
-    float Y = Rect.Y;
-    float W = Rect.Width;
-    float H = Rect.Height;
-    float U = TexRect.U;
-    float V = TexRect.V;
-    float U2 = TexRect.U2;
-    float V2 = TexRect.V2;
+    float x = Rect.X;
+    float y = Rect.Y;
+    float w = Rect.Width;
+    float h = Rect.Height;
+    float u = TexRect.u;
+    float v = TexRect.v;
+    float u2 = TexRect.u2;
+    float v2 = TexRect.v2;
     if (FlipV) {
-        V2 = V;
-        V = TexRect.V2;
+        v2 = v;
+        v = TexRect.v2;
     }
 
     color C = vColor;
     switch (PrimType) {
     case GL_LINE_LOOP:
-        PushVertex(GUI.Buffer, {X,   Y,   U, V,   C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X+W, Y,   U2, V,  C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X+W, Y+H, U2, V2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X,   Y+H, U,  V2, C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
         break;
 
     case GL_TRIANGLES:
-        PushVertex(GUI.Buffer, {X,   Y,   U, V,   C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X,   Y+H, U,  V2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X+W, Y,   U2, V,  C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X,   Y+H, U,  V2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X+W, Y+H, U2, V2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {X+W, Y,   U2, V,  C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
         break;
     }
 

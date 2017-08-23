@@ -6,11 +6,20 @@ import struct
 
 def convert_map(filename, data):
     filename = filename.split('.')[0]
-    layer = data['layers'][0]
+    bg = None
+    heightmap = None
+    for layer in data['layers']:
+        if layer['name'] == 'bg':
+            bg = layer
+        elif layer['name'] == 'heightmap':
+            heightmap = layer
+
     dest = open('build/data/levels/%s.ll' % filename, 'wb')
     dest.write(struct.pack('I', layer['width']))
     dest.write(struct.pack('I', layer['height']))
-    for t in layer['data']:
+    for t in bg['data']:
+        dest.write(struct.pack('B', t))
+    for t in heightmap['data']:
         dest.write(struct.pack('B', t))
     dest.close()
 

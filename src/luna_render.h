@@ -38,6 +38,7 @@ struct texture_wrap
 
 struct texture
 {
+    string Filename;
     GLuint ID;
     GLuint Target;
     uint32 Width;
@@ -49,8 +50,8 @@ struct texture
 
 struct texture_rect
 {
-    float U, V;
-    float U2, V2;
+    float u, v;
+    float u2, v2;
 };
 
 struct animated_sprite
@@ -108,9 +109,9 @@ struct camera
 struct material
 {
     color DiffuseColor = Color_white;
-    float Emission;
-    float TexWeight;
-    texture *Texture;
+    float Emission = 0;
+    float TexWeight = 0;
+    texture *Texture = NULL;
 };
 
 struct mesh_part
@@ -132,6 +133,7 @@ struct model_program
     shader_program ShaderProgram;
     int ProjectionView;
     int Transform;
+    int NormalTransform;
     int DiffuseColor;
     int TexWeight;
     int Sampler;
@@ -139,6 +141,7 @@ struct model_program
 
 struct render_state
 {
+    vertex_buffer SpriteBuffer;
     model_program ModelProgram;
 };
 
@@ -161,6 +164,10 @@ void Bind(texture &Texture, int TextureUnit);
 void Unbind(texture &Texture, int TextureUnit);
 void ApplyTextureParameters(texture &Texture, int TextureUnit);
 void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data);
+vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV = false);
+
+void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset = false);
+void UpdateAnimation(animated_sprite &Sprite, float DeltaTime);
 
 void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near = -1, float Far = 1);
 void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov, float Near, float Far);
@@ -169,6 +176,7 @@ void UpdateProjectionView(camera &Camera);
 void InitMeshBuffer(vertex_buffer &Buffer);
 
 void InitRenderState(render_state &RenderState);
-void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh);
+void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix);
+void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position);
 
 #endif

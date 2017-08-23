@@ -10,6 +10,7 @@ texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename)
     texture *Result;
     if (AssetCache.Textures.find(Filename) == AssetCache.Textures.end()) {
         Result = new texture;
+        Result->Filename = Filename;
         Result->Target = GL_TEXTURE_2D;
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Result->Wrap = {DefaultTextureWrap, DefaultTextureWrap};

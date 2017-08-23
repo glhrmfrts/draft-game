@@ -40,4 +40,12 @@ struct rect
     float Width, Height;
 };
 
+#ifdef LUNA_DEBUG
+template<typename T>
+inline static void Println(T Arg)
+{
+    std::cout << Arg << std::endl;
+}
+#endif
+
 #endif
