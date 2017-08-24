@@ -334,6 +334,11 @@ void InitRenderState(render_state &RenderState)
 {
     CompileModelProgram(RenderState.ModelProgram);
     InitMeshBuffer(RenderState.SpriteBuffer);
+
+#ifdef LUNA_DEBUG
+    InitMeshBuffer(RenderState.DebugBuffer);
+    glLineWidth(2);
+#endif
 }
 
 void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix)
@@ -392,13 +397,14 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     auto Frame = Sprite.CurrentFrame;
     assert(Frame);
 
-    vec3 Scale = vec3(0.75f);
+    vec3 Scale = Sprite.Scale;
     mat4 InverseViewMatrix = glm::inverse(Camera.View);
     vec4 Right4 = InverseViewMatrix * vec4(1, 0, 0, 0);
     vec4 Up4 = InverseViewMatrix * vec4(0, 1, 0, 0);
     vec3 Right = vec3(Right4);
     vec3 Up = vec3(Up4);
 
+    Position += Sprite.Offset;
     vec3 a = Position - ((Right + Up) * Scale);
     vec3 b = Position + ((Right - Up) * Scale);
     vec3 c = Position + ((Right + Up) * Scale);
@@ -425,6 +431,71 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     Unbind(*Sprite.Texture, 0);
     UnbindShaderProgram();
 }
+
+#ifdef LUNA_DEBUG
+#include "luna_level_mode.h"
+void DebugRenderAABB(render_state &RenderState, camera &Camera, shape_aabb *Shape, bool Colliding)
+{
+    assert(Camera.Updated);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glBindVertexArray(RenderState.DebugBuffer.VAO);
+
+    auto &Program = RenderState.ModelProgram;
+    Bind(Program.ShaderProgram);
+    BindCamera(Program, Camera);
+    SetUniform(Program.Transform, mat4(1.0));
+    SetUniform(Program.TexWeight, 0.0f);
+
+    color DiffuseColor = Color_green;
+    if (Colliding)
+    {
+        DiffuseColor = Color_red;
+    }
+    SetUniform(Program.DiffuseColor, DiffuseColor);
+
+    vec3 a = Shape->Position - Shape->Half;
+    vec3 b = Shape->Position + Shape->Half;
+    ResetBuffer(RenderState.DebugBuffer);
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+
+    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+
+    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
+    UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
+
+    glDrawArrays(GL_LINES, 0, RenderState.DebugBuffer.VertexCount);
+
+    UnbindShaderProgram();
+    glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
+}
+#endif
 
 string ModelVertexShader = R"FOO(
 #version 330

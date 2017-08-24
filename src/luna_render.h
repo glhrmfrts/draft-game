@@ -56,6 +56,8 @@ struct texture_rect
 
 struct animated_sprite
 {
+    vec3 Scale = vec3(1.0f);
+    vec3 Offset = vec3(0.0f);
     vector<texture_rect> Frames;
     vector<int> Indices;
     float Interval = 0;
@@ -141,6 +143,9 @@ struct model_program
 
 struct render_state
 {
+#ifdef LUNA_DEBUG
+    vertex_buffer DebugBuffer;
+#endif
     vertex_buffer SpriteBuffer;
     model_program ModelProgram;
 };
@@ -178,5 +183,10 @@ void InitMeshBuffer(vertex_buffer &Buffer);
 void InitRenderState(render_state &RenderState);
 void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix);
 void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position);
+
+#ifdef LUNA_DEBUG
+struct shape_aabb;
+void DebugRenderAABB(render_state &RenderState, camera &Cam, shape_aabb *Shape, bool Colliding);
+#endif
 
 #endif

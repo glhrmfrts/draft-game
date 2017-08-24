@@ -32,6 +32,8 @@ using std::unordered_map;
 
 #define Color_white color(1, 1, 1, 1)
 #define Color_blue  color(0, 0, 0.5, 1)
+#define Color_green  color(0, 1, 0, 1)
+#define Color_red  color(1, 0, 0, 1)
 #define Color_gray  color(0.5, 0.5, 0.5, 1)
 
 struct rect
@@ -41,8 +43,22 @@ struct rect
 };
 
 #ifdef LUNA_DEBUG
+#include <sstream>
+
+inline static string
+ToString(vec3 v3)
+{
+    std::ostringstream stream;
+    stream << "[";
+    stream << v3.x << "," << v3.y << "," << v3.z;
+    stream << "]";
+
+    return stream.str();
+}
+
 template<typename T>
-inline static void Println(T Arg)
+inline static void
+Println(T Arg)
 {
     std::cout << Arg << std::endl;
 }

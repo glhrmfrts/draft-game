@@ -1,22 +1,58 @@
 #ifndef LUNA_LEVEL_MODE_H
 #define LUNA_LEVEL_MODE_H
 
-#include "luna_collision.h"
 #include "luna_render.h"
 
 #define EntityFlag_kinematic 0x1
+
+enum shape_type
+{
+    Shape_aabb,
+};
+
+struct shape_aabb
+{
+    vec3 Half;
+    vec3 Position;
+};
+
+struct shape
+{
+    shape_type Type;
+
+    shape() {}
+
+    union
+    {
+        shape_aabb AABB;
+    };
+};
 
 struct entity
 {
     vec3 Position;
     vec3 Velocity;
-    vec3 Scale = vec3(1.0f);
+    vec3 Size = vec3(1.0f);
+
+    vec3 MovementVelocity;
+    vec3 MovementDest;
+    float MovementSpeed;
+    bool IsMoving = false;
+
     uint32 Flags = 0;
     int NumCollisions = 0;
 
     shape *Shape = NULL;
     animated_sprite *Sprite = NULL;
     mesh *Mesh = NULL;
+};
+
+struct collision
+{
+    vec3 Normal;
+    float Depth;
+    entity *First;
+    entity *Second;
 };
 
 struct level_mode
@@ -29,6 +65,7 @@ struct level_mode
     vector<entity *> MeshEntities;
     vector<entity *> SpriteEntities;
     vector<entity *> ShapedEntities;
+    vector<collision> Collisions;
     entity *PlayerEntity;
     int CurrentLevel = 0;
     uint32 Width;
