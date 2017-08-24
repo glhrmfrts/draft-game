@@ -36,6 +36,12 @@ using std::unordered_map;
 #define Color_red  color(1, 0, 0, 1)
 #define Color_gray  color(0.5, 0.5, 0.5, 1)
 
+enum direction
+{
+    Direction_right,
+    Direction_left,
+};
+
 struct rect
 {
     float X, Y;

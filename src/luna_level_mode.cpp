@@ -3,11 +3,10 @@
 
 #define FloorTile 1
 #define WallTile 2
-#define WallHeight 10.0f
-#define TileSize 4.0f
-#define TileHeight 1.0f
-#define CameraOffsetY 10.0f
-#define CameraOffsetZ 12.0f
+#define WallHeight 2.5f
+#define TileHeight 0.25f
+#define CameraOffsetY 4.0f
+#define CameraOffsetZ 5.0f
 
 #define TileAt(Data, Width, Length, x, z) (Data[(Length - z - 1) * Width + (x)])
 #define HeightAt(Data, Width, Length, x, z) (TileAt(Data,Width,Length,x,z) - 13*16)
@@ -82,13 +81,15 @@ CreatePlayerEntity(game_state &GameState)
     Result->Size.x = 0.5f;
     Result->Size.z = 0.5f;
     Result->MovementSpeed = 3;
+    Result->IdleAnimation = {{0, 1}, 0.8f};
+    Result->WalkAnimation = {{16, 17, 18, 19, 20, 21, 22, 23}, 0.1f};
 
     Result->Sprite = new animated_sprite;
     Result->Sprite->Scale = vec3(0.75f);
     Result->Sprite->Offset.y = 0.25f;
     Result->Sprite->Texture = LoadTextureFile(GameState.AssetCache, "data/textures/player.png");
     Result->Sprite->Frames  = SplitTexture(*Result->Sprite->Texture, 16, 16);
-    SetAnimationFrames(*Result->Sprite, {0, 16}, 0.8f);
+    SetAnimation(*Result->Sprite, Result->IdleAnimation);
 
     Result->Shape = CreateShape(Shape_aabb);
     return Result;
@@ -151,7 +152,7 @@ void StartLevel(game_state &GameState, level_mode &Mode)
     Mode.HeightMap = HeightMap;
 
     Mode.PlayerEntity = CreatePlayerEntity(GameState);
-    Mode.PlayerEntity->Position = vec3(31, 5, -5) * TileSize;
+    Mode.PlayerEntity->Position = vec3(31, 5, -5);
 
     Mode.Gravity = vec3(0, -9.87f, 0);
     AddEntity(Mode, Mode.PlayerEntity);
@@ -170,8 +171,7 @@ void StartLevel(game_state &GameState, level_mode &Mode)
             if (Tile == FloorTile)
             {
                 auto Entity = new entity;
-                Entity->Position = vec3(fx, fy*TileHeight/TileSize, -fz) * TileSize;
-                Entity->Size = vec3(TileSize, TileHeight, TileSize);
+                Entity->Position = vec3(fx, fy*TileHeight, -fz);
                 Entity->Mesh = &Mode.FloorMesh;
                 Entity->Shape = CreateShape(Shape_aabb);
                 Entity->Flags |= EntityFlag_kinematic;
@@ -180,9 +180,9 @@ void StartLevel(game_state &GameState, level_mode &Mode)
             else if (Tile == WallTile)
             {
                 auto Entity = new entity;
-                Entity->Position = vec3(fx, fy*(float)TileHeight/(float)TileSize, -fz) * TileSize;
+                Entity->Position = vec3(fx, fy*TileHeight + 0.75f, -fz);
                 Entity->Mesh = &Mode.WallMesh;
-                Entity->Size = vec3(TileSize, WallHeight, TileSize);
+                Entity->Size.y = WallHeight;
                 Entity->Shape = CreateShape(Shape_aabb);
                 Entity->Flags |= EntityFlag_kinematic;
                 AddEntity(Mode, Entity);
@@ -216,44 +216,6 @@ UpdateEntityAABB(entity *Entity)
     // TODO: this is not good
     Entity->Shape->AABB.Half = Entity->Size*0.5f;
     Entity->Shape->AABB.Position = Entity->Position;
-}
-
-#define ClimbHeight 0.02f
-static bool
-IsColliding(shape_aabb &First, shape_aabb &Second, collision &Result)
-{
-    vec3 Dif = Second.Position - First.Position;
-
-    float dx = First.Half.x + Second.Half.x - std::abs(Dif.x);
-    if (dx <= 0)
-    {
-        return false;
-    }
-
-    float dy = First.Half.y + Second.Half.y - std::abs(Dif.y);
-    if (dy <= 0)
-    {
-        return false;
-    }
-
-    float dz = First.Half.z + Second.Half.z - std::abs(Dif.z);
-    if (dz <= 0)
-    {
-        return false;
-    }
-
-    Result.Normal = vec3(0.0f);
-    if (dx < dy && dy > TileHeight+ClimbHeight)
-    {
-        Result.Normal.x = std::copysign(1, Dif.x);
-        Result.Depth = dx;
-    }
-    else
-    {
-        Result.Normal.y = std::copysign(1, Dif.y);
-        Result.Depth = dy;
-    }
-    return true;
 }
 
 static bool
@@ -294,6 +256,53 @@ Square(float v)
     return v * v;
 }
 
+inline static void
+StopMovement(entity *Entity)
+{
+    Entity->Position.x = Entity->MovementDest.x;
+    Entity->Position.z = Entity->MovementDest.z;
+    Entity->IsMoving = false;
+    Entity->Velocity = vec3(0.0f);
+    SetAnimation(*Entity->Sprite, Entity->IdleAnimation, true);
+}
+
+static void
+SetMovementDest(level_mode &Mode, entity *Entity, vec3 BasePosition, float MoveH, float MoveV)
+{
+    direction Dir = Entity->Sprite->Direction;
+    if (MoveH < 0)
+    {
+        Dir = Direction_left;
+    }
+    else if (MoveH > 0)
+    {
+        Dir = Direction_right;
+    }
+    Entity->Sprite->Direction = Dir;
+
+    bool MoveAny = (std::abs(MoveH) + std::abs(MoveV)) == 1;
+    if (MoveAny)
+    {
+        int DestTileX   = (int)(BasePosition.x+0.5f + MoveH);
+        int DestTileZ   = (int)(BasePosition.z-0.5f - MoveV);
+        DestTileZ = -DestTileZ;
+
+        uint8 Tile = TileAt(Mode.TileData, Mode.Width, Mode.Length, DestTileX, DestTileZ);
+        if (Tile != WallTile)
+        {
+            Entity->IsMoving = true;
+            Entity->MovementVelocity = vec3(MoveH * Entity->MovementSpeed, Entity->Velocity.y, -MoveV * Entity->MovementSpeed);
+            Entity->MovementDest = vec3(int(BasePosition.x+0.5f + MoveH), 0,
+                                        int(BasePosition.z-0.5f - MoveV));
+            SetAnimation(*Entity->Sprite, Entity->WalkAnimation, false);
+        }
+        else
+        {
+            StopMovement(Entity);
+        }
+    }
+}
+
 #ifdef LUNA_DEBUG
 static bool DebugFreeCamEnabled = true;
 static float Pitch;
@@ -301,6 +310,7 @@ static float Yaw;
 #endif
 
 #define PlayerSpeed 5.0f
+#define ClimbHeight 0.02f
 void UpdateAndRenderLevel(game_state &GameState, level_mode &Mode, float DeltaTime)
 {
     auto &Input = GameState.Input;
@@ -346,14 +356,21 @@ void UpdateAndRenderLevel(game_state &GameState, level_mode &Mode, float DeltaTi
     {
         float MoveH = GetAxisValue(GameState.Input, Action_horizontal);
         float MoveV = GetAxisValue(GameState.Input, Action_vertical);
-        auto Entity = Mode.PlayerEntity;
+        bool MoveAny = (std::abs(MoveH) + std::abs(MoveV)) == 1;
+        entity *Entity = Mode.PlayerEntity;
 
         if (Entity->IsMoving)
         {
-            if (Length2DSq(Entity->Position - Entity->MovementDest) < Square(0.1f))
+            if (Length2DSq(Entity->Position - Entity->MovementDest) < Square(0.2f))
             {
-                Entity->IsMoving = false;
-                Entity->Velocity = vec3(0.0f);
+                if (!MoveAny)
+                {
+                    StopMovement(Entity);
+                }
+                else
+                {
+                    SetMovementDest(Mode, Entity, Entity->MovementDest, MoveH, MoveV);
+                }
             }
             else
             {
@@ -363,20 +380,7 @@ void UpdateAndRenderLevel(game_state &GameState, level_mode &Mode, float DeltaTi
         }
         else
         {
-            if (std::abs(MoveH) > 0 || std::abs(MoveV) > 0)
-            {
-                int DestTileX   = (int)(Entity->Position.x + MoveH) / TileSize;
-                int DestTileZ   = (int)(Entity->Position.z - MoveV) / TileSize;
-                DestTileZ = -DestTileZ;
-
-                uint8 Tile = TileAt(Mode.TileData, Mode.Width, Mode.Length, DestTileX, DestTileZ);
-                if (Tile != WallTile)
-                {
-                    Entity->IsMoving = true;
-                    Entity->MovementVelocity = vec3(MoveH, Entity->Velocity.y, -MoveV) * Entity->MovementSpeed;
-                    Entity->MovementDest = Entity->Position + vec3(MoveH, 0, -MoveV);
-                }
-            }
+            SetMovementDest(Mode, Entity, Entity->Position, MoveH, MoveV);
         }
     }
 
@@ -393,24 +397,60 @@ void UpdateAndRenderLevel(game_state &GameState, level_mode &Mode, float DeltaTi
             auto EntityB = Mode.ShapedEntities[j];
             UpdateEntityAABB(EntityB);
 
-            collision Col;
-            if (IsColliding(EntityA->Shape->AABB, EntityB->Shape->AABB, Col))
+            shape_aabb &First = EntityA->Shape->AABB;
+            shape_aabb &Second = EntityB->Shape->AABB;
+            vec3 Dif = Second.Position - First.Position;
+            float dx = First.Half.x + Second.Half.x - std::abs(Dif.x);
+            if (dx <= 0)
             {
-                size_t Size = Mode.Collisions.size();
-                if (FrameCollisionCount + 1 > Size)
-                {
-                    if (Size == 0)
-                    {
-                        Size = 4;
-                    }
+                continue;
+            }
 
-                    Mode.Collisions.resize(Size * 2);
+            float dy = First.Half.y + Second.Half.y - std::abs(Dif.y);
+            if (dy <= 0)
+            {
+                continue;
+            }
+
+            float dz = First.Half.z + Second.Half.z - std::abs(Dif.z);
+            if (dz <= 0)
+            {
+                continue;
+            }
+
+            // At this point we have a collision
+            collision Col;
+            Col.Normal = vec3(0.0f);
+            if (dx < dy && dy > TileHeight+ClimbHeight)
+            {
+                Col.Normal.x = std::copysign(1, Dif.x);
+                Col.Depth = dx;
+            }
+            else if (dz < dy && dy > TileHeight+ClimbHeight)
+            {
+                Col.Normal.z = std::copysign(1, Dif.z);
+                Col.Depth = dz;
+            }
+            else
+            {
+                Col.Normal.y = std::copysign(1, Dif.y);
+                Col.Depth = dy;
+            }
+
+            size_t Size = Mode.Collisions.size();
+            if (FrameCollisionCount + 1 > Size)
+            {
+                if (Size == 0)
+                {
+                    Size = 4;
                 }
 
-                Col.First = EntityA;
-                Col.Second = EntityB;
-                Mode.Collisions[FrameCollisionCount++] = Col;
+                Mode.Collisions.resize(Size * 2);
             }
+
+            Col.First = EntityA;
+            Col.Second = EntityB;
+            Mode.Collisions[FrameCollisionCount++] = Col;
         }
     }
 

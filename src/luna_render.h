@@ -60,11 +60,18 @@ struct animated_sprite
     vec3 Offset = vec3(0.0f);
     vector<texture_rect> Frames;
     vector<int> Indices;
+    direction Direction = Direction_right;
     float Interval = 0;
     float Timer = 0;
     int CurrentIndex = 0;
     texture_rect *CurrentFrame;
     texture *Texture;
+};
+
+struct sprite_animation
+{
+    vector<int> Frames;
+    float Interval;
 };
 
 struct projection_orthographic
@@ -171,7 +178,7 @@ void ApplyTextureParameters(texture &Texture, int TextureUnit);
 void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data);
 vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV = false);
 
-void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset = false);
+void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset = false);
 void UpdateAnimation(animated_sprite &Sprite, float DeltaTime);
 
 void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near = -1, float Far = 1);

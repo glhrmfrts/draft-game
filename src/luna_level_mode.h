@@ -34,6 +34,9 @@ struct entity
     vec3 Velocity;
     vec3 Size = vec3(1.0f);
 
+    sprite_animation IdleAnimation;
+    sprite_animation WalkAnimation;
+
     vec3 MovementVelocity;
     vec3 MovementDest;
     float MovementSpeed;

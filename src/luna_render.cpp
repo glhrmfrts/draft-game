@@ -184,7 +184,8 @@ void Unbind(texture &Texture, int TextureUnit)
 
 void ApplyTextureParameters(texture &Texture, int TextureUnit)
 {
-    if (!Texture.ID) {
+    if (!Texture.ID)
+    {
         glGenTextures(1, &Texture.ID);
     }
 
@@ -194,7 +195,8 @@ void ApplyTextureParameters(texture &Texture, int TextureUnit)
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_S, Texture.Wrap.WrapS);
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_T, Texture.Wrap.WrapT);
 
-    if (Texture.Mipmap) {
+    if (Texture.Mipmap)
+    {
         glGenerateMipmap(Texture.Target);
     }
 
@@ -211,8 +213,10 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool 
     vector<texture_rect> Result;
     float tw = 1.0f / float(Texture.Width / Width);
     float th = 1.0f / float(Texture.Height / Height);
-    for (int x = 0; x < Width; x++) {
-        for (int y = 0; y < Height; y++) {
+    for (int y = 0; y < Height; y++)
+    {
+        for (int x = 0; x < Width; x++)
+        {
             float u = x * Width / (float)Texture.Width;
             float v = y * Height / (float)Texture.Height;
 
@@ -221,7 +225,8 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool 
             Rect.v = v + th*0.01f;
             Rect.u2 = u + tw + tw*0.01f;
             Rect.v2 = v + th + th*0.01f;
-            if (FlipV) {
+            if (FlipV)
+            {
                 Rect.v = v + th;
                 Rect.v2 = v;
             }
@@ -231,11 +236,12 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool 
     return Result;
 }
 
-void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, float Interval, bool Reset)
+void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset)
 {
-    Sprite.Indices = Indices;
-    Sprite.Interval = Interval;
-    if (Reset) {
+    Sprite.Indices = Animation.Frames;
+    Sprite.Interval = Animation.Interval;
+    if (Reset)
+    {
         Sprite.CurrentIndex = 0;
     }
 }
@@ -243,11 +249,13 @@ void SetAnimationFrames(animated_sprite &Sprite, const vector<int> &Indices, flo
 void UpdateAnimation(animated_sprite &Sprite, float DeltaTime)
 {
     Sprite.Timer += DeltaTime;
-    if (Sprite.Timer >= Sprite.Interval) {
+    if (Sprite.Timer >= Sprite.Interval)
+    {
         Sprite.Timer = 0;
 
         int NextIndex = Sprite.CurrentIndex + 1;
-        if (NextIndex >= (int)Sprite.Indices.size()) {
+        if (NextIndex >= (int)Sprite.Indices.size())
+        {
             NextIndex = 0;
         }
         Sprite.CurrentIndex = NextIndex;
@@ -414,6 +422,11 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     float v = Frame->v;
     float u2 = Frame->u2;
     float v2 = Frame->v2;
+    if (Sprite.Direction == Direction_left)
+    {
+        u = u2;
+        u2 = Frame->u;
+    }
     ResetBuffer(RenderState.SpriteBuffer);
     PushVertex(RenderState.SpriteBuffer, {a.x, a.y, a.z, u, v2,  1, 1, 1, 1, 0, 0, 0});
     PushVertex(RenderState.SpriteBuffer, {b.x, b.y, b.z, u2, v2,  1, 1, 1, 1, 0, 0, 0});
