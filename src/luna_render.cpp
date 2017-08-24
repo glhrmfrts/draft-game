@@ -446,7 +446,6 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
 }
 
 #ifdef LUNA_DEBUG
-#include "luna_level_mode.h"
 void DebugRenderAABB(render_state &RenderState, camera &Camera, shape_aabb *Shape, bool Colliding)
 {
     assert(Camera.Updated);

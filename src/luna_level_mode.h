@@ -5,29 +5,6 @@
 
 #define EntityFlag_kinematic 0x1
 
-enum shape_type
-{
-    Shape_aabb,
-};
-
-struct shape_aabb
-{
-    vec3 Half;
-    vec3 Position;
-};
-
-struct shape
-{
-    shape_type Type;
-
-    shape() {}
-
-    union
-    {
-        shape_aabb AABB;
-    };
-};
-
 struct entity
 {
     vec3 Position;

@@ -48,6 +48,29 @@ struct rect
     float Width, Height;
 };
 
+enum shape_type
+{
+    Shape_aabb,
+};
+
+struct shape_aabb
+{
+    vec3 Half;
+    vec3 Position;
+};
+
+struct shape
+{
+    shape_type Type;
+
+    shape() {}
+
+    union
+    {
+        shape_aabb AABB;
+    };
+};
+
 #ifdef LUNA_DEBUG
 #include <sstream>
 

@@ -192,7 +192,6 @@ void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat
 void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position);
 
 #ifdef LUNA_DEBUG
-struct shape_aabb;
 void DebugRenderAABB(render_state &RenderState, camera &Cam, shape_aabb *Shape, bool Colliding);
 #endif
 
