@@ -160,12 +160,12 @@ void StartLevel(game_state &GameState, level_mode &Mode)
         auto &SkyboxMesh = Mode.SkyboxMesh;
         InitMeshBuffer(SkyboxMesh.Buffer);
 
-        texture *FrontTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/zpos.png");
-        texture *RightTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/xpos.png");
-        texture *BackTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/zneg.png");
-        texture *LeftTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/xneg.png");
-        texture *TopTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/ypos.png");
-        texture *BottomTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/interstellar/yneg.png");
+        texture *FrontTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_ft.png");
+        texture *RightTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_rt.png");
+        texture *BackTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_bk.png");
+        texture *LeftTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_lf.png");
+        texture *TopTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_up.png");
+        texture *BottomTexture = LoadTextureFile(GameState.AssetCache, "data/skyboxes/kurt/space_dn.png");
         AddSkyboxFace(SkyboxMesh, vec3(-1, 1, -1), vec3(1, 1, -1), vec3(1, 1, 1), vec3(-1, 1, 1), FrontTexture, 0);
         AddSkyboxFace(SkyboxMesh, vec3(1, 1, -1), vec3(1, -1, -1), vec3(1, -1, 1), vec3(1, 1, 1), RightTexture, 1);
         AddSkyboxFace(SkyboxMesh, vec3(1, -1, -1), vec3(-1, -1, -1), vec3(-1, -1, 1), vec3(1, -1, 1), BackTexture, 2);
