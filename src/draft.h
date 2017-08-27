@@ -1,9 +1,9 @@
-#ifndef LUNA_LUNA_H
-#define LUNA_LUNA_H
+#ifndef DRAFT_DRAFT_H
+#define DRAFT_DRAFT_H
 
-#include "luna_asset.h"
-#include "luna_gui.h"
-#include "luna_level_mode.h"
+#include "asset.h"
+#include "gui.h"
+#include "level.h"
 
 enum action_type
 {

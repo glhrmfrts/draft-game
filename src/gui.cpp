@@ -1,8 +1,42 @@
-#include "luna.h"
-#include "luna_gui.h"
+#include "draft.h"
+#include "gui.h"
 
-extern string GUIVertexShader;
-extern string GUIFragmentShader;
+static string GUIVertexShader = R"FOO(
+#version 330
+
+layout (location = 0) in vec2  a_Position;
+layout (location = 1) in vec2  a_Uv;
+layout (location = 2) in vec4  a_Color;
+
+uniform mat4 u_ProjectionView;
+
+smooth out vec2 v_Uv;
+smooth out vec4 v_Color;
+
+void main() {
+    gl_Position = u_ProjectionView * vec4(a_Position, 0.0, 1.0);
+    v_Uv = a_Uv;
+    v_Color = a_Color;
+}
+)FOO";
+
+static string GUIFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2D u_Sampler;
+uniform float u_TexWeight;
+uniform vec4 u_DiffuseColor;
+
+smooth in vec2 v_Uv;
+smooth in vec4 v_Color;
+
+out vec4 BlendUnitColor;
+
+void main() {
+    vec4 TexColor = texture(u_Sampler, v_Uv);
+    BlendUnitColor = mix(v_Color, TexColor, u_TexWeight) * u_DiffuseColor;
+}
+)FOO";
 
 static uint32 CheckElementState(game_input &Input, rect Rect)
 {
@@ -84,8 +118,8 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *
         Curr.TexWeight != TexWeight ||
         Curr.PrimitiveType != PrimType ||
         Curr.DiffuseColor != DiffuseColor ||
-        GUI.Buffer.VertexCount == 0) {
-
+        GUI.Buffer.VertexCount == 0)
+    {
         PushDrawCommand(GUI);
         GUI.CurrentDrawCommand = NextDrawCommand(GUI, PrimType, TexWeight, DiffuseColor, Texture);
     }
@@ -98,13 +132,15 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *
     float v = TexRect.v;
     float u2 = TexRect.u2;
     float v2 = TexRect.v2;
-    if (FlipV) {
+    if (FlipV)
+    {
         v2 = v;
         v = TexRect.v2;
     }
 
     color C = vColor;
-    switch (PrimType) {
+    switch (PrimType)
+    {
     case GL_LINE_LOOP:
         PushVertex(GUI.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
         PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
@@ -122,7 +158,8 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *
         break;
     }
 
-    if (CheckState) {
+    if (CheckState)
+    {
         return CheckElementState(*GUI.Input, Rect);
     }
     return GUIElementState_none;
@@ -146,7 +183,8 @@ uint32 PushText(gui &GUI, font &Font, const string &Text, rect R, color C, bool 
 
     R.Width = Size.x;
     R.Height = Size.y;
-    if (CheckState) {
+    if (CheckState)
+    {
         return CheckElementState(*GUI.Input, R);
     }
     return GUIElementState_none;
@@ -160,16 +198,17 @@ void End(gui &GUI)
 
     glBindVertexArray(GUI.Buffer.VAO);
 
-    for (const auto &Cmd : GUI.DrawCommandList) {
-        if (Cmd.Texture) {
+    for (const auto &Cmd : GUI.DrawCommandList)
+    {
+        if (Cmd.Texture)
+        {
             Bind(*Cmd.Texture, 0);
         }
-
         SetUniform(GUI.TexWeight, Cmd.TexWeight);
         SetUniform(GUI.DiffuseColor, Cmd.DiffuseColor);
         glDrawArrays(Cmd.PrimitiveType, Cmd.Offset, Cmd.Count);
-
-        if (Cmd.Texture) {
+        if (Cmd.Texture)
+        {
             Unbind(*Cmd.Texture, 0);
         }
     }
@@ -178,40 +217,3 @@ void End(gui &GUI)
     UnbindShaderProgram();
     glDisable(GL_BLEND);
 }
-
-string GUIVertexShader = R"FOO(
-#version 330
-
-layout (location = 0) in vec2  a_Position;
-layout (location = 1) in vec2  a_Uv;
-layout (location = 2) in vec4  a_Color;
-
-uniform mat4 u_ProjectionView;
-
-smooth out vec2 v_Uv;
-smooth out vec4 v_Color;
-
-void main() {
-    gl_Position = u_ProjectionView * vec4(a_Position, 0.0, 1.0);
-    v_Uv = a_Uv;
-    v_Color = a_Color;
-}
-)FOO";
-
-string GUIFragmentShader = R"FOO(
-#version 330
-
-uniform sampler2D u_Sampler;
-uniform float u_TexWeight;
-uniform vec4 u_DiffuseColor;
-
-smooth in vec2 v_Uv;
-smooth in vec4 v_Color;
-
-out vec4 BlendUnitColor;
-
-void main() {
-    vec4 TexColor = texture(u_Sampler, v_Uv);
-    BlendUnitColor = mix(v_Color, TexColor, u_TexWeight) * u_DiffuseColor;
-}
-)FOO";

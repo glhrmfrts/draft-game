@@ -1,6 +1,8 @@
 /*
   Current TODO:
-  - Render entity sprites
+  - Create other types of movable entities
+  - Try to use region-based (arenas) memory allocators
+  - Maybe move everything back to pointer-based again, for consistency
   - Create a render command buffer
   - Create some kind of alpha map where it follows the player, so we can see behind the walls
  */
@@ -12,8 +14,7 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <AL/alc.h>
-#include "luna.h"
-#include "luna_level_mode.h"
+#include "draft.h"
 
 #undef main
 
@@ -28,7 +29,8 @@ static void RegisterInputActions(game_input &Input)
 
 int main(int argc, char **argv)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    {
         std::cout << "Failed to init display SDL" << std::endl;
     }
 
@@ -79,7 +81,8 @@ int main(int argc, char **argv)
     clock_t PreviousTime = clock();
     float DeltaTime = 0.016f;
     float DeltaTimeMS = DeltaTime * 1000;
-    while (GameState.Running) {
+    while (GameState.Running)
+    {
         clock_t CurrentTime = clock();
         float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC * 1000);
 
@@ -195,6 +198,9 @@ int main(int argc, char **argv)
         SDL_GL_SwapWindow(Window);
         PreviousTime = CurrentTime;
     }
+
+    FreeArena(GameState.LevelMode.Arena);
+    FreeArena(GameState.AssetCache.Arena);
 
     alcMakeContextCurrent(NULL);
     alcDestroyContext(AudioContext);

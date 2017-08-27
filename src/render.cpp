@@ -1,8 +1,71 @@
-#include "luna_render.h"
+#include "render.h"
 
-// forward declarations of shaders
-extern string ModelVertexShader;
-extern string ModelFragmentShader;
+static string ModelVertexShader = R"FOO(
+#version 330
+
+// In this game we use only one forward directional light
+// so these simple defines will do the job
+#define AmbientLight vec4(0.5f)
+#define LightColor vec4(1.0f)
+#define LightIntensity 1
+#define M_PI 3.1415926535897932384626433832795
+
+    layout (location = 0) in vec3  a_Position;
+    layout (location = 1) in vec2  a_Uv;
+    layout (location = 2) in vec4  a_Color;
+    layout (location = 3) in vec3  a_Normal;
+
+    uniform mat4 u_ProjectionView;
+    uniform mat4 u_Transform;
+    uniform mat4 u_NormalTransform;
+
+    smooth out vec2  v_Uv;
+    smooth out vec4  v_Color;
+
+    void main() {
+      vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
+      gl_Position = u_ProjectionView * WorldPos;
+
+      vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
+
+      vec4 Lighting = AmbientLight;
+      Lighting += LightColor * dot(-vec3(0, 0, -1), Normal) * LightIntensity;
+      Lighting.a = 1.0f;
+
+      v_Uv = a_Uv;
+      v_Color = a_Color * clamp(Lighting, 0, 1);
+    }
+)FOO";
+
+static string ModelFragmentShader = R"FOO(
+#version 330
+
+    uniform sampler2D u_Sampler;
+    uniform vec4 u_DiffuseColor;
+    uniform float u_Emission;
+    uniform float u_TexWeight;
+
+    smooth in vec2  v_Uv;
+    smooth in vec4  v_Color;
+
+    out vec4 BlendUnitColor;
+
+    void main() {
+      vec4 TexColor = texture(u_Sampler, v_Uv);
+      vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
+      Color *= v_Color;
+      Color *= u_DiffuseColor;
+
+      //float fog = abs(v_worldPos.z - u_camPos.z);
+      //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
+      //fog = clamp(fog, 0.0, 1.0);
+
+      //float emitSpread = 1.0f;
+      //vec3 emit = (color * u_emission).rgb;
+
+      BlendUnitColor = Color;//mix(color, u_fogColor, 1.0 - fog);
+    }
+)FOO";
 
 static void EnableVertexAttribute(vertex_attribute Attr)
 {
@@ -17,7 +80,8 @@ static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 
     glBindVertexArray(Buffer.VAO);
     glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
-    for (size_t i = 0; i < AttrCount; i++) {
+    for (size_t i = 0; i < AttrCount; i++)
+    {
         vertex_attribute Attr = va_arg(Args, vertex_attribute);
         EnableVertexAttribute(Attr);
     }
@@ -29,11 +93,14 @@ static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 #define InitialVertexBufferSize 16
 static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 {
-    if (Buffer.RawIndex + Size > Buffer.Vertices.size()) {
-        if (Buffer.Vertices.size() == 0) {
+    if (Buffer.RawIndex + Size > Buffer.Vertices.size())
+    {
+        if (Buffer.Vertices.size() == 0)
+        {
             Buffer.Vertices.resize(InitialVertexBufferSize * Buffer.VertexSize);
         }
-        else {
+        else
+        {
             Buffer.Vertices.resize(Buffer.Vertices.size() * 2);
         }
     }
@@ -87,7 +154,8 @@ static GLuint CompileShader(const char *Source, GLint Type)
 
     int Status = 0;
     glGetShaderiv(Shader, GL_COMPILE_STATUS, &Status);
-    if (Status == GL_FALSE) {
+    if (Status == GL_FALSE)
+    {
         int logLength = 0;
         glGetShaderiv(Shader, GL_INFO_LOG_LENGTH, &logLength);
 
@@ -113,7 +181,8 @@ void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const 
 
     int Status;
     glGetProgramiv(Prog.ID, GL_LINK_STATUS, &Status);
-    if (Status == GL_FALSE) {
+    if (Status == GL_FALSE)
+    {
       int LogLength = 0;
       glGetProgramiv(Prog.ID, GL_INFO_LOG_LENGTH, &LogLength);
 
@@ -238,6 +307,8 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool 
 
 void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset)
 {
+    assert(Animation.Frames.size());
+
     Sprite.Indices = Animation.Frames;
     Sprite.Interval = Animation.Interval;
     if (Reset)
@@ -283,9 +354,10 @@ void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov,
 void UpdateProjectionView(camera &Camera)
 {
     Camera.Updated = true;
-    Camera.Up = vec3(0, 1, 0);
+    Camera.Up = vec3(0, 0, 1);
 
-    switch (Camera.Type) {
+    switch (Camera.Type)
+    {
     case Camera_orthographic: {
         Camera.ProjectionView = glm::ortho(Camera.Ortho.Left,
                                             Camera.Ortho.Right,
@@ -300,22 +372,158 @@ void UpdateProjectionView(camera &Camera)
         auto &Persp = Camera.Perspective;
         Camera.Projection = glm::perspective(glm::radians(Persp.Fov), Persp.Width / Persp.Height, Camera.Near, Camera.Far);
         Camera.View = glm::lookAt(Camera.Position, Camera.LookAt, Camera.Up);
+        //Camera.View = glm::rotate(Camera.View, 90.0f, vec3(1.0f, 0.0f, 0.0f));
         Camera.ProjectionView = Camera.Projection * Camera.View;
         break;
     }
     }
 }
 
+#define OPENGL_DEPTH_COMPONENT_TYPE GL_DEPTH_COMPONENT32F
+#define Framebuffer_HasDepth 0x1
+#define Framebuffer_IsFloat  0x2
+
+static GLenum FramebufferColorAttachments[] = {
+    GL_COLOR_ATTACHMENT0,
+    GL_COLOR_ATTACHMENT1,
+    GL_COLOR_ATTACHMENT2,
+    GL_COLOR_ATTACHMENT3,
+    GL_COLOR_ATTACHMENT4,
+    GL_COLOR_ATTACHMENT5,
+    GL_COLOR_ATTACHMENT6,
+    GL_COLOR_ATTACHMENT7,
+    GL_COLOR_ATTACHMENT8,
+    GL_COLOR_ATTACHMENT9,
+    GL_COLOR_ATTACHMENT10,
+    GL_COLOR_ATTACHMENT11,
+    GL_COLOR_ATTACHMENT12,
+    GL_COLOR_ATTACHMENT13,
+    GL_COLOR_ATTACHMENT14,
+    GL_COLOR_ATTACHMENT15,
+};
+
+enum color_texture_type
+{
+    ColorTexture_SurfaceReflect,
+    ColorTexture_Emit,
+    ColorTexture_Count,
+};
+struct framebuffer
+{
+    uint32 Flags;
+    uint32 Width, Height;
+    size_t ColorTextureCount;
+    GLuint ID;
+    texture DepthTexture;
+    texture ColorTextures[ColorTexture_Count];
+};
+static void
+CreateFramebufferTexture(texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
+{
+    Texture.Target = Target;
+    Texture.Width = Width;
+    Texture.Height = Height;
+    Texture.Filters = {Filter, Filter};
+    Texture.Wrap = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE};
+    ApplyTextureParameters(Texture, 0);
+    UploadTexture(Texture, Format, (Format == OPENGL_DEPTH_COMPONENT_TYPE) ? GL_DEPTH_COMPONENT : GL_BGRA_EXT, GL_UNSIGNED_BYTE, NULL);
+}
+
+static void
+InitFramebuffer(framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Flags, size_t ColorTextureCount)
+{
+    Framebuffer.Width = Width;
+    Framebuffer.Height = Height;
+    Framebuffer.Flags = Flags;
+    Framebuffer.ColorTextureCount = ColorTextureCount;
+
+    glGenFramebuffers(1, &Framebuffer.ID);
+    glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
+
+    for (size_t i = 0; i < ColorTextureCount; i++)
+    {
+        CreateFramebufferTexture(Framebuffer.ColorTextures[i], GL_TEXTURE_2D, Width, Height, GL_NEAREST, GL_RGBA8);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, Framebuffer.ColorTextures[i].ID, 0);
+    }
+    glDrawBuffers(ColorTextureCount, FramebufferColorAttachments);
+
+    if (Flags & Framebuffer_HasDepth)
+    {
+        CreateFramebufferTexture(Framebuffer.DepthTexture, GL_TEXTURE_2D, Width, Height, GL_NEAREST, OPENGL_DEPTH_COMPONENT_TYPE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Framebuffer.DepthTexture.ID, 0);
+    }
+
+    GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    assert(Status == GL_FRAMEBUFFER_COMPLETE);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static void
+DestroyFramebuffer(framebuffer &Framebuffer)
+{
+    //DestroyTexture(Framebuffer.DepthTexture);
+    for (size_t i = 0; i < Framebuffer.ColorTextureCount; i++)
+    {
+        //DestroyTexture(Framebuffer.ColorTextures[i]);
+    }
+    glDeleteFramebuffers(1, &Framebuffer.ID);
+}
+
+static void
+Bind(framebuffer &Framebuffer)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
+    glViewport(0, 0, Framebuffer.Width, Framebuffer.Height);
+}
+
+static void
+UnbindFramebuffer()
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // TODO: set viewport back to default backbuffer size
+}
+
+#define MeshVertexSize 12
+
 // InitMeshBuffer initializes a vertex_buffer with the common attributes
 // used by all meshes in the game
 void InitMeshBuffer(vertex_buffer &Buffer)
 {
-    size_t Stride = 12*sizeof(float);
+    size_t Stride = MeshVertexSize*sizeof(float);
     InitBuffer(Buffer, 12, 4,
                (vertex_attribute){0, 3, GL_FLOAT, Stride, 0}, // position
                (vertex_attribute){1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
                (vertex_attribute){2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
                (vertex_attribute){3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
+}
+
+void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds)
+{
+    auto &b = Mesh.Buffer;
+    UploadVertices(b, Usage);
+
+    if (!ComputeBounds) return;
+
+    // calculate bounding box
+    vec3 Min(0.0f);
+    vec3 Max(0.0f);
+    for (size_t i = 0; i < b.VertexCount; i++)
+    {
+        size_t VertexIndex = i * MeshVertexSize;
+        vec3 Pos = {b.Vertices[VertexIndex], b.Vertices[VertexIndex+1], b.Vertices[VertexIndex+2]};
+
+        Min.x = std::min(Min.x, Pos.x);
+        Min.y = std::min(Min.y, Pos.y);
+        Min.z = std::min(Min.z, Pos.z);
+
+        Max.x = std::max(Max.x, Pos.x);
+        Max.y = std::max(Max.y, Pos.y);
+        Max.z = std::max(Max.z, Pos.z);
+    }
+
+    Mesh.Min = Min;
+    Mesh.Max = Max;
 }
 
 static void CompileModelProgram(model_program &Program)
@@ -343,20 +551,20 @@ void InitRenderState(render_state &RenderState)
     CompileModelProgram(RenderState.ModelProgram);
     InitMeshBuffer(RenderState.SpriteBuffer);
 
-#ifdef LUNA_DEBUG
+#ifdef DRAFT_DEBUG
     InitMeshBuffer(RenderState.DebugBuffer);
     glLineWidth(2);
 #endif
 }
 
-void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix)
+void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix)
 {
     assert(RenderState.ModelProgram.ShaderProgram.ID);
     assert(Camera.Updated);
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    glBindVertexArray(Mesh.Buffer.VAO);
+    glBindVertexArray(Model.Mesh->Buffer.VAO);
 
     auto &Program = RenderState.ModelProgram;
     Bind(Program.ShaderProgram);
@@ -364,23 +572,40 @@ void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat
 
     SetUniform(Program.Transform, TransformMatrix);
     SetUniform(Program.NormalTransform, mat4(1.0f));
-    for (const auto &Part : Mesh.Parts) {
-        auto &Material = Part.Material;
-        if (Material.Texture) {
-            //Println(Material.Texture->Filename);
-            Bind(*Material.Texture, 0);
+    for (const auto &Part : Model.Mesh->Parts)
+    {
+        const material *Material = Model.Material;
+        if (!Material)
+        {
+            Material = &Part.Material;
+        }
+        if (Material->Texture)
+        {
+            Bind(*Material->Texture, 0);
         }
 
-        SetUniform(Program.DiffuseColor, Material.DiffuseColor);
-        SetUniform(Program.TexWeight, Material.TexWeight);
+        if (Material->DiffuseColor.a < 1.0f)
+        {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        else
+        {
+            glDisable(GL_BLEND);
+        }
+
+        SetUniform(Program.DiffuseColor, Material->DiffuseColor);
+        SetUniform(Program.TexWeight, Material->TexWeight);
         glDrawArrays(Part.PrimitiveType, Part.Offset, Part.Count);
 
-        if (Material.Texture) {
-            Unbind(*Material.Texture, 0);
+        if (Material->Texture)
+        {
+            Unbind(*Material->Texture, 0);
         }
     }
 
     glBindVertexArray(0);
+    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
 }
 
@@ -445,8 +670,8 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     UnbindShaderProgram();
 }
 
-#ifdef LUNA_DEBUG
-void DebugRenderAABB(render_state &RenderState, camera &Camera, shape_aabb *Shape, bool Colliding)
+#ifdef DRAFT_DEBUG
+void DebugRenderBounds(render_state &RenderState, camera &Camera, const bounding_box &Box, bool Colliding)
 {
     assert(Camera.Updated);
 
@@ -467,8 +692,8 @@ void DebugRenderAABB(render_state &RenderState, camera &Camera, shape_aabb *Shap
     }
     SetUniform(Program.DiffuseColor, DiffuseColor);
 
-    vec3 a = Shape->Position - Shape->Half;
-    vec3 b = Shape->Position + Shape->Half;
+    vec3 a = Box.Center - Box.Half;
+    vec3 b = Box.Center + Box.Half;
     ResetBuffer(RenderState.DebugBuffer);
     PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
     PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
@@ -508,69 +733,3 @@ void DebugRenderAABB(render_state &RenderState, camera &Camera, shape_aabb *Shap
     glDisable(GL_DEPTH_TEST);
 }
 #endif
-
-string ModelVertexShader = R"FOO(
-#version 330
-
-// In this game we use only one forward directional light
-// so these simple defines will do the job
-#define AmbientLight vec4(0.5f)
-#define LightColor vec4(1.0f)
-#define LightIntensity 1
-
-    layout (location = 0) in vec3  a_Position;
-    layout (location = 1) in vec2  a_Uv;
-    layout (location = 2) in vec4  a_Color;
-    layout (location = 3) in vec3  a_Normal;
-
-    uniform mat4 u_ProjectionView;
-    uniform mat4 u_Transform;
-    uniform mat4 u_NormalTransform;
-
-    smooth out vec2  v_Uv;
-    smooth out vec4  v_Color;
-
-    void main() {
-      vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
-      gl_Position = u_ProjectionView * WorldPos;
-
-      vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
-
-      vec4 Lighting = AmbientLight;
-      Lighting += LightColor * dot(-vec3(0, -1, 0), Normal) * LightIntensity;
-      Lighting.a = 1.0f;
-
-      v_Uv = a_Uv;
-      v_Color = a_Color * clamp(Lighting, 0, 1);
-    }
-)FOO";
-
-string ModelFragmentShader = R"FOO(
-#version 330
-
-    uniform sampler2D u_Sampler;
-    uniform vec4 u_DiffuseColor;
-    uniform float u_Emission;
-    uniform float u_TexWeight;
-
-    smooth in vec2  v_Uv;
-    smooth in vec4  v_Color;
-
-    out vec4 BlendUnitColor;
-
-    void main() {
-      vec4 TexColor = texture(u_Sampler, v_Uv);
-      vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
-      Color *= v_Color;
-      Color *= u_DiffuseColor;
-
-      //float fog = abs(v_worldPos.z - u_camPos.z);
-      //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
-      //fog = clamp(fog, 0.0, 1.0);
-
-      //float emitSpread = 1.0f;
-      //vec3 emit = (color * u_emission).rgb;
-
-      BlendUnitColor = Color;//mix(color, u_fogColor, 1.0 - fog);
-    }
-)FOO";

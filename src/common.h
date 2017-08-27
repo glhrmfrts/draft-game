@@ -1,5 +1,5 @@
-#ifndef LUNA_COMMON_H
-#define LUNA_COMMON_H
+#ifndef DRAFT_COMMON_H
+#define DRAFT_COMMON_H
 
 #include <iostream>
 #include <cassert>
@@ -42,36 +42,7 @@ enum direction
     Direction_left,
 };
 
-struct rect
-{
-    float X, Y;
-    float Width, Height;
-};
-
-enum shape_type
-{
-    Shape_aabb,
-};
-
-struct shape_aabb
-{
-    vec3 Half;
-    vec3 Position;
-};
-
-struct shape
-{
-    shape_type Type;
-
-    shape() {}
-
-    union
-    {
-        shape_aabb AABB;
-    };
-};
-
-#ifdef LUNA_DEBUG
+#ifdef DRAFT_DEBUG
 #include <sstream>
 
 inline static string

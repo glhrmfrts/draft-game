@@ -1,7 +1,8 @@
-#ifndef LUNA_RENDER_H
-#define LUNA_RENDER_H
+#ifndef DRAFT_RENDER_H
+#define DRAFT_RENDER_H
 
-#include "luna_common.h"
+#include "common.h"
+#include "collision.h"
 
 struct vertex_buffer
 {
@@ -39,7 +40,7 @@ struct texture_wrap
 struct texture
 {
     string Filename;
-    GLuint ID;
+    GLuint ID = 0;
     GLuint Target;
     uint32 Width;
     uint32 Height;
@@ -134,7 +135,15 @@ struct mesh_part
 struct mesh
 {
     vertex_buffer Buffer;
+    vec3 Min;
+    vec3 Max;
     vector<mesh_part> Parts;
+};
+
+struct model
+{
+    mesh *Mesh;
+    material *Material;
 };
 
 struct model_program
@@ -150,7 +159,7 @@ struct model_program
 
 struct render_state
 {
-#ifdef LUNA_DEBUG
+#ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;
 #endif
     vertex_buffer SpriteBuffer;
@@ -186,13 +195,14 @@ void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov,
 void UpdateProjectionView(camera &Camera);
 
 void InitMeshBuffer(vertex_buffer &Buffer);
+void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true);
 
 void InitRenderState(render_state &RenderState);
-void RenderMesh(render_state &RenderState, camera &Camera, mesh &Mesh, const mat4 &TransformMatrix);
+void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix);
 void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position);
 
-#ifdef LUNA_DEBUG
-void DebugRenderAABB(render_state &RenderState, camera &Cam, shape_aabb *Shape, bool Colliding);
+#ifdef DRAFT_DEBUG
+void DebugRenderBounds(render_state &RenderState, camera &Cam, const bounding_box &Box, bool Colliding);
 #endif
 
 #endif

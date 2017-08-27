@@ -1,12 +1,18 @@
-#ifndef LUNA_GUI_H
-#define LUNA_GUI_H
+#ifndef DRAFT_GUI_H
+#define DRAFT_GUI_H
 
-#include "luna_common.h"
-#include "luna_render.h"
+#include "common.h"
+#include "render.h"
 
 #define GUIElementState_none 0x0
 #define GUIElementState_hovered 0x1
 #define GUIElementState_left_pressed 0x2
+
+struct rect
+{
+    float X, Y;
+    float Width, Height;
+};
 
 struct gui_draw_command
 {

@@ -11,12 +11,12 @@ endif
 INCLUDE_PATHS = -Ideps -IC:/c-cpp/libs/include -IC:/c-cpp/pl/lua/src -IC:/c-cpp/LuaBridge/Source
 
 CC = clang++
-CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DGLEW_STATIC -DLUNA_DEBUG
+CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DGLEW_STATIC -DDRAFT_DEBUG
 LDFLAGS = -LC:/c-cpp/libs/lib/x64 $(LIBS)
 
-OUT = build/luna
+OUT = build/draft
 ifdef SystemRoot
-	OUT = build/luna.exe
+	OUT = build/draft.exe
 endif
 
 $(OUT): $(OBJ)
@@ -27,7 +27,6 @@ $(OUT): $(OBJ)
 	@printf "%s\n" $@
 
 run: $(OUT)
-	./map_convert.py
 	@cd build && ./../$(OUT)
 
 clean:

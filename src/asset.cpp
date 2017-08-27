@@ -1,6 +1,6 @@
 #include <iostream>
 #include "lodepng.h"
-#include "luna_asset.h"
+#include "asset.h"
 
 #define DefaultTextureFilter GL_NEAREST
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
@@ -8,8 +8,9 @@
 texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename)
 {
     texture *Result;
-    if (AssetCache.Textures.find(Filename) == AssetCache.Textures.end()) {
-        Result = new texture;
+    if (AssetCache.Textures.find(Filename) == AssetCache.Textures.end())
+    {
+        Result = PushStruct<texture>(AssetCache.Arena);
         Result->Filename = Filename;
         Result->Target = GL_TEXTURE_2D;
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
@@ -29,7 +30,8 @@ texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename)
 
         AssetCache.Textures[Filename] = Result;
     }
-    else {
+    else
+    {
         Result = AssetCache.Textures[Filename];
     }
 
