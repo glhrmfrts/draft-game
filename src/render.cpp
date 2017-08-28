@@ -49,7 +49,7 @@ static string ModelFragmentShader = R"FOO(
     smooth in vec2  v_Uv;
     smooth in vec4  v_Color;
 
-    out vec4 BlendUnitColor;
+    layout (location = 0) out vec4 BlendUnitColor[2];
 
     void main() {
       vec4 TexColor = texture(u_Sampler, v_Uv);
@@ -63,17 +63,107 @@ static string ModelFragmentShader = R"FOO(
 
       vec4 Emit = (Color * u_Emission);
 
-      BlendUnitColor = Emit + Color;//mix(color, u_fogColor, 1.0 - fog);
+      BlendUnitColor[0] = Emit + Color;//mix(color, u_fogColor, 1.0 - fog);
+      BlendUnitColor[1] = Emit;
     }
 )FOO";
 
-static void EnableVertexAttribute(vertex_attribute Attr)
+static string ScreenVertexShader = R"FOO(
+#version 330
+
+layout (location = 0) in vec2 a_position;
+layout (location = 1) in vec2 a_uv;
+
+smooth out vec2 v_uv;
+
+void main() {
+  gl_Position = vec4(a_position, 0.0, 1.0);
+  v_uv = a_uv;
+}
+)FOO";
+
+static string BlurFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2D u_sampler;
+uniform vec2 u_texelSize;
+uniform int u_orientation;
+uniform int u_amount;
+uniform float u_scale;
+uniform float u_strength;
+
+smooth in vec2 v_uv;
+
+out vec4 outColor;
+
+float gaussian(float x, float deviation) {
+	return (1.0 / sqrt(2.0 * 3.141592 * deviation)) * exp(-((x * x) / (2.0 * deviation)));
+}
+
+void main() {
+	float halfBlur = float(u_amount) * 0.5;
+	vec4 colour = vec4(0.0);
+	vec4 texColour = vec4(0.0);
+
+	// gaussian deviation
+	float deviation = halfBlur * 0.35;
+	deviation *= deviation;
+	float strength = 1.0 - u_strength;
+
+	if (u_orientation == 0) {
+		// horizontal blur
+		for (int i = 0; i < 10; ++i) {
+			if (i >= u_amount)
+				break;
+
+			float offset = float(i) - halfBlur;
+			texColour = texture2D(u_sampler, v_uv + vec2(offset * u_texelSize.x * u_scale, 0.0)) * gaussian(offset * strength, deviation);
+			colour += texColour;
+		}
+	}
+	else {
+		// vertical blur
+		for (int i = 0; i < 10; ++i) {
+			if (i >= u_amount)
+				break;
+
+			float offset = float(i) - halfBlur;
+			texColour = texture2D(u_sampler, v_uv + vec2(0.0, offset * u_texelSize.y * u_scale)) * gaussian(offset * strength, deviation);
+			colour += texColour;
+		}
+	}
+
+	// apply colour
+	outColor = colour;
+}
+)FOO";
+
+static string BlendFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2D u_Sampler1;
+uniform sampler2D u_Sampler2;
+
+smooth in vec2 v_uv;
+
+out vec4 outColor;
+
+void main() {
+  vec4 scene = texture(u_Sampler1, v_uv);
+  vec4 blur  = texture(u_Sampler2, v_uv);
+  outColor = (scene + blur) - (scene * blur);
+}
+)FOO";
+
+static void
+EnableVertexAttribute(vertex_attribute Attr)
 {
   glEnableVertexAttribArray(Attr.Location);
   glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
-static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
+static void
+vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 {
     glGenVertexArrays(1, &Buffer.VAO);
     glGenBuffers(1, &Buffer.VBO);
@@ -384,8 +474,6 @@ void UpdateProjectionView(camera &Camera)
 }
 
 #define OPENGL_DEPTH_COMPONENT_TYPE GL_DEPTH_COMPONENT32F
-#define Framebuffer_HasDepth 0x1
-#define Framebuffer_IsFloat  0x2
 
 static GLenum FramebufferColorAttachments[] = {
     GL_COLOR_ATTACHMENT0,
@@ -406,21 +494,6 @@ static GLenum FramebufferColorAttachments[] = {
     GL_COLOR_ATTACHMENT15,
 };
 
-enum color_texture_type
-{
-    ColorTexture_SurfaceReflect,
-    ColorTexture_Emit,
-    ColorTexture_Count,
-};
-struct framebuffer
-{
-    uint32 Flags;
-    uint32 Width, Height;
-    size_t ColorTextureCount;
-    GLuint ID;
-    texture DepthTexture;
-    texture ColorTextures[ColorTexture_Count];
-};
 static void
 CreateFramebufferTexture(texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
 {
@@ -430,7 +503,9 @@ CreateFramebufferTexture(texture &Texture, GLuint Target, uint32 Width, uint32 H
     Texture.Filters = {Filter, Filter};
     Texture.Wrap = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE};
     ApplyTextureParameters(Texture, 0);
+    Bind(Texture, 0);
     UploadTexture(Texture, Format, (Format == OPENGL_DEPTH_COMPONENT_TYPE) ? GL_DEPTH_COMPONENT : GL_BGRA_EXT, GL_UNSIGNED_BYTE, NULL);
+    Unbind(Texture, 0);
 }
 
 static void
@@ -475,17 +550,17 @@ DestroyFramebuffer(framebuffer &Framebuffer)
 }
 
 static void
-Bind(framebuffer &Framebuffer)
+BindFramebuffer(framebuffer &Framebuffer)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
     glViewport(0, 0, Framebuffer.Width, Framebuffer.Height);
 }
 
 static void
-UnbindFramebuffer()
+UnbindFramebuffer(render_state &RenderState)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    // TODO: set viewport back to default backbuffer size
+    glViewport(0, 0, RenderState.Width, RenderState.Height);
 }
 
 #define MeshVertexSize 12
@@ -530,7 +605,8 @@ void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
     Mesh.Max = Max;
 }
 
-static void CompileModelProgram(model_program &Program)
+static void
+CompileModelProgram(model_program &Program)
 {
     CompileShaderProgram(Program.ShaderProgram, ModelVertexShader.c_str(), ModelFragmentShader.c_str());
     Program.MaterialFlags = glGetUniformLocation(Program.ShaderProgram.ID, "u_MaterialFlags");
@@ -547,20 +623,113 @@ static void CompileModelProgram(model_program &Program)
     UnbindShaderProgram();
 }
 
-static void BindCamera(model_program &Program, camera &Camera)
+static void
+CompileBlurProgram(blur_program &Program)
 {
-    SetUniform(Program.ProjectionView, Camera.ProjectionView);
+    CompileShaderProgram(Program.ShaderProgram, ScreenVertexShader.c_str(), BlurFragmentShader.c_str());
+    Program.TexelSize = glGetUniformLocation(Program.ShaderProgram.ID, "u_texelSize");
+    Program.Orientation = glGetUniformLocation(Program.ShaderProgram.ID, "u_orientation");
+    Program.Amount = glGetUniformLocation(Program.ShaderProgram.ID, "u_amount");
+    Program.Scale = glGetUniformLocation(Program.ShaderProgram.ID, "u_scale");
+    Program.Strength = glGetUniformLocation(Program.ShaderProgram.ID, "u_strength");
+    Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_sampler");
+
+    Bind(Program.ShaderProgram);
+    SetUniform(Program.Sampler, 0);
+    UnbindShaderProgram();
 }
 
-void InitRenderState(render_state &RenderState)
+static void
+CompileBlendProgram(shader_program &Program)
 {
+    CompileShaderProgram(Program, ScreenVertexShader.c_str(), BlendFragmentShader.c_str());
+
+    Bind(Program);
+    SetUniform(glGetUniformLocation(Program.ID, "u_Sampler1"), 0);
+    SetUniform(glGetUniformLocation(Program.ID, "u_Sampler2"), 1);
+    UnbindShaderProgram();
+}
+
+void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
+{
+    RenderState.Width = Width;
+    RenderState.Height = Height;
+
     CompileModelProgram(RenderState.ModelProgram);
+    CompileBlurProgram(RenderState.BlurProgram);
+    CompileBlendProgram(RenderState.BlendProgram);
+
     InitMeshBuffer(RenderState.SpriteBuffer);
+    InitBuffer(RenderState.ScreenBuffer, 4, 2,
+               (vertex_attribute){0, 2, GL_FLOAT, 4*sizeof(float), 0},
+               (vertex_attribute){1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
+    PushVertex(RenderState.ScreenBuffer, {-1, -1, 0, 0});
+    PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
+    PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
+    PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
+    PushVertex(RenderState.ScreenBuffer, {1, 1, 1, 1});
+    PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
+    UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
+
+    // TODO: framebuffer needs depth
+    InitFramebuffer(RenderState.SceneFramebuffer, Width, Height, 0, ColorTexture_Count);
+    InitFramebuffer(RenderState.BlurHorizontalFramebuffer, Width, Height, 0, 1);
+    InitFramebuffer(RenderState.BlurVerticalFramebuffer, Width, Height, 0, 1);
+
+    glLineWidth(2);
 
 #ifdef DRAFT_DEBUG
     InitMeshBuffer(RenderState.DebugBuffer);
-    glLineWidth(1);
 #endif
+}
+
+void RenderBegin(render_state &RenderState)
+{
+    BindFramebuffer(RenderState.SceneFramebuffer);
+}
+
+enum blur_orientation
+{
+    Blur_Horizontal,
+    Blur_Vertical,
+};
+void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Orientation)
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+    auto &Program = RenderState.BlurProgram;
+    Bind(Program.ShaderProgram);
+    SetUniform(Program.TexelSize, vec2(1.0f / (float)RenderState.Width, 1.0f / (float)RenderState.Height));
+    SetUniform(Program.Orientation, (int)Orientation);
+    SetUniform(Program.Amount, 10);
+    SetUniform(Program.Scale, 0.5f);
+    SetUniform(Program.Strength, 1);
+    Bind(Texture, 0);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    Unbind(Texture, 0);
+    UnbindShaderProgram();
+}
+
+void RenderEnd(render_state &RenderState)
+{
+    UnbindFramebuffer(RenderState);
+
+    glBindVertexArray(RenderState.ScreenBuffer.VAO);
+
+    //BindFramebuffer(RenderState.BlurHorizontalFramebuffer);
+    RenderBlur(RenderState, RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Horizontal);
+    //UnbindFramebuffer(RenderState);
+
+    //BindFramebuffer(RenderState.BlurVerticalFramebuffer);
+    //RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
+    //UnbindFramebuffer(RenderState);
+
+    // blend scene and blur
+    /*glClear(GL_COLOR_BUFFER_BIT);
+    Bind(RenderState.BlendProgram);
+    Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 0);
+    Bind(RenderState.BlurVerticalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    UnbindShaderProgram();*/
 }
 
 void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix)
@@ -574,17 +743,19 @@ void RenderModel(render_state &RenderState, camera &Camera, model &Model, const 
 
     auto &Program = RenderState.ModelProgram;
     Bind(Program.ShaderProgram);
-    BindCamera(Program, Camera);
 
+    SetUniform(Program.ProjectionView, Camera.ProjectionView);
     SetUniform(Program.Transform, TransformMatrix);
+
+    // @TODO: check why this breaks the floor model
     SetUniform(Program.NormalTransform, mat4(1.0f));
     for (const auto &Part : Model.Mesh->Parts)
     {
         size_t i = &Part - &Model.Mesh->Parts[0];
-        const material *Material = Model.Material;
-        if (!Material || Model.MaterialOverrideIndex != i)
+        const material *Material = &Part.Material;
+        if (i < Model.Materials.size() && Model.Materials[i])
         {
-            Material = &Part.Material;
+            Material = Model.Materials[i];
         }
         if (Material->Texture)
         {
@@ -641,7 +812,7 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     auto &Program = RenderState.ModelProgram;
     Bind(*Sprite.Texture, 0);
     Bind(Program.ShaderProgram);
-    BindCamera(Program, Camera);
+    SetUniform(Program.ProjectionView, Camera.ProjectionView);
     SetUniform(Program.Transform, mat4(1.0));
     SetUniform(Program.TexWeight, 1.0f);
     SetUniform(Program.DiffuseColor, Color_white);
@@ -700,7 +871,7 @@ void DebugRenderBounds(render_state &RenderState, camera &Camera, const bounding
 
     auto &Program = RenderState.ModelProgram;
     Bind(Program.ShaderProgram);
-    BindCamera(Program, Camera);
+    SetUniform(Program.ProjectionView, Camera.ProjectionView);
     SetUniform(Program.Transform, mat4(1.0));
     SetUniform(Program.TexWeight, 0.0f);
 

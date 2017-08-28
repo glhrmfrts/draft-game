@@ -56,6 +56,7 @@ struct entity
     vec3 Position;
     vec3 Velocity;
     vec3 Size = vec3(1.0f);
+    vec3 Rotation = vec3(0.0f);
 
     uint32 Flags = 0;
     int NumCollisions = 0;
@@ -64,9 +65,11 @@ struct entity
     model *Model = NULL;
 };
 
-#define TrackSegmentLength 10
+#define TrackSegmentLength 20
 #define TrackSegmentWidth  7
-#define TrackSegmentCount  10
+#define TrackLaneWidth     2.5f
+#define TrackSegmentCount  20
+#define TrackSegmentPadding 0.25f
 struct track_segment
 {
     vec3 Position;

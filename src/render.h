@@ -1,6 +1,31 @@
 #ifndef DRAFT_RENDER_H
 #define DRAFT_RENDER_H
 
+#define Color_white color(1, 1, 1, 1)
+#define Color_black color(0, 0, 0, 1)
+#define Color_blue  color(0, 0, 0.5, 1)
+#define Color_green  color(0, 1, 0, 1)
+#define Color_red  color(1, 0, 0, 1)
+#define Color_gray  color(0.5, 0.5, 0.5, 1)
+#define Color_yellow  color(1, 1, 0, 1)
+
+struct color_palette
+{
+    int Colors[5];
+};
+
+static color_palette FirstPalette = {{0x21042D, 0x6F0C74, 0x25006D, 0x0E00CA, 0xEE1F97}};
+static color_palette SecondPalette = {{0x86008A, 0x4B0034, 0x2703EC, 0x00BDFF, 0xB8C9EE}};
+
+inline static color
+IntColor(int c, float alpha = 1.0f)
+{
+    int b = c & 0xFF;
+    int g = (c >> 8) & 0xFF;
+    int r = (c >> 16) & 0xFF;
+    return color(r/255.0f, g/255.0f, b/255.0f, alpha);
+}
+
 struct vertex_buffer
 {
     vector<float> Vertices;
@@ -142,9 +167,8 @@ struct mesh
 
 struct model
 {
+    vector<material *> Materials;
     mesh *Mesh;
-    material *Material = NULL;
-    size_t MaterialOverrideIndex = 0;
 };
 
 struct model_program
@@ -160,13 +184,55 @@ struct model_program
     int MaterialFlags;
 };
 
+struct blur_program
+{
+    shader_program ShaderProgram;
+    int TexelSize;
+    int Orientation;
+    int Amount;
+    int Scale;
+    int Strength;
+    int Sampler;
+};
+
+enum color_texture_type
+{
+    ColorTexture_SurfaceReflect,
+    ColorTexture_Emit,
+    ColorTexture_Count,
+};
+
+#define Framebuffer_HasDepth 0x1
+#define Framebuffer_IsFloat  0x2
+struct framebuffer
+{
+    uint32 Flags;
+    uint32 Width, Height;
+    size_t ColorTextureCount;
+    GLuint ID;
+    texture DepthTexture;
+    texture ColorTextures[ColorTexture_Count];
+};
+
 struct render_state
 {
+    model_program ModelProgram;
+    blur_program BlurProgram;
+    shader_program BlendProgram;
+
+    framebuffer SceneFramebuffer;
+    framebuffer BlurHorizontalFramebuffer;
+    framebuffer BlurVerticalFramebuffer;
+
+    vertex_buffer SpriteBuffer;
+    vertex_buffer ScreenBuffer;
+
+    uint32 Width;
+    uint32 Height;
+
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;
 #endif
-    vertex_buffer SpriteBuffer;
-    model_program ModelProgram;
 };
 
 #endif

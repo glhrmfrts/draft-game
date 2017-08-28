@@ -34,6 +34,13 @@ RegisterInputActions(game_input &Input)
 #define CameraOffsetZ 5.0f
 
 static void
+AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
+{
+    PushVertex(Buffer, {p1.x, p1.y, p1.z, 0, 0,  c.r, c.g, c.b, c.a,  n.x, n.y, n.z});
+    PushVertex(Buffer, {p2.x, p2.y, p2.z, 0, 0,  c.r, c.g, c.b, c.a,  n.x, n.y, n.z});
+}
+
+static void
 AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
         color c1 = Color_white, vec3 n = vec3(0), bool FlipV = false)
 {
@@ -120,22 +127,22 @@ CreateShape(shape_type Type)
 }
 
 static material *
-CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture)
+CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
 {
     material *Result = PushStruct<material>(Arena);
     Result->DiffuseColor = Color;
     Result->Emission = Emission;
     Result->TexWeight = TexWeight;
     Result->Texture = Texture;
+    Result->Flags = Flags;
     return Result;
 }
 
 static model *
-CreateModel(memory_arena &Arena, mesh *Mesh, material *Material)
+CreateModel(memory_arena &Arena, mesh *Mesh)
 {
     model *Result = PushStruct<model>(Arena);
     Result->Mesh = Mesh;
-    Result->Material = Material;
     return Result;
 }
 
@@ -153,17 +160,19 @@ AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, 
 }
 
 static entity *
-CreateShipEntity(game_state &Game, color Color)
+CreateShipEntity(game_state &Game, color Color, color OutlineColor)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
-    Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh, CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.9f), 0, 0, NULL));
+    Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.9f), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, MaterialFlag_PolygonLines));
     Entity->Size.y = 3;
     Entity->Shape = CreateShape(Shape_BoundingBox);
     AddEntity(Game, Entity);
     return Entity;
 }
 
-#define SkyboxScale vec3(200.0f)
+#define SkyboxScale vec3(500.0f)
 static void
 StartLevel(game_state &Game)
 {
@@ -172,11 +181,24 @@ StartLevel(game_state &Game)
     {
         auto &FloorMesh = Game.FloorMesh;
         InitMeshBuffer(FloorMesh.Buffer);
-        AddQuad(FloorMesh.Buffer, vec3(0, 0, 0), vec3(1, 0, 0), vec3(1, 1, 0), vec3(0, 1, 0), Color_white, vec3(0, 0, 1));
 
-        material FloorMaterial = {Color_white, 0, 1, LoadTextureFile(Game.AssetCache, "data/textures/checker.png")};
-        FloorMesh.Parts.resize(1);
-        FloorMesh.Parts[0] = {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES};
+        material FloorMaterial = {IntColor(FirstPalette.Colors[2], 0.5f), 0, 0, NULL};
+        material LaneMaterial = {IntColor(FirstPalette.Colors[3]), 1, 0, NULL};
+
+        float w = TrackSegmentWidth * TrackLaneWidth;
+        float l = -w/2;
+        float r = w/2;
+        AddQuad(FloorMesh.Buffer, vec3(l, 0, 0), vec3(r, 0, 0), vec3(r, 1, 0), vec3(l, 1, 0), Color_white, vec3(0, 0, 1));
+        AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES});
+
+        size_t LineVertexCount = 0;
+        for (int i = 1; i < TrackSegmentWidth; i++)
+        {
+            AddLine(FloorMesh.Buffer, vec3(l+i*TrackLaneWidth, 0, 0), vec3(l+i*TrackLaneWidth, 1, 0), Color_white, vec3(1.0f));
+            LineVertexCount += 2;
+        }
+        AddPart(FloorMesh, {LaneMaterial, 6, LineVertexCount, GL_LINES});
+
         EndMesh(FloorMesh, GL_STATIC_DRAW);
     }
 
@@ -217,7 +239,7 @@ StartLevel(game_state &Game)
         EndMesh(SkyboxMesh, GL_STATIC_DRAW);
 
         auto Entity = PushStruct<entity>(Game.Arena);
-        Entity->Model = CreateModel(Game.Arena, &SkyboxMesh, NULL);
+        Entity->Model = CreateModel(Game.Arena, &SkyboxMesh);
         Entity->Size = SkyboxScale;
         AddEntity(Game, Entity);
         Game.SkyboxEntity = Entity;
@@ -228,15 +250,16 @@ StartLevel(game_state &Game)
     Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
-    Game.EnemyEntity = CreateShipEntity(Game, Color_black);
-    Game.PlayerEntity = CreateShipEntity(Game, Color_blue);
+    Game.EnemyEntity = CreateShipEntity(Game, Color_black, IntColor(SecondPalette.Colors[3]));
+    Game.PlayerEntity = CreateShipEntity(Game, IntColor(FirstPalette.Colors[0]), IntColor(FirstPalette.Colors[1]));
+    Game.PlayerEntity->Rotation.y = 20.0f;
 
     Game.EnemyEntity->Position.x = 4;
 
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < TrackSegmentCount; i++)
     {
         auto &TrackSegment = Game.Segments[i];
-        TrackSegment.Position = vec3(0, i*TrackSegmentLength, -0.5f);
+        TrackSegment.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.5f);
     }
 }
 
@@ -283,30 +306,42 @@ static float Pitch;
 static float Yaw;
 #endif
 
-#define PlayerMaxVel  50.0f
-#define PlayerAcceleration 20.0f
-#define PlayerBreakAcceleration 30.0f
-#define PlayerSteerSpeed 10.0f
-#define PlayerSteerAcceleration 30.0f
+#define ShipMaxVel  50.0f
+#define ShipAcceleration 20.0f
+#define ShipBreakAcceleration 30.0f
+#define ShipSteerSpeed 10.0f
+#define ShipSteerAcceleration 50.0f
+#define ShipFriction 2.0f
 #define CameraOffsetY 5.0f
 #define CameraOffsetZ 2.0f
 static void
 MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
-    if (MoveV > 0.0f && Entity->Velocity.y < PlayerMaxVel)
+    if (MoveV > 0.0f && Entity->Velocity.y < ShipMaxVel)
     {
-        Entity->Velocity.y += MoveV * PlayerAcceleration * DeltaTime;
+        Entity->Velocity.y += MoveV * ShipAcceleration * DeltaTime;
     }
     else if (MoveV < 0.0f && Entity->Velocity.y > 0)
     {
-        Entity->Velocity.y = std::max(0.0f, Entity->Velocity.y + (MoveV * PlayerBreakAcceleration * DeltaTime));
+        Entity->Velocity.y = std::max(0.0f, Entity->Velocity.y + (MoveV * ShipBreakAcceleration * DeltaTime));
     }
-    Entity->Velocity.y = std::min(PlayerMaxVel, Entity->Velocity.y);
 
-    float SteerTarget = MoveH * PlayerSteerSpeed;
+    if (MoveV <= 0.0f)
+    {
+        Entity->Velocity.y -= ShipFriction * DeltaTime;
+    }
+    Entity->Velocity.y = std::max(0.0f, std::min(ShipMaxVel, Entity->Velocity.y));
+
+    float SteerTarget = MoveH * ShipSteerSpeed;
     Entity->Velocity.x = Interp(Entity->Velocity.x,
                                 SteerTarget,
-                                PlayerSteerAcceleration,
+                                ShipSteerAcceleration,
+                                DeltaTime);
+
+    Entity->Rotation.y = 20.0f * (Entity->Velocity.x / ShipSteerSpeed);
+    Entity->Rotation.x = Interp(Entity->Rotation.x,
+                                5.0f * MoveV,
+                                20.0f,
                                 DeltaTime);
 }
 
@@ -389,17 +424,21 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     UpdateProjectionView(Game.Camera);
 
+    RenderBegin(Game.RenderState);
+
     for (auto &Segment : Game.Segments)
     {
-        if (Segment.Position.y + TrackSegmentLength < Game.Camera.Position.y)
+        size_t i = &Segment - &Game.Segments[0];
+        if (Segment.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
         {
-            Segment.Position.y += TrackSegmentCount*TrackSegmentLength;
+            Segment.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
+            Println(i);
         }
 
         mat4 TransformMatrix = glm::translate(mat4(1.0f), Segment.Position);
-        TransformMatrix = glm::scale(TransformMatrix, vec3(TrackSegmentWidth, TrackSegmentLength, 0));
+        TransformMatrix = glm::scale(TransformMatrix, vec3(1, TrackSegmentLength, 0));
 
-        model TmpModel = {&Game.FloorMesh, NULL};
+        model TmpModel = {{}, &Game.FloorMesh};
         RenderModel(Game.RenderState, Game.Camera, TmpModel, TransformMatrix);
     }
 
@@ -407,6 +446,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         mat4 TransformMatrix = glm::translate(mat4(1.0f), Entity->Position);
         TransformMatrix = glm::scale(TransformMatrix, Entity->Size);
+        if (Entity->Rotation.x != 0.0f)
+        {
+            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(Entity->Rotation.x), vec3(1, 0, 0));
+        }
+        if (Entity->Rotation.y != 0.0f)
+        {
+            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(Entity->Rotation.y), vec3(0, 1, 0));
+        }
         RenderModel(Game.RenderState, Game.Camera, *Entity->Model, TransformMatrix);
     }
 
@@ -417,6 +464,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         DebugRenderBounds(Game.RenderState, Game.Camera, Entity->Shape->BoundingBox, Entity->NumCollisions > 0);
     }
 #endif
+
+    RenderEnd(Game.RenderState);
 }
 
 int main(int argc, char **argv)
@@ -467,7 +516,7 @@ int main(int argc, char **argv)
     RegisterInputActions(Input);
     InitGUI(Game.GUI, Input);
     MakeCameraOrthographic(Game.GUICamera, 0, Width, 0, Height, -1, 1);
-    InitRenderState(Game.RenderState);
+    InitRenderState(Game.RenderState, Width, Height);
     StartLevel(Game);
 
     clock_t PreviousTime = clock();
