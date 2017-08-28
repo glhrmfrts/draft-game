@@ -1,9 +1,6 @@
 #ifndef DRAFT_RENDER_H
 #define DRAFT_RENDER_H
 
-#include "common.h"
-#include "collision.h"
-
 struct vertex_buffer
 {
     vector<float> Vertices;
@@ -116,12 +113,15 @@ struct camera
     };
 };
 
+#define MaterialFlag_NoLight 0x1
+#define MaterialFlag_PolygonLines 0x2
 struct material
 {
     color DiffuseColor = Color_white;
     float Emission = 0;
     float TexWeight = 0;
     texture *Texture = NULL;
+    uint32 Flags = 0;
 };
 
 struct mesh_part
@@ -143,7 +143,8 @@ struct mesh
 struct model
 {
     mesh *Mesh;
-    material *Material;
+    material *Material = NULL;
+    size_t MaterialOverrideIndex = 0;
 };
 
 struct model_program
@@ -154,7 +155,9 @@ struct model_program
     int NormalTransform;
     int DiffuseColor;
     int TexWeight;
+    int Emission;
     int Sampler;
+    int MaterialFlags;
 };
 
 struct render_state
@@ -165,44 +168,5 @@ struct render_state
     vertex_buffer SpriteBuffer;
     model_program ModelProgram;
 };
-
-void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...);
-void ResetBuffer(vertex_buffer &Buffer);
-void PushVertex(vertex_buffer &Buffer, const vector<float> &Verts);
-void UploadVertices(vertex_buffer &Buffer, GLenum Usage);
-
-void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const char *FragmentSource);
-void SetUniform(GLuint Location, int Value);
-void SetUniform(GLuint Location, float Value);
-void SetUniform(GLuint Location, const vec2 &Value);
-void SetUniform(GLuint Location, const vec3 &Value);
-void SetUniform(GLuint Location, const vec4 &Value);
-void SetUniform(GLuint Location, const mat4 &Value);
-void Bind(shader_program &Prog);
-void UnbindShaderProgram();
-
-void Bind(texture &Texture, int TextureUnit);
-void Unbind(texture &Texture, int TextureUnit);
-void ApplyTextureParameters(texture &Texture, int TextureUnit);
-void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data);
-vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV = false);
-
-void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset = false);
-void UpdateAnimation(animated_sprite &Sprite, float DeltaTime);
-
-void MakeCameraOrthographic(camera &Camera, float Left, float Right, float Bottom, float Top, float Near = -1, float Far = 1);
-void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov, float Near, float Far);
-void UpdateProjectionView(camera &Camera);
-
-void InitMeshBuffer(vertex_buffer &Buffer);
-void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true);
-
-void InitRenderState(render_state &RenderState);
-void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix);
-void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position);
-
-#ifdef DRAFT_DEBUG
-void DebugRenderBounds(render_state &RenderState, camera &Cam, const bounding_box &Box, bool Colliding);
-#endif
 
 #endif

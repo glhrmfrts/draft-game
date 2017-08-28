@@ -1,11 +1,11 @@
-#include <iostream>
+// Copyright
 #include "lodepng.h"
-#include "asset.h"
 
-#define DefaultTextureFilter GL_NEAREST
+#define DefaultTextureFilter GL_LINEAR
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
 
-texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename)
+static texture *
+LoadTextureFile(asset_cache &AssetCache, const string &Filename, bool Mipmap = false)
 {
     texture *Result;
     if (AssetCache.Textures.find(Filename) == AssetCache.Textures.end())
@@ -15,6 +15,7 @@ texture *LoadTextureFile(asset_cache &AssetCache, const string &Filename)
         Result->Target = GL_TEXTURE_2D;
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Result->Wrap = {DefaultTextureWrap, DefaultTextureWrap};
+        Result->Mipmap = Mipmap;
         ApplyTextureParameters(*Result, 0);
 
         vector<uint8> Data;

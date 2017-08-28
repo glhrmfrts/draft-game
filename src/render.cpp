@@ -1,4 +1,4 @@
-#include "render.h"
+// Copyright
 
 static string ModelVertexShader = R"FOO(
 #version 330
@@ -18,6 +18,7 @@ static string ModelVertexShader = R"FOO(
     uniform mat4 u_ProjectionView;
     uniform mat4 u_Transform;
     uniform mat4 u_NormalTransform;
+    uniform int u_MaterialFlags;
 
     smooth out vec2  v_Uv;
     smooth out vec4  v_Color;
@@ -60,10 +61,9 @@ static string ModelFragmentShader = R"FOO(
       //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
       //fog = clamp(fog, 0.0, 1.0);
 
-      //float emitSpread = 1.0f;
-      //vec3 emit = (color * u_emission).rgb;
+      vec4 Emit = (Color * u_Emission);
 
-      BlendUnitColor = Color;//mix(color, u_fogColor, 1.0 - fog);
+      BlendUnitColor = Emit + Color;//mix(color, u_fogColor, 1.0 - fog);
     }
 )FOO";
 
@@ -91,7 +91,8 @@ static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 }
 
 #define InitialVertexBufferSize 16
-static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
+static void
+EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 {
     if (Buffer.RawIndex + Size > Buffer.Vertices.size())
     {
@@ -106,9 +107,17 @@ static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
     }
 }
 
+static void
+ResetBuffer(vertex_buffer &Buffer)
+{
+    Buffer.VertexCount = 0;
+    Buffer.RawIndex = 0;
+}
+
 // InitBuffer accepts a variadic number of vertex_attributes, it
 // initializes the buffer and enable the passed attributes
-void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
+static void
+InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
 {
     Buffer.VertexSize = VertexSize;
     ResetBuffer(Buffer);
@@ -119,15 +128,10 @@ void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
     va_end(Args);
 }
 
-void ResetBuffer(vertex_buffer &Buffer)
-{
-    Buffer.VertexCount = 0;
-    Buffer.RawIndex = 0;
-}
-
 // PushVertex pushes a single vertex to the buffer, the vertex size
 // is known by the VertexSize field
-void PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
+static void
+PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
 {
     EnsureCapacity(Buffer, Buffer.VertexSize);
 
@@ -277,7 +281,7 @@ void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum 
     glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
 }
 
-vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV)
+vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV = false)
 {
     vector<texture_rect> Result;
     float tw = 1.0f / float(Texture.Width / Width);
@@ -305,7 +309,7 @@ vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool 
     return Result;
 }
 
-void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset)
+void SetAnimation(animated_sprite &Sprite, const sprite_animation &Animation, bool Reset = false)
 {
     assert(Animation.Frames.size());
 
@@ -498,7 +502,7 @@ void InitMeshBuffer(vertex_buffer &Buffer)
                (vertex_attribute){3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
 }
 
-void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds)
+void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
 {
     auto &b = Mesh.Buffer;
     UploadVertices(b, Usage);
@@ -529,11 +533,13 @@ void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds)
 static void CompileModelProgram(model_program &Program)
 {
     CompileShaderProgram(Program.ShaderProgram, ModelVertexShader.c_str(), ModelFragmentShader.c_str());
+    Program.MaterialFlags = glGetUniformLocation(Program.ShaderProgram.ID, "u_MaterialFlags");
     Program.ProjectionView = glGetUniformLocation(Program.ShaderProgram.ID, "u_ProjectionView");
     Program.Transform = glGetUniformLocation(Program.ShaderProgram.ID, "u_Transform");
     Program.NormalTransform = glGetUniformLocation(Program.ShaderProgram.ID, "u_NormalTransform");
     Program.DiffuseColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_DiffuseColor");
     Program.TexWeight = glGetUniformLocation(Program.ShaderProgram.ID, "u_TexWeight");
+    Program.Emission = glGetUniformLocation(Program.ShaderProgram.ID, "u_Emission");
     Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
 
     Bind(Program.ShaderProgram);
@@ -553,7 +559,7 @@ void InitRenderState(render_state &RenderState)
 
 #ifdef DRAFT_DEBUG
     InitMeshBuffer(RenderState.DebugBuffer);
-    glLineWidth(2);
+    glLineWidth(1);
 #endif
 }
 
@@ -574,8 +580,9 @@ void RenderModel(render_state &RenderState, camera &Camera, model &Model, const 
     SetUniform(Program.NormalTransform, mat4(1.0f));
     for (const auto &Part : Model.Mesh->Parts)
     {
+        size_t i = &Part - &Model.Mesh->Parts[0];
         const material *Material = Model.Material;
-        if (!Material)
+        if (!Material || Model.MaterialOverrideIndex != i)
         {
             Material = &Part.Material;
         }
@@ -594,9 +601,21 @@ void RenderModel(render_state &RenderState, camera &Camera, model &Model, const 
             glDisable(GL_BLEND);
         }
 
+        if (Material->Flags & MaterialFlag_PolygonLines)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+
+        SetUniform(Program.MaterialFlags, (int)Material->Flags);
         SetUniform(Program.DiffuseColor, Material->DiffuseColor);
         SetUniform(Program.TexWeight, Material->TexWeight);
+        SetUniform(Program.Emission, Material->Emission);
         glDrawArrays(Part.PrimitiveType, Part.Offset, Part.Count);
+
+        if (Material->Flags & MaterialFlag_PolygonLines)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
 
         if (Material->Texture)
         {

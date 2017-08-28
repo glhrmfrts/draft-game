@@ -1,5 +1,4 @@
-#include "draft.h"
-#include "gui.h"
+// Copyright
 
 static string GUIVertexShader = R"FOO(
 #version 330
@@ -38,17 +37,19 @@ void main() {
 }
 )FOO";
 
-static uint32 CheckElementState(game_input &Input, rect Rect)
+static uint32
+CheckElementState(game_input &Input, rect Rect)
 {
     uint32 Result = GUIElementState_none;
     auto &MouseState = Input.MouseState;
     if (MouseState.X > Rect.X &&
         MouseState.Y > Rect.Y &&
         MouseState.X < Rect.X + Rect.Width &&
-        MouseState.Y < Rect.Y + Rect.Height) {
-
+        MouseState.Y < Rect.Y + Rect.Height)
+    {
         Result |= GUIElementState_hovered;
-        if (MouseState.Buttons & MouseButton_left) {
+        if (MouseState.Buttons & MouseButton_left)
+        {
             Result |= GUIElementState_left_pressed;
         }
     }
@@ -96,13 +97,15 @@ void Begin(gui &GUI, camera &Camera)
     ResetBuffer(GUI.Buffer);
 }
 
-static gui_draw_command NextDrawCommand(gui &GUI, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
+static gui_draw_command
+NextDrawCommand(gui &GUI, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
     gui_draw_command Command = {DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 
-static void PushDrawCommand(gui &GUI)
+static void
+PushDrawCommand(gui &GUI)
 {
     if (!GUI.Buffer.VertexCount) return;
 
@@ -111,7 +114,10 @@ static void PushDrawCommand(gui &GUI)
     GUI.DrawCommandList.push_back(Curr);
 }
 
-uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor, texture *Texture, texture_rect TexRect, float TexWeight, bool FlipV, GLuint PrimType, bool CheckState)
+static uint32
+PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
+         texture *Texture, texture_rect TexRect, float TexWeight,
+         bool FlipV, GLuint PrimType, bool CheckState)
 {
     auto &Curr = GUI.CurrentDrawCommand;
     if (Curr.Texture != Texture ||

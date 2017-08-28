@@ -1,7 +1,5 @@
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include "memory.h"
+// Copyright
+#include <typeinfo>
 
 #define Alignment 4
 #define InitialBlockSize 1024*1024
@@ -23,7 +21,7 @@ static size_t GetEffectiveSizeFor(memory_arena &Arena, size_t SizeInit)
     return SizeInit + GetAlignmentOffset(Arena);
 }
 
-void *PushSize(memory_arena &Arena, size_t SizeInit)
+void *PushSize(memory_arena &Arena, size_t SizeInit, const char *Name)
 {
     void *Result = 0;
     size_t Size = SizeInit;
@@ -42,13 +40,14 @@ void *PushSize(memory_arena &Arena, size_t SizeInit)
         }
 
         memory_block *Block = (memory_block *)calloc(1, sizeof(memory_block));
+        Block->Name = ++Name;
         Block->Base = malloc(AllocSize);
         Block->Prev = Arena.CurrentBlock;
         Block->Size = AllocSize;
         Arena.CurrentBlock = Block;
 
 #ifdef DRAFT_DEBUG
-        printf("[memory] Allocating memory block of %u bytes at address %p\n", AllocSize, Block->Base);
+        printf("[memory] Allocating memory block '%s' of %u bytes at address %p\n", Name, AllocSize, Block->Base);
 #endif
     }
 
@@ -63,13 +62,23 @@ void *PushSize(memory_arena &Arena, size_t SizeInit)
     return Result;
 }
 
+template<typename T>
+T *PushStruct(memory_arena &Arena)
+{
+    auto Result = (T *)PushSize(Arena, sizeof(T), typeid(T).name());
+
+    // call the constructor manually
+    new(Result) T();
+    return Result;
+}
+
 void FreeArena(memory_arena &Arena)
 {
     while (Arena.CurrentBlock)
     {
         auto Block = Arena.CurrentBlock;
 #ifdef DRAFT_DEBUG
-        printf("[memory] Freeing memory block of %u bytes at address %p\n", Block->Size, Block->Base);
+        printf("[memory] Freeing memory block '%s' of %u bytes at address %p\n", Block->Name, Block->Size, Block->Base);
 #endif
         free(Block->Base);
         free(Block);

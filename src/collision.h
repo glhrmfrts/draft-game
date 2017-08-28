@@ -1,8 +1,6 @@
 #ifndef DRAFT_COLLISION_H
 #define DRAFT_COLLISION_H
 
-#include "common.h"
-
 enum shape_type
 {
     Shape_BoundingBox,
@@ -43,9 +41,5 @@ BoundsFromMinMax(vec3 Min, vec3 Max)
     Result.Center = Min + Result.Half;
     return Result;
 }
-
-void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions);
-void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime);
-void ResolveCollision(collision &Col);
 
 #endif

@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -31,10 +32,12 @@ using std::vector;
 using std::unordered_map;
 
 #define Color_white color(1, 1, 1, 1)
+#define Color_black color(0, 0, 0, 1)
 #define Color_blue  color(0, 0, 0.5, 1)
 #define Color_green  color(0, 1, 0, 1)
 #define Color_red  color(1, 0, 0, 1)
 #define Color_gray  color(0.5, 0.5, 0.5, 1)
+#define Color_yellow  color(1, 1, 0, 1)
 
 enum direction
 {

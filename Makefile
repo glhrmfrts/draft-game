@@ -1,6 +1,5 @@
 SRC = $(wildcard src/*.cpp)
 SRC += $(wildcard deps/*.cpp)
-OBJ = ${SRC:.cpp=.o}
 
 ifdef SystemRoot
 	LIBS = -lglew32s -lfreetype-6 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lgdi32 -lopenAL32 -lsndfile-1
@@ -19,17 +18,13 @@ ifdef SystemRoot
 	OUT = build/draft.exe
 endif
 
-$(OUT): $(OBJ)
-	@$(CC) $^ $(LDFLAGS) -o $@
-
-%.o: %.cpp
-	@$(CC) -c $(CFLAGS) $< -o $@
-	@printf "%s\n" $@
+$(OUT): $(SRC)
+	$(CC) $(CFLAGS) deps/lodepng.cpp src/draft.cpp -o $@ $(LDFLAGS)
 
 run: $(OUT)
 	@cd build && ./../$(OUT)
 
 clean:
-	@rm $(OBJ) $(OUT)
+	@rm $(OUT)
 
 .PHONY: run clean
