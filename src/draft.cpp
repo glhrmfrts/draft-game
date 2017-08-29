@@ -431,7 +431,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         if (Segment.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
         {
             Segment.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
-            Println(i);
         }
 
         mat4 TransformMatrix = glm::translate(mat4(1.0f), Segment.Position);
@@ -525,6 +524,8 @@ int main(int argc, char **argv)
     {
         clock_t CurrentTime = clock();
         float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC * 1000);
+
+        Println(Elapsed / 1000.0f);
 
         SDL_Event Event;
         while (SDL_PollEvent(&Event)) {

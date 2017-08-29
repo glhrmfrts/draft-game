@@ -541,6 +541,7 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     InitFramebuffer(RenderState.FXAAFramebuffer[1], Width, Height, 0, 1);
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
+        // @TODO: maybe it is not necessary to scale down
         size_t BlurWidth = Width >> i;
         size_t BlurHeight = Height >> i;
 
