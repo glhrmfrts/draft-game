@@ -138,8 +138,8 @@ struct camera
     };
 };
 
-#define MaterialFlag_NoLight 0x1
-#define MaterialFlag_PolygonLines 0x2
+#define Material_NoLight 0x1
+#define Material_PolygonLines 0x2
 struct material
 {
     color DiffuseColor = Color_white;

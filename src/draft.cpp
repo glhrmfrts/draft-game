@@ -165,7 +165,7 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.9f), 0, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, MaterialFlag_PolygonLines));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
     Entity->Shape = CreateShape(Shape_BoundingBox);
     AddEntity(Game, Entity);
@@ -213,7 +213,7 @@ StartLevel(game_state &Game)
         AddTriangle(ShipMesh.Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
 
         material ShipMaterial = {Color_white, 0, 0, NULL};
-        material ShipOutlineMaterial = {Color_white, 1, 0, NULL, MaterialFlag_PolygonLines};
+        material ShipOutlineMaterial = {Color_white, 1, 0, NULL, Material_PolygonLines};
         AddPart(ShipMesh, {ShipMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
         AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
 
@@ -421,9 +421,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         Game.SkyboxEntity->Position.x += dx * 0.25f;
     }
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     UpdateProjectionView(Game.Camera);
-
     RenderBegin(Game.RenderState);
 
     for (auto &Segment : Game.Segments)

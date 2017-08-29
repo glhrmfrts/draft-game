@@ -18,7 +18,7 @@ static string ModelVertexShader = R"FOO(
     uniform mat4 u_ProjectionView;
     uniform mat4 u_Transform;
     uniform mat4 u_NormalTransform;
-    uniform int u_MaterialFlags;
+    uniform int u_Materials;
 
     smooth out vec2  v_Uv;
     smooth out vec4  v_Color;
@@ -672,9 +672,9 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
 
     // TODO: framebuffer needs depth
-    InitFramebuffer(RenderState.SceneFramebuffer, Width, Height, 0, ColorTexture_Count);
-    InitFramebuffer(RenderState.BlurHorizontalFramebuffer, Width, Height, 0, 1);
-    InitFramebuffer(RenderState.BlurVerticalFramebuffer, Width, Height, 0, 1);
+    InitFramebuffer(RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
+    InitFramebuffer(RenderState.BlurHorizontalFramebuffer, Width/2, Height/2, 0, 1);
+    InitFramebuffer(RenderState.BlurVerticalFramebuffer, Width/2, Height/2, 0, 1);
 
     glLineWidth(2);
 
@@ -686,6 +686,7 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 void RenderBegin(render_state &RenderState)
 {
     BindFramebuffer(RenderState.SceneFramebuffer);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 enum blur_orientation
@@ -701,7 +702,7 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
     SetUniform(Program.TexelSize, vec2(1.0f / (float)RenderState.Width, 1.0f / (float)RenderState.Height));
     SetUniform(Program.Orientation, (int)Orientation);
     SetUniform(Program.Amount, 10);
-    SetUniform(Program.Scale, 0.5f);
+    SetUniform(Program.Scale, 3.0f);
     SetUniform(Program.Strength, 1);
     Bind(Texture, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -715,21 +716,21 @@ void RenderEnd(render_state &RenderState)
 
     glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
-    //BindFramebuffer(RenderState.BlurHorizontalFramebuffer);
+    BindFramebuffer(RenderState.BlurHorizontalFramebuffer);
     RenderBlur(RenderState, RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Horizontal);
-    //UnbindFramebuffer(RenderState);
+    UnbindFramebuffer(RenderState);
 
-    //BindFramebuffer(RenderState.BlurVerticalFramebuffer);
-    //RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
-    //UnbindFramebuffer(RenderState);
+    BindFramebuffer(RenderState.BlurVerticalFramebuffer);
+    RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
+    UnbindFramebuffer(RenderState);
 
     // blend scene and blur
-    /*glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     Bind(RenderState.BlendProgram);
     Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 0);
     Bind(RenderState.BlurVerticalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 1);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    UnbindShaderProgram();*/
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    UnbindShaderProgram();
 }
 
 void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix)
@@ -772,7 +773,7 @@ void RenderModel(render_state &RenderState, camera &Camera, model &Model, const 
             glDisable(GL_BLEND);
         }
 
-        if (Material->Flags & MaterialFlag_PolygonLines)
+        if (Material->Flags & Material_PolygonLines)
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
@@ -783,7 +784,7 @@ void RenderModel(render_state &RenderState, camera &Camera, model &Model, const 
         SetUniform(Program.Emission, Material->Emission);
         glDrawArrays(Part.PrimitiveType, Part.Offset, Part.Count);
 
-        if (Material->Flags & MaterialFlag_PolygonLines)
+        if (Material->Flags & Material_PolygonLines)
         {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
@@ -816,6 +817,7 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     SetUniform(Program.Transform, mat4(1.0));
     SetUniform(Program.TexWeight, 1.0f);
     SetUniform(Program.DiffuseColor, Color_white);
+    SetUniform(Program.Emission, 0.0f);
 
     auto Frame = Sprite.CurrentFrame;
     assert(Frame);
@@ -874,6 +876,7 @@ void DebugRenderBounds(render_state &RenderState, camera &Camera, const bounding
     SetUniform(Program.ProjectionView, Camera.ProjectionView);
     SetUniform(Program.Transform, mat4(1.0));
     SetUniform(Program.TexWeight, 0.0f);
+    SetUniform(Program.Emission, 0.0f);
 
     color DiffuseColor = Color_green;
     if (Colliding)
