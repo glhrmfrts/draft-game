@@ -195,6 +195,12 @@ struct blur_program
     int Sampler;
 };
 
+struct fxaa_program
+{
+    shader_program ShaderProgram;
+    int Resolution;
+};
+
 enum color_texture_type
 {
     ColorTexture_SurfaceReflect,
@@ -204,6 +210,7 @@ enum color_texture_type
 
 #define Framebuffer_HasDepth 0x1
 #define Framebuffer_IsFloat  0x2
+#define Framebuffer_Filtered 0x4
 struct framebuffer
 {
     uint32 Flags;
@@ -214,15 +221,18 @@ struct framebuffer
     texture ColorTextures[ColorTexture_Count];
 };
 
+#define BloomBlurPassCount 3
 struct render_state
 {
     model_program ModelProgram;
     blur_program BlurProgram;
+    fxaa_program FXAAProgram;
     shader_program BlendProgram;
 
     framebuffer SceneFramebuffer;
-    framebuffer BlurHorizontalFramebuffer;
-    framebuffer BlurVerticalFramebuffer;
+    framebuffer FXAAFramebuffer[2];
+    framebuffer BlurHorizontalFramebuffer[BloomBlurPassCount];
+    framebuffer BlurVerticalFramebuffer[BloomBlurPassCount];
 
     vertex_buffer SpriteBuffer;
     vertex_buffer ScreenBuffer;

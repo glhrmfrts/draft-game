@@ -1,159 +1,6 @@
 // Copyright
 
-static string ModelVertexShader = R"FOO(
-#version 330
-
-// In this game we use only one forward directional light
-// so these simple defines will do the job
-#define AmbientLight vec4(0.5f)
-#define LightColor vec4(1.0f)
-#define LightIntensity 1
-#define M_PI 3.1415926535897932384626433832795
-
-    layout (location = 0) in vec3  a_Position;
-    layout (location = 1) in vec2  a_Uv;
-    layout (location = 2) in vec4  a_Color;
-    layout (location = 3) in vec3  a_Normal;
-
-    uniform mat4 u_ProjectionView;
-    uniform mat4 u_Transform;
-    uniform mat4 u_NormalTransform;
-    uniform int u_Materials;
-
-    smooth out vec2  v_Uv;
-    smooth out vec4  v_Color;
-
-    void main() {
-      vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
-      gl_Position = u_ProjectionView * WorldPos;
-
-      vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
-
-      vec4 Lighting = AmbientLight;
-      Lighting += LightColor * dot(-vec3(0, 0, -1), Normal) * LightIntensity;
-      Lighting.a = 1.0f;
-
-      v_Uv = a_Uv;
-      v_Color = a_Color * clamp(Lighting, 0, 1);
-    }
-)FOO";
-
-static string ModelFragmentShader = R"FOO(
-#version 330
-
-    uniform sampler2D u_Sampler;
-    uniform vec4 u_DiffuseColor;
-    uniform float u_Emission;
-    uniform float u_TexWeight;
-
-    smooth in vec2  v_Uv;
-    smooth in vec4  v_Color;
-
-    layout (location = 0) out vec4 BlendUnitColor[2];
-
-    void main() {
-      vec4 TexColor = texture(u_Sampler, v_Uv);
-      vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
-      Color *= v_Color;
-      Color *= u_DiffuseColor;
-
-      //float fog = abs(v_worldPos.z - u_camPos.z);
-      //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
-      //fog = clamp(fog, 0.0, 1.0);
-
-      vec4 Emit = (Color * u_Emission);
-
-      BlendUnitColor[0] = Emit + Color;//mix(color, u_fogColor, 1.0 - fog);
-      BlendUnitColor[1] = Emit;
-    }
-)FOO";
-
-static string ScreenVertexShader = R"FOO(
-#version 330
-
-layout (location = 0) in vec2 a_position;
-layout (location = 1) in vec2 a_uv;
-
-smooth out vec2 v_uv;
-
-void main() {
-  gl_Position = vec4(a_position, 0.0, 1.0);
-  v_uv = a_uv;
-}
-)FOO";
-
-static string BlurFragmentShader = R"FOO(
-#version 330
-
-uniform sampler2D u_sampler;
-uniform vec2 u_texelSize;
-uniform int u_orientation;
-uniform int u_amount;
-uniform float u_scale;
-uniform float u_strength;
-
-smooth in vec2 v_uv;
-
-out vec4 outColor;
-
-float gaussian(float x, float deviation) {
-	return (1.0 / sqrt(2.0 * 3.141592 * deviation)) * exp(-((x * x) / (2.0 * deviation)));
-}
-
-void main() {
-	float halfBlur = float(u_amount) * 0.5;
-	vec4 colour = vec4(0.0);
-	vec4 texColour = vec4(0.0);
-
-	// gaussian deviation
-	float deviation = halfBlur * 0.35;
-	deviation *= deviation;
-	float strength = 1.0 - u_strength;
-
-	if (u_orientation == 0) {
-		// horizontal blur
-		for (int i = 0; i < 10; ++i) {
-			if (i >= u_amount)
-				break;
-
-			float offset = float(i) - halfBlur;
-			texColour = texture2D(u_sampler, v_uv + vec2(offset * u_texelSize.x * u_scale, 0.0)) * gaussian(offset * strength, deviation);
-			colour += texColour;
-		}
-	}
-	else {
-		// vertical blur
-		for (int i = 0; i < 10; ++i) {
-			if (i >= u_amount)
-				break;
-
-			float offset = float(i) - halfBlur;
-			texColour = texture2D(u_sampler, v_uv + vec2(0.0, offset * u_texelSize.y * u_scale)) * gaussian(offset * strength, deviation);
-			colour += texColour;
-		}
-	}
-
-	// apply colour
-	outColor = colour;
-}
-)FOO";
-
-static string BlendFragmentShader = R"FOO(
-#version 330
-
-uniform sampler2D u_Sampler1;
-uniform sampler2D u_Sampler2;
-
-smooth in vec2 v_uv;
-
-out vec4 outColor;
-
-void main() {
-  vec4 scene = texture(u_Sampler1, v_uv);
-  vec4 blur  = texture(u_Sampler2, v_uv);
-  outColor = (scene + blur) - (scene * blur);
-}
-)FOO";
+#include "shaders.cpp"
 
 static void
 EnableVertexAttribute(vertex_attribute Attr)
@@ -519,16 +366,18 @@ InitFramebuffer(framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Fl
     glGenFramebuffers(1, &Framebuffer.ID);
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
 
+    GLint Filter = (Flags & Framebuffer_Filtered) ? GL_LINEAR : GL_NEAREST;
+    GLuint Format = (Flags & Framebuffer_IsFloat) ? GL_RGBA16F : GL_RGBA8;
     for (size_t i = 0; i < ColorTextureCount; i++)
     {
-        CreateFramebufferTexture(Framebuffer.ColorTextures[i], GL_TEXTURE_2D, Width, Height, GL_NEAREST, GL_RGBA8);
+        CreateFramebufferTexture(Framebuffer.ColorTextures[i], GL_TEXTURE_2D, Width, Height, Filter, Format);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, Framebuffer.ColorTextures[i].ID, 0);
     }
     glDrawBuffers(ColorTextureCount, FramebufferColorAttachments);
 
     if (Flags & Framebuffer_HasDepth)
     {
-        CreateFramebufferTexture(Framebuffer.DepthTexture, GL_TEXTURE_2D, Width, Height, GL_NEAREST, OPENGL_DEPTH_COMPONENT_TYPE);
+        CreateFramebufferTexture(Framebuffer.DepthTexture, GL_TEXTURE_2D, Width, Height, Filter, OPENGL_DEPTH_COMPONENT_TYPE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Framebuffer.DepthTexture.ID, 0);
     }
 
@@ -626,7 +475,7 @@ CompileModelProgram(model_program &Program)
 static void
 CompileBlurProgram(blur_program &Program)
 {
-    CompileShaderProgram(Program.ShaderProgram, ScreenVertexShader.c_str(), BlurFragmentShader.c_str());
+    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), BlurFragmentShader.c_str());
     Program.TexelSize = glGetUniformLocation(Program.ShaderProgram.ID, "u_texelSize");
     Program.Orientation = glGetUniformLocation(Program.ShaderProgram.ID, "u_orientation");
     Program.Amount = glGetUniformLocation(Program.ShaderProgram.ID, "u_amount");
@@ -642,11 +491,26 @@ CompileBlurProgram(blur_program &Program)
 static void
 CompileBlendProgram(shader_program &Program)
 {
-    CompileShaderProgram(Program, ScreenVertexShader.c_str(), BlendFragmentShader.c_str());
-
+    CompileShaderProgram(Program, BlitVertexShader.c_str(), BlendFragmentShader.c_str());
     Bind(Program);
-    SetUniform(glGetUniformLocation(Program.ID, "u_Sampler1"), 0);
-    SetUniform(glGetUniformLocation(Program.ID, "u_Sampler2"), 1);
+    for (int i = 0; i < BloomBlurPassCount; i++)
+    {
+        char Name[] = "u_Pass#";
+        Name[7] = (char)('0' + i);
+        SetUniform(glGetUniformLocation(Program.ID, Name), 0);
+    }
+    SetUniform(glGetUniformLocation(Program.ID, "u_Scene"), BloomBlurPassCount);
+    UnbindShaderProgram();
+}
+
+static void
+CompileFXAAProgram(fxaa_program &Program)
+{
+    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), FXAAFragmentShader.c_str());
+    Program.Resolution = glGetUniformLocation(Program.ShaderProgram.ID, "u_resolution");
+
+    Bind(Program.ShaderProgram);
+    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_sampler"), 0);
     UnbindShaderProgram();
 }
 
@@ -658,6 +522,7 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     CompileModelProgram(RenderState.ModelProgram);
     CompileBlurProgram(RenderState.BlurProgram);
     CompileBlendProgram(RenderState.BlendProgram);
+    CompileFXAAProgram(RenderState.FXAAProgram);
 
     InitMeshBuffer(RenderState.SpriteBuffer);
     InitBuffer(RenderState.ScreenBuffer, 4, 2,
@@ -671,10 +536,17 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
     UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
 
-    // TODO: framebuffer needs depth
     InitFramebuffer(RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
-    InitFramebuffer(RenderState.BlurHorizontalFramebuffer, Width/2, Height/2, 0, 1);
-    InitFramebuffer(RenderState.BlurVerticalFramebuffer, Width/2, Height/2, 0, 1);
+    InitFramebuffer(RenderState.FXAAFramebuffer[0], Width, Height, 0, 1);
+    InitFramebuffer(RenderState.FXAAFramebuffer[1], Width, Height, 0, 1);
+    for (int i = 0; i < BloomBlurPassCount; i++)
+    {
+        size_t BlurWidth = Width >> i;
+        size_t BlurHeight = Height >> i;
+
+        InitFramebuffer(RenderState.BlurHorizontalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
+        InitFramebuffer(RenderState.BlurVerticalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
+    }
 
     glLineWidth(2);
 
@@ -702,8 +574,8 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
     SetUniform(Program.TexelSize, vec2(1.0f / (float)RenderState.Width, 1.0f / (float)RenderState.Height));
     SetUniform(Program.Orientation, (int)Orientation);
     SetUniform(Program.Amount, 10);
-    SetUniform(Program.Scale, 3.0f);
-    SetUniform(Program.Strength, 1);
+    SetUniform(Program.Scale, 1.0f);
+    SetUniform(Program.Strength, 0.25f);
     Bind(Texture, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     Unbind(Texture, 0);
@@ -713,24 +585,70 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
 void RenderEnd(render_state &RenderState)
 {
     UnbindFramebuffer(RenderState);
-
     glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
-    BindFramebuffer(RenderState.BlurHorizontalFramebuffer);
-    RenderBlur(RenderState, RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Horizontal);
-    UnbindFramebuffer(RenderState);
+    for (int i = 0; i < BloomBlurPassCount; i++)
+    {
+        texture *Input = &RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit];
+        if (i > 0)
+        {
+            Input = &RenderState.BlurVerticalFramebuffer[i - 1].ColorTextures[ColorTexture_SurfaceReflect];
+        }
 
-    BindFramebuffer(RenderState.BlurVerticalFramebuffer);
-    RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
-    UnbindFramebuffer(RenderState);
+        BindFramebuffer(RenderState.BlurHorizontalFramebuffer[i]);
+        RenderBlur(RenderState, *Input, Blur_Horizontal);
+        UnbindFramebuffer(RenderState);
+
+        BindFramebuffer(RenderState.BlurVerticalFramebuffer[i]);
+        RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
+        UnbindFramebuffer(RenderState);
+    }
 
     // blend scene and blur
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    BindFramebuffer(RenderState.FXAAFramebuffer[0]);
+    glClear(GL_COLOR_BUFFER_BIT);
     Bind(RenderState.BlendProgram);
-    Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 0);
-    Bind(RenderState.BlurVerticalFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], 1);
+    for (int i = 0; i < BloomBlurPassCount; i++)
+    {
+        Bind(RenderState.BlurVerticalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], i);
+    }
+    Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     UnbindShaderProgram();
+    UnbindFramebuffer(RenderState);
+
+    // fxaa passes
+    const int FXAAPassCount = 2;
+    for (int i = 1; i < FXAAPassCount; i++)
+    {
+        framebuffer *Input = &RenderState.FXAAFramebuffer[1];
+        framebuffer *Output = &RenderState.FXAAFramebuffer[0];
+        if (i % 2)
+        {
+            Input = Input - 1;
+            Output = Output + 1;
+        }
+
+        if (i == FXAAPassCount - 1)
+        {
+            Output = NULL;
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+        else
+        {
+            BindFramebuffer(*Output);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        Bind(RenderState.FXAAProgram.ShaderProgram);
+        Bind(Input->ColorTextures[ColorTexture_SurfaceReflect], 0);
+        SetUniform(RenderState.FXAAProgram.Resolution, vec2(RenderState.Width, RenderState.Height));
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        UnbindFramebuffer(RenderState);
+        UnbindShaderProgram();
+    }
+
+    // @TODO: cleanup textures
 }
 
 void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix)

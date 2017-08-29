@@ -1,7 +1,8 @@
 /*
-  Current TODO:
-  - Create other types of movable entities
-  - Create a render command buffer
+  Current TODOs:
+  - Fix order of rendering (by creating the renderer buffer)
+  - Dev console to tweak runtime variables (maybe ImGUI)
+  - Create the ship's "trail"
  */
 
 #include <iostream>
@@ -164,7 +165,7 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.9f), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
     Entity->Shape = CreateShape(Shape_BoundingBox);
@@ -182,8 +183,8 @@ StartLevel(game_state &Game)
         auto &FloorMesh = Game.FloorMesh;
         InitMeshBuffer(FloorMesh.Buffer);
 
-        material FloorMaterial = {IntColor(FirstPalette.Colors[2], 0.5f), 0, 0, NULL};
-        material LaneMaterial = {IntColor(FirstPalette.Colors[3]), 1, 0, NULL};
+        material FloorMaterial = {IntColor(FirstPalette.Colors[2], 0.25f), 0, 0, NULL};
+        material LaneMaterial = {IntColor(FirstPalette.Colors[3]), 0.5f, 0, NULL};
 
         float w = TrackSegmentWidth * TrackLaneWidth;
         float l = -w/2;
@@ -250,8 +251,8 @@ StartLevel(game_state &Game)
     Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
-    Game.EnemyEntity = CreateShipEntity(Game, Color_black, IntColor(SecondPalette.Colors[3]));
-    Game.PlayerEntity = CreateShipEntity(Game, IntColor(FirstPalette.Colors[0]), IntColor(FirstPalette.Colors[1]));
+    Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[2]), IntColor(SecondPalette.Colors[3]));
+    Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]));
     Game.PlayerEntity->Rotation.y = 20.0f;
 
     Game.EnemyEntity->Position.x = 4;
@@ -459,7 +460,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
     {
         auto Entity = Game.ShapedEntities[i];
-        DebugRenderBounds(Game.RenderState, Game.Camera, Entity->Shape->BoundingBox, Entity->NumCollisions > 0);
+        //DebugRenderBounds(Game.RenderState, Game.Camera, Entity->Shape->BoundingBox, Entity->NumCollisions > 0);
     }
 #endif
 
