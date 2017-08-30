@@ -1,6 +1,7 @@
 #ifndef DRAFT_DRAFT_H
 #define DRAFT_DRAFT_H
 
+#include "config.h"
 #include "common.h"
 #include "memory.h"
 #include "collision.h"

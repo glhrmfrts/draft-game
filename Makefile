@@ -1,6 +1,8 @@
 SRC = $(wildcard src/*.cpp)
 SRC += $(wildcard deps/*.cpp)
 
+CFILES = deps/imgui.cpp deps/imgui_draw.cpp deps/imgui_demo.cpp deps/imgui_impl_sdl_gl3.cpp deps/lodepng.cpp src/draft.cpp
+
 ifdef SystemRoot
 	LIBS = -lglew32s -lfreetype-6 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lgdi32 -lopenAL32 -lsndfile-1
 else
@@ -19,7 +21,7 @@ ifdef SystemRoot
 endif
 
 $(OUT): $(SRC)
-	$(CC) $(CFLAGS) deps/lodepng.cpp src/draft.cpp -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(CFILES) -o $@ $(LDFLAGS)
 
 run: $(OUT)
 	@cd build && ./../$(OUT)

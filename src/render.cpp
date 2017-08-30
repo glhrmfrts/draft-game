@@ -542,8 +542,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
         // @TODO: maybe it is not necessary to scale down
-        size_t BlurWidth = Width >> i;
-        size_t BlurHeight = Height >> i;
+        size_t BlurWidth = Width;// >> i;
+        size_t BlurHeight = Height;// >> i;
 
         InitFramebuffer(RenderState.BlurHorizontalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
         InitFramebuffer(RenderState.BlurVerticalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
@@ -558,9 +558,64 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
 void RenderBegin(render_state &RenderState)
 {
+    RenderState.LastVAO = -1;
     RenderState.RenderableCount = 0;
     RenderState.FrameSolidRenderables.clear();
     RenderState.FrameTransparentRenderables.clear();
+}
+
+static void
+RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
+{
+    if (RenderState.LastVAO != r.VAO)
+    {
+        glBindVertexArray(RenderState.LastVAO = r.VAO);
+    }
+
+    auto &Program = RenderState.ModelProgram;
+    Bind(Program.ShaderProgram);
+    SetUniform(Program.ProjectionView, Camera.ProjectionView);
+
+    mat4 TransformMatrix = glm::translate(mat4(1.0f), r.Position);
+    TransformMatrix = glm::scale(TransformMatrix, r.Scale);
+    if (r.Rotation.x != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.x), vec3(1,0,0));
+    }
+    if (r.Rotation.y != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.y), vec3(0,1,0));
+    }
+    if (r.Rotation.z != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.z), vec3(0,0,1));
+    }
+    SetUniform(Program.Transform, TransformMatrix);
+
+    // @TODO: check why this breaks the floor model
+    SetUniform(Program.NormalTransform, mat4(1.0f));
+
+    if (r.Material->Texture)
+    {
+        Bind(*r.Material->Texture, 0);
+    }
+    if (r.Material->Flags & Material_PolygonLines)
+    {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+    SetUniform(Program.MaterialFlags, (int)r.Material->Flags);
+    SetUniform(Program.DiffuseColor, r.Material->DiffuseColor);
+    SetUniform(Program.TexWeight, r.Material->TexWeight);
+    SetUniform(Program.Emission, r.Material->Emission);
+    glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
+    if (r.Material->Flags & Material_PolygonLines)
+    {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+    if (r.Material->Texture)
+    {
+        Unbind(*r.Material->Texture, 0);
+    }
 }
 
 enum blur_orientation
@@ -575,9 +630,9 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
     Bind(Program.ShaderProgram);
     SetUniform(Program.TexelSize, vec2(1.0f / (float)RenderState.Width, 1.0f / (float)RenderState.Height));
     SetUniform(Program.Orientation, (int)Orientation);
-    SetUniform(Program.Amount, 10);
-    SetUniform(Program.Scale, 1.0f);
-    SetUniform(Program.Strength, 0.25f);
+    SetUniform(Program.Amount, Global_Renderer_BloomBlurAmount);
+    SetUniform(Program.Scale, Global_Renderer_BloomBlurScale);
+    SetUniform(Program.Strength, Global_Renderer_BloomBlurStrength);
     Bind(Texture, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     Unbind(Texture, 0);
@@ -588,135 +643,105 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 {
     assert(Camera.Updated);
 
-    BindFramebuffer(RenderState.SceneFramebuffer);
+    if (Global_Renderer_DoPostFX)
+    {
+        BindFramebuffer(RenderState.SceneFramebuffer);
+    }
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    //glEnable(GL_BLEND);
-    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    RenderState.LastVAO = -1;
-    for (auto r : RenderState.FrameSolidRenderables)
+    for (auto RenderableIndex : RenderState.FrameSolidRenderables)
     {
-        if (RenderState.LastVAO != r->VAO)
-        {
-            glBindVertexArray(RenderState.LastVAO = r->VAO);
-        }
-
-        auto &Program = RenderState.ModelProgram;
-        Bind(Program.ShaderProgram);
-        SetUniform(Program.ProjectionView, Camera.ProjectionView);
-
-        mat4 TransformMatrix = glm::translate(mat4(1.0f), r->Position);
-        TransformMatrix = glm::scale(TransformMatrix, r->Scale);
-        if (r->Rotation.x != 0.0f)
-        {
-            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.x), vec3(1,0,0));
-        }
-        if (r->Rotation.y != 0.0f)
-        {
-            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.y), vec3(0,1,0));
-        }
-        if (r->Rotation.z != 0.0f)
-        {
-            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.z), vec3(0,0,1));
-        }
-        SetUniform(Program.Transform, TransformMatrix);
-
-        // @TODO: check why this breaks the floor model
-        SetUniform(Program.NormalTransform, mat4(1.0f));
-
-        if (r->Material->Texture)
-        {
-            //Bind(*r->Material->Texture, 0);
-        }
-        if (r->Material->Flags & Material_PolygonLines)
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        }
-        SetUniform(Program.MaterialFlags, (int)r->Material->Flags);
-        SetUniform(Program.DiffuseColor, r->Material->DiffuseColor);
-        SetUniform(Program.TexWeight, r->Material->TexWeight);
-        SetUniform(Program.Emission, r->Material->Emission);
-        glDrawArrays(r->PrimitiveType, r->VertexOffset, r->VertexCount);
-        if (r->Material->Flags & Material_PolygonLines)
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        }
-        if (r->Material->Texture)
-        {
-            //Unbind(*r->Material->Texture, 0);
-        }
+        RenderRenderable(RenderState, Camera, RenderState.Renderables[RenderableIndex]);
     }
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    for (auto RenderableIndex : RenderState.FrameTransparentRenderables)
+    {
+        RenderRenderable(RenderState, Camera, RenderState.Renderables[RenderableIndex]);
+    }
+    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
 
-    UnbindFramebuffer(RenderState);
-    glBindVertexArray(RenderState.ScreenBuffer.VAO);
-
-    for (int i = 0; i < BloomBlurPassCount; i++)
+    if (Global_Renderer_DoPostFX)
     {
-        texture *Input = &RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit];
-        if (i > 0)
-        {
-            Input = &RenderState.BlurVerticalFramebuffer[i - 1].ColorTextures[ColorTexture_SurfaceReflect];
-        }
-
-        BindFramebuffer(RenderState.BlurHorizontalFramebuffer[i]);
-        RenderBlur(RenderState, *Input, Blur_Horizontal);
         UnbindFramebuffer(RenderState);
+        glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
-        BindFramebuffer(RenderState.BlurVerticalFramebuffer[i]);
-        RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
-        UnbindFramebuffer(RenderState);
-    }
-
-    // blend scene and blur
-    BindFramebuffer(RenderState.FXAAFramebuffer[0]);
-    glClear(GL_COLOR_BUFFER_BIT);
-    Bind(RenderState.BlendProgram);
-    for (int i = 0; i < BloomBlurPassCount; i++)
-    {
-        Bind(RenderState.BlurVerticalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], i);
-    }
-    Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    UnbindShaderProgram();
-    UnbindFramebuffer(RenderState);
-
-    // fxaa passes
-    const int FXAAPassCount = 2;
-    for (int i = 1; i < FXAAPassCount; i++)
-    {
-        framebuffer *Input = &RenderState.FXAAFramebuffer[1];
-        framebuffer *Output = &RenderState.FXAAFramebuffer[0];
-        if (i % 2)
+        for (int i = 0; i < BloomBlurPassCount; i++)
         {
-            Input = Input - 1;
-            Output = Output + 1;
+            texture *Input = &RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit];
+            if (i > 0)
+            {
+                Input = &RenderState.BlurVerticalFramebuffer[i - 1].ColorTextures[ColorTexture_SurfaceReflect];
+            }
+
+            BindFramebuffer(RenderState.BlurHorizontalFramebuffer[i]);
+            RenderBlur(RenderState, *Input, Blur_Horizontal);
+            UnbindFramebuffer(RenderState);
+
+            BindFramebuffer(RenderState.BlurVerticalFramebuffer[i]);
+            RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
+            UnbindFramebuffer(RenderState);
         }
 
-        if (i == FXAAPassCount - 1)
+        // blend scene and blur
+        if (Global_Renderer_FXAAPasses)
         {
-            Output = NULL;
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        }
-        else
-        {
-            BindFramebuffer(*Output);
+            BindFramebuffer(RenderState.FXAAFramebuffer[0]);
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
-        Bind(RenderState.FXAAProgram.ShaderProgram);
-        Bind(Input->ColorTextures[ColorTexture_SurfaceReflect], 0);
-        SetUniform(RenderState.FXAAProgram.Resolution, vec2(RenderState.Width, RenderState.Height));
+        Bind(RenderState.BlendProgram);
+        for (int i = 0; i < BloomBlurPassCount; i++)
+        {
+            Bind(RenderState.BlurVerticalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], i);
+        }
+        Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        UnbindFramebuffer(RenderState);
         UnbindShaderProgram();
-    }
 
+        if (Global_Renderer_FXAAPasses)
+        {
+            UnbindFramebuffer(RenderState);
+
+            // fxaa passes
+            for (int i = 1; i < Global_Renderer_FXAAPasses; i++)
+            {
+                framebuffer *Input = &RenderState.FXAAFramebuffer[1];
+                framebuffer *Output = &RenderState.FXAAFramebuffer[0];
+                if (i % 2)
+                {
+                    Input = Input - 1;
+                    Output = Output + 1;
+                }
+
+                if (i == Global_Renderer_FXAAPasses - 1)
+                {
+                    Output = NULL;
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                }
+                else
+                {
+                    BindFramebuffer(*Output);
+                    glClear(GL_COLOR_BUFFER_BIT);
+                }
+
+                Bind(RenderState.FXAAProgram.ShaderProgram);
+                Bind(Input->ColorTextures[ColorTexture_SurfaceReflect], 0);
+                SetUniform(RenderState.FXAAProgram.Resolution, vec2(RenderState.Width, RenderState.Height));
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+                UnbindFramebuffer(RenderState);
+                UnbindShaderProgram();
+            }
+        }
+    }
     // @TODO: cleanup textures
 }
 
-renderable *NextRenderable(render_state &RenderState)
+// returns the index of the next available renderable
+size_t NextRenderable(render_state &RenderState)
 {
     size_t Size = RenderState.Renderables.size();
     if (RenderState.RenderableCount >= Size)
@@ -728,7 +753,7 @@ renderable *NextRenderable(render_state &RenderState)
         }
         RenderState.Renderables.resize(NewSize);
     }
-    return &RenderState.Renderables[RenderState.RenderableCount++];
+    return RenderState.RenderableCount++;
 }
 
 void PushModel(render_state &RenderState, model &Model, const vec3 &Position, const vec3 &Scale, const vec3 &Rotation)
@@ -737,30 +762,31 @@ void PushModel(render_state &RenderState, model &Model, const vec3 &Position, co
     for (auto &Part : Mesh->Parts)
     {
         size_t i = &Part - &Mesh->Parts[0];
-        material *Material = &Part.Material;
+        auto Material = &Part.Material;
         if (i < Model.Materials.size() && Model.Materials[i])
         {
             Material = Model.Materials[i];
         }
 
-        renderable *r = NextRenderable(RenderState);
-        r->PrimitiveType = Part.PrimitiveType;
-        r->VertexOffset = Part.Offset;
-        r->VertexCount = Part.Count;
-        r->VAO = Mesh->Buffer.VAO;
-        r->Material = Material;
-        r->Position = Position;
-        r->Scale = Scale;
-        r->Rotation = Rotation;
-        r->Bounds = BoundsFromMinMax(Mesh->Min*Scale, Mesh->Max*Scale);
-        r->Bounds.Center += r->Position;
+        size_t Index = NextRenderable(RenderState);
+        auto &r = RenderState.Renderables[Index];
+        r.PrimitiveType = Part.PrimitiveType;
+        r.VertexOffset = Part.Offset;
+        r.VertexCount = Part.Count;
+        r.VAO = Mesh->Buffer.VAO;
+        r.Material = Material;
+        r.Position = Position;
+        r.Scale = Scale;
+        r.Rotation = Rotation;
+        r.Bounds = BoundsFromMinMax(Mesh->Min*Scale, Mesh->Max*Scale);
+        r.Bounds.Center += r.Position;
         if (Material->DiffuseColor.a < 1.0f)
         {
-            RenderState.FrameTransparentRenderables.push_back(r);
+            RenderState.FrameTransparentRenderables.push_back(Index);
         }
         else
         {
-            RenderState.FrameSolidRenderables.push_back(r);
+            RenderState.FrameSolidRenderables.push_back(Index);
         }
     }
 }

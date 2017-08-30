@@ -253,8 +253,8 @@ struct render_state
     vector<renderable> Renderables;
     size_t RenderableCount;
 
-    vector<renderable *> FrameSolidRenderables;
-    vector<renderable *> FrameTransparentRenderables;
+    vector<size_t> FrameSolidRenderables;
+    vector<size_t> FrameTransparentRenderables;
 
     uint32 Width;
     uint32 Height;

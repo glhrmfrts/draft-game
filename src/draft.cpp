@@ -1,8 +1,8 @@
 /*
   Current TODOs:
-  - Fix order of rendering (by creating the renderer buffer)
-  - Dev console to tweak runtime variables (maybe ImGUI)
-  - Create the ship's "trail"
+  - (Renderer) Framebuffers need to support multisampling
+  - (Renderer) Fix order of rendering (by creating the renderer buffer & sorting renderables)
+  - (Game)     Create the ship's "trail"
  */
 
 #include <iostream>
@@ -12,12 +12,15 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <AL/alc.h>
+#include "imgui.h"
+#include "imgui_impl_sdl_gl3.h"
 #include "draft.h"
 #include "memory.cpp"
 #include "collision.cpp"
 #include "render.cpp"
 #include "asset.cpp"
 #include "gui.cpp"
+#include "debug_ui.cpp"
 
 #undef main
 
@@ -260,7 +263,7 @@ StartLevel(game_state &Game)
     for (size_t i = 0; i < TrackSegmentCount; i++)
     {
         auto &TrackSegment = Game.Segments[i];
-        TrackSegment.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.5f);
+        TrackSegment.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
     }
 }
 
@@ -300,12 +303,6 @@ Interp(float c, float t, float a, float dt)
     c += a * dir * dt;
     return (dir == std::copysign(1, t - c)) ? c : t;
 }
-
-#ifdef DRAFT_DEBUG
-static bool DebugFreeCamEnabled = false;
-static float Pitch;
-static float Yaw;
-#endif
 
 #define ShipMaxVel  50.0f
 #define ShipAcceleration 20.0f
@@ -354,13 +351,10 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto CamDir = CameraDir(Camera);
 
 #ifdef DRAFT_DEBUG
-    if (IsJustPressed(Game, Action_debugFreeCam))
+    if (Global_Camera_FreeCam)
     {
-        DebugFreeCamEnabled = !DebugFreeCamEnabled;
-    }
-
-    if (DebugFreeCamEnabled)
-    {
+        static float Pitch;
+        static float Yaw;
         float Speed = 20.0f;
         float AxisValue = GetAxisValue(Input, Action_camVertical);
 
@@ -382,10 +376,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
         Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
     }
-    else
 #endif
-    {
-    }
 
     float MoveH = GetAxisValue(Game.Input, Action_horizontal);
     float MoveV = GetAxisValue(Game.Input, Action_vertical);
@@ -407,7 +398,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
     Integrate(Game.ShapedEntities, Game.Gravity, DeltaTime);
 
-    if (!DebugFreeCamEnabled)
+    if (!Global_Camera_FreeCam)
     {
         auto PlayerPosition = Game.PlayerEntity->Position;
         Camera.Position = vec3(PlayerPosition.x,
@@ -439,13 +430,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     for (auto Entity : Game.ModelEntities)
     {
-        //PushModel(Game.RenderState, *Entity->Model, Entity->Position, Entity->Size, Entity->Rotation);
+        PushModel(Game.RenderState, *Entity->Model, Entity->Position, Entity->Size, Entity->Rotation);
     }
 
 #ifdef DRAFT_DEBUG
     for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
     {
-        auto Entity = Game.ShapedEntities[i];
+        // @TODO: time to move debug render bounds to use renderables
+        //auto Entity = Game.ShapedEntities[i];
         //DebugRenderBounds(Game.RenderState, Game.Camera, Entity->Shape->BoundingBox, Entity->NumCollisions > 0);
     }
 #endif
@@ -493,6 +485,8 @@ int main(int argc, char **argv)
     if (!alcMakeContextCurrent(AudioContext))
         std::cerr << "Error setting audio context" << std::endl;
 
+    ImGui_ImplSdlGL3_Init(Window);
+
     game_state Game = {};
     Game.Width = Width;
     Game.Height = Height;
@@ -504,18 +498,22 @@ int main(int argc, char **argv)
     InitRenderState(Game.RenderState, Width, Height);
     StartLevel(Game);
 
+    ImVec4 clear_color = ImColor(114, 144, 154);
+    bool show_test_window = true;
+    bool show_another_window = false;
+
     clock_t PreviousTime = clock();
     float DeltaTime = 0.016f;
-    float DeltaTimeMS = DeltaTime * 1000;
+    float DeltaTimeMS = DeltaTime * 1000.0f;
     while (Game.Running)
     {
         clock_t CurrentTime = clock();
-        float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC * 1000);
-
-        Println(Elapsed / 1000.0f);
+        float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC);
 
         SDL_Event Event;
-        while (SDL_PollEvent(&Event)) {
+        while (SDL_PollEvent(&Event))
+        {
+            ImGui_ImplSdlGL3_ProcessEvent(&Event);
             switch (Event.type) {
             case SDL_QUIT:
                 Game.Running = false;
@@ -535,6 +533,11 @@ int main(int argc, char **argv)
                             Action.AxisValue = -1;
                         }
                     }
+                }
+
+                if (Key == SDLK_BACKQUOTE)
+                {
+                    Global_DebugUI = !Global_DebugUI;
                 }
                 break;
             }
@@ -609,19 +612,36 @@ int main(int argc, char **argv)
             }
         }
 
+        ImGui_ImplSdlGL3_NewFrame(Window);
         UpdateAndRenderLevel(Game, DeltaTime);
+
+        DrawDebugUI(Elapsed);
+
+#if 0
+        // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+        if (show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiCond_FirstUseEver);
+            ImGui::ShowTestWindow(&show_test_window);
+        }
+#endif
+
+        ImGui::Render();
 
         memcpy(&Game.PrevInput, &Game.Input, sizeof(game_input));
         Input.MouseState.dX = 0;
         Input.MouseState.dY = 0;
 
-        if (Elapsed < DeltaTimeMS) {
-            SDL_Delay(DeltaTimeMS - Elapsed);
+        if (Elapsed*1000.0f < DeltaTimeMS)
+        {
+            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
         SDL_GL_SwapWindow(Window);
         PreviousTime = CurrentTime;
     }
+
+    ImGui_ImplSdlGL3_Shutdown();
 
     FreeArena(Game.Arena);
     FreeArena(Game.AssetCache.Arena);
