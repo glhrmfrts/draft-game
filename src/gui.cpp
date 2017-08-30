@@ -77,9 +77,9 @@ void InitGUI(gui &GUI, game_input &Input)
     GUI.Input = &Input;
     CompileGUIShader(GUI);
     InitBuffer(GUI.Buffer, GUIVertexSize, 3,
-               (vertex_attribute){0, 2, GL_FLOAT, 8 * sizeof(float), 0},
-               (vertex_attribute){1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
-               (vertex_attribute){2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
+               vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
+               vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
+               vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
 }
 
 void Begin(gui &GUI, camera &Camera)
@@ -100,7 +100,7 @@ void Begin(gui &GUI, camera &Camera)
 static gui_draw_command
 NextDrawCommand(gui &GUI, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
-    gui_draw_command Command = {DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
+	gui_draw_command Command{DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 

@@ -420,10 +420,10 @@ void InitMeshBuffer(vertex_buffer &Buffer)
 {
     size_t Stride = MeshVertexSize*sizeof(float);
     InitBuffer(Buffer, 12, 4,
-               (vertex_attribute){0, 3, GL_FLOAT, Stride, 0}, // position
-               (vertex_attribute){1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
-               (vertex_attribute){2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
-               (vertex_attribute){3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
+               vertex_attribute({0, 3, GL_FLOAT, Stride, 0}), // position
+               vertex_attribute({1, 2, GL_FLOAT, Stride, 3*sizeof(float)}), // uv
+               vertex_attribute({2, 4, GL_FLOAT, Stride, 5*sizeof(float)}), // color
+               vertex_attribute({3, 3, GL_FLOAT, Stride, 9*sizeof(float)})); // normal
 }
 
 void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
@@ -526,8 +526,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
     InitMeshBuffer(RenderState.SpriteBuffer);
     InitBuffer(RenderState.ScreenBuffer, 4, 2,
-               (vertex_attribute){0, 2, GL_FLOAT, 4*sizeof(float), 0},
-               (vertex_attribute){1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
+               vertex_attribute({0, 2, GL_FLOAT, 4*sizeof(float), 0}),
+               vertex_attribute({1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)}));
     PushVertex(RenderState.ScreenBuffer, {-1, -1, 0, 0});
     PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
     PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});

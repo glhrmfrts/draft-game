@@ -62,7 +62,7 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
-    shape *Shape = NULL;
+    bounding_box *Bounds = NULL;
     model *Model = NULL;
 };
 
@@ -104,6 +104,8 @@ struct game_state
     int Width;
     int Height;
     bool Running = true;
+
+    game_state() {}
 };
 
 #endif

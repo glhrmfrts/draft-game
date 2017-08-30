@@ -1,6 +1,7 @@
 #ifndef DRAFT_COMMON_H
 #define DRAFT_COMMON_H
 
+#include <algorithm>
 #include <iostream>
 #include <cassert>
 #include <cstdint>

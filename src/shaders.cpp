@@ -1,6 +1,6 @@
 // Copyright
 
-static string ModelVertexShader = R"FOO(
+static std::string ModelVertexShader = R"FOO(
 #version 330
 
 // In this game we use only one forward directional light
@@ -38,7 +38,7 @@ static string ModelVertexShader = R"FOO(
     }
 )FOO";
 
-static string ModelFragmentShader = R"FOO(
+static std::string ModelFragmentShader = R"FOO(
 #version 330
 
     uniform sampler2D u_Sampler;
@@ -68,7 +68,7 @@ static string ModelFragmentShader = R"FOO(
     }
 )FOO";
 
-static string BlitVertexShader = R"FOO(
+static std::string BlitVertexShader = R"FOO(
 #version 330
 
 layout (location = 0) in vec2 a_position;
@@ -82,7 +82,7 @@ void main() {
 }
 )FOO";
 
-static string BlitFragmentShader = R"FOO(
+static std::string BlitFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_Sampler;
@@ -96,7 +96,7 @@ void main() {
 }
 )FOO";
 
-static string BlurFragmentShader = R"FOO(
+static std::string BlurFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_sampler;
@@ -152,7 +152,7 @@ void main() {
 }
 )FOO";
 
-static string BlendFragmentShader = R"FOO(
+static std::string BlendFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_Pass0;
@@ -174,7 +174,7 @@ void main() {
 }
 )FOO";
 
-static string FXAAFragmentShader = R"FOO(
+static std::string FXAAFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_sampler;

@@ -147,6 +147,9 @@ struct material
     float TexWeight = 0;
     texture *Texture = NULL;
     uint32 Flags = 0;
+
+    material(color c, float e, float tw, texture *t, uint32 f = 0)
+        : DiffuseColor(c), Emission(e), TexWeight(tw), Texture(t), Flags(f) {}
 };
 
 struct mesh_part
@@ -155,6 +158,9 @@ struct mesh_part
     size_t Offset;
     size_t Count;
     GLuint PrimitiveType;
+
+    mesh_part(material m, size_t o, size_t c, GLuint p)
+        : Material(m), Offset(o), Count(c), PrimitiveType(p) {}
 };
 
 struct mesh

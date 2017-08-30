@@ -1,5 +1,4 @@
 #include "collision.h"
-#include "level.h"
 
 inline static void
 UpdateEntityBounds(entity *Entity)
@@ -7,14 +6,14 @@ UpdateEntityBounds(entity *Entity)
     // TODO: this is not good
     if (Entity->Model)
     {
-        Entity->Shape->BoundingBox = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Size,
-                                                      Entity->Model->Mesh->Max*Entity->Size);
-        Entity->Shape->BoundingBox.Center += Entity->Position;
+        *Entity->Bounds = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Size,
+                                           Entity->Model->Mesh->Max*Entity->Size);
+        Entity->Bounds->Center += Entity->Position;
     }
     else
     {
-        Entity->Shape->BoundingBox.Center = Entity->Position;
-        Entity->Shape->BoundingBox.Half = Entity->Size*0.5f;
+        Entity->Bounds->Center = Entity->Position;
+        Entity->Bounds->Half = Entity->Size*0.5f;
     }
 }
 
@@ -61,8 +60,8 @@ void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collis
         for (size_t j = i+1; j < EntityCount; j++)
         {
             auto EntityB = Entities[j];
-            auto &First = EntityA->Shape->BoundingBox;
-            auto &Second = EntityB->Shape->BoundingBox;
+            auto &First = *EntityA->Bounds;
+            auto &Second = *EntityB->Bounds;
             vec3 Dif = Second.Center - First.Center;
             float dx = First.Half.x + Second.Half.x - std::abs(Dif.x);
             if (dx <= 0)

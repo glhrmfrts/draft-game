@@ -110,7 +110,7 @@ AddEntity(game_state &Game, entity *Entity)
     {
         Game.ModelEntities.push_back(Entity);
     }
-    if (Entity->Shape)
+    if (Entity->Bounds)
     {
         Game.ShapedEntities.push_back(Entity);
     }
@@ -120,14 +120,6 @@ inline static void
 AddFlags(entity *Entity, uint32 Flags)
 {
     Entity->Flags |= Flags;
-}
-
-static shape *
-CreateShape(shape_type Type)
-{
-    shape *Result = new shape;
-    Result->Type = Type;
-    return Result;
 }
 
 static material *
@@ -160,7 +152,7 @@ static void
 AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
 {
     AddQuad(Mesh.Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
-    AddPart(Mesh, {{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
+    AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
 }
 
 static entity *
@@ -171,7 +163,7 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
-    Entity->Shape = CreateShape(Shape_BoundingBox);
+    Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
     AddEntity(Game, Entity);
     return Entity;
 }
@@ -487,7 +479,7 @@ int main(int argc, char **argv)
 
     ImGui_ImplSdlGL3_Init(Window);
 
-    game_state Game = {};
+    game_state Game;
     Game.Width = Width;
     Game.Height = Height;
 
