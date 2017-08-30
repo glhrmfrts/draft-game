@@ -221,6 +221,19 @@ struct framebuffer
     texture ColorTextures[ColorTexture_Count];
 };
 
+struct renderable
+{
+    bounding_box Bounds;
+    vec3 Position;
+    vec3 Scale;
+    vec3 Rotation;
+    material *Material;
+    size_t VertexOffset;
+    size_t VertexCount;
+    GLint VAO;
+    GLuint PrimitiveType;
+};
+
 #define BloomBlurPassCount 3
 struct render_state
 {
@@ -237,8 +250,16 @@ struct render_state
     vertex_buffer SpriteBuffer;
     vertex_buffer ScreenBuffer;
 
+    vector<renderable> Renderables;
+    size_t RenderableCount;
+
+    vector<renderable *> FrameSolidRenderables;
+    vector<renderable *> FrameTransparentRenderables;
+
     uint32 Width;
     uint32 Height;
+
+    GLint LastVAO;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;

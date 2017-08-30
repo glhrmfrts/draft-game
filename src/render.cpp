@@ -5,8 +5,8 @@
 static void
 EnableVertexAttribute(vertex_attribute Attr)
 {
-  glEnableVertexAttribArray(Attr.Location);
-  glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
+    glEnableVertexAttribArray(Attr.Location);
+    glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
 static void
@@ -558,8 +558,9 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
 void RenderBegin(render_state &RenderState)
 {
-    BindFramebuffer(RenderState.SceneFramebuffer);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    RenderState.RenderableCount = 0;
+    RenderState.FrameSolidRenderables.clear();
+    RenderState.FrameTransparentRenderables.clear();
 }
 
 enum blur_orientation
@@ -583,8 +584,71 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
     UnbindShaderProgram();
 }
 
-void RenderEnd(render_state &RenderState)
+void RenderEnd(render_state &RenderState, camera &Camera)
 {
+    assert(Camera.Updated);
+
+    BindFramebuffer(RenderState.SceneFramebuffer);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    RenderState.LastVAO = -1;
+    for (auto r : RenderState.FrameSolidRenderables)
+    {
+        if (RenderState.LastVAO != r->VAO)
+        {
+            glBindVertexArray(RenderState.LastVAO = r->VAO);
+        }
+
+        auto &Program = RenderState.ModelProgram;
+        Bind(Program.ShaderProgram);
+        SetUniform(Program.ProjectionView, Camera.ProjectionView);
+
+        mat4 TransformMatrix = glm::translate(mat4(1.0f), r->Position);
+        TransformMatrix = glm::scale(TransformMatrix, r->Scale);
+        if (r->Rotation.x != 0.0f)
+        {
+            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.x), vec3(1,0,0));
+        }
+        if (r->Rotation.y != 0.0f)
+        {
+            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.y), vec3(0,1,0));
+        }
+        if (r->Rotation.z != 0.0f)
+        {
+            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r->Rotation.z), vec3(0,0,1));
+        }
+        SetUniform(Program.Transform, TransformMatrix);
+
+        // @TODO: check why this breaks the floor model
+        SetUniform(Program.NormalTransform, mat4(1.0f));
+
+        if (r->Material->Texture)
+        {
+            //Bind(*r->Material->Texture, 0);
+        }
+        if (r->Material->Flags & Material_PolygonLines)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        SetUniform(Program.MaterialFlags, (int)r->Material->Flags);
+        SetUniform(Program.DiffuseColor, r->Material->DiffuseColor);
+        SetUniform(Program.TexWeight, r->Material->TexWeight);
+        SetUniform(Program.Emission, r->Material->Emission);
+        glDrawArrays(r->PrimitiveType, r->VertexOffset, r->VertexCount);
+        if (r->Material->Flags & Material_PolygonLines)
+        {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+        if (r->Material->Texture)
+        {
+            //Unbind(*r->Material->Texture, 0);
+        }
+    }
+    glDisable(GL_DEPTH_TEST);
+
     UnbindFramebuffer(RenderState);
     glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
@@ -652,71 +716,53 @@ void RenderEnd(render_state &RenderState)
     // @TODO: cleanup textures
 }
 
-void RenderModel(render_state &RenderState, camera &Camera, model &Model, const mat4 &TransformMatrix)
+renderable *NextRenderable(render_state &RenderState)
 {
-    assert(RenderState.ModelProgram.ShaderProgram.ID);
-    assert(Camera.Updated);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glBindVertexArray(Model.Mesh->Buffer.VAO);
-
-    auto &Program = RenderState.ModelProgram;
-    Bind(Program.ShaderProgram);
-
-    SetUniform(Program.ProjectionView, Camera.ProjectionView);
-    SetUniform(Program.Transform, TransformMatrix);
-
-    // @TODO: check why this breaks the floor model
-    SetUniform(Program.NormalTransform, mat4(1.0f));
-    for (const auto &Part : Model.Mesh->Parts)
+    size_t Size = RenderState.Renderables.size();
+    if (RenderState.RenderableCount >= Size)
     {
-        size_t i = &Part - &Model.Mesh->Parts[0];
-        const material *Material = &Part.Material;
+        size_t NewSize = Size*2;
+        if (!NewSize)
+        {
+            NewSize = 4;
+        }
+        RenderState.Renderables.resize(NewSize);
+    }
+    return &RenderState.Renderables[RenderState.RenderableCount++];
+}
+
+void PushModel(render_state &RenderState, model &Model, const vec3 &Position, const vec3 &Scale, const vec3 &Rotation)
+{
+    mesh *Mesh = Model.Mesh;
+    for (auto &Part : Mesh->Parts)
+    {
+        size_t i = &Part - &Mesh->Parts[0];
+        material *Material = &Part.Material;
         if (i < Model.Materials.size() && Model.Materials[i])
         {
             Material = Model.Materials[i];
         }
-        if (Material->Texture)
-        {
-            Bind(*Material->Texture, 0);
-        }
 
+        renderable *r = NextRenderable(RenderState);
+        r->PrimitiveType = Part.PrimitiveType;
+        r->VertexOffset = Part.Offset;
+        r->VertexCount = Part.Count;
+        r->VAO = Mesh->Buffer.VAO;
+        r->Material = Material;
+        r->Position = Position;
+        r->Scale = Scale;
+        r->Rotation = Rotation;
+        r->Bounds = BoundsFromMinMax(Mesh->Min*Scale, Mesh->Max*Scale);
+        r->Bounds.Center += r->Position;
         if (Material->DiffuseColor.a < 1.0f)
         {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            RenderState.FrameTransparentRenderables.push_back(r);
         }
         else
         {
-            glDisable(GL_BLEND);
-        }
-
-        if (Material->Flags & Material_PolygonLines)
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        }
-
-        SetUniform(Program.MaterialFlags, (int)Material->Flags);
-        SetUniform(Program.DiffuseColor, Material->DiffuseColor);
-        SetUniform(Program.TexWeight, Material->TexWeight);
-        SetUniform(Program.Emission, Material->Emission);
-        glDrawArrays(Part.PrimitiveType, Part.Offset, Part.Count);
-
-        if (Material->Flags & Material_PolygonLines)
-        {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        }
-
-        if (Material->Texture)
-        {
-            Unbind(*Material->Texture, 0);
+            RenderState.FrameSolidRenderables.push_back(r);
         }
     }
-
-    glBindVertexArray(0);
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
 }
 
 void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position)

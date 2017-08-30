@@ -433,26 +433,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             Segment.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
         }
 
-        mat4 TransformMatrix = glm::translate(mat4(1.0f), Segment.Position);
-        TransformMatrix = glm::scale(TransformMatrix, vec3(1, TrackSegmentLength, 0));
-
         model TmpModel = {{}, &Game.FloorMesh};
-        RenderModel(Game.RenderState, Game.Camera, TmpModel, TransformMatrix);
+        PushModel(Game.RenderState, TmpModel, Segment.Position, vec3(1, TrackSegmentLength, 0), vec3(0.0f));
     }
 
     for (auto Entity : Game.ModelEntities)
     {
-        mat4 TransformMatrix = glm::translate(mat4(1.0f), Entity->Position);
-        TransformMatrix = glm::scale(TransformMatrix, Entity->Size);
-        if (Entity->Rotation.x != 0.0f)
-        {
-            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(Entity->Rotation.x), vec3(1, 0, 0));
-        }
-        if (Entity->Rotation.y != 0.0f)
-        {
-            TransformMatrix = glm::rotate(TransformMatrix, glm::radians(Entity->Rotation.y), vec3(0, 1, 0));
-        }
-        RenderModel(Game.RenderState, Game.Camera, *Entity->Model, TransformMatrix);
+        //PushModel(Game.RenderState, *Entity->Model, Entity->Position, Entity->Size, Entity->Rotation);
     }
 
 #ifdef DRAFT_DEBUG
@@ -463,7 +450,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
 #endif
 
-    RenderEnd(Game.RenderState);
+    RenderEnd(Game.RenderState, Game.Camera);
 }
 
 int main(int argc, char **argv)
