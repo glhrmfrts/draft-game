@@ -624,12 +624,13 @@ int main(int argc, char **argv)
         Input.MouseState.dX = 0;
         Input.MouseState.dY = 0;
 
+        SDL_GL_SwapWindow(Window);
+
         if (Elapsed*1000.0f < DeltaTimeMS)
         {
             SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
-        SDL_GL_SwapWindow(Window);
         PreviousTime = CurrentTime;
     }
 

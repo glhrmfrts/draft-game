@@ -21,6 +21,7 @@ struct gui_draw_command
     texture *Texture;
 
     // vs shit
+    gui_draw_command() {}
     gui_draw_command(color c, GLuint p, size_t o, size_t cnt, float tw, texture *t)
         : DiffuseColor(c), PrimitiveType(p), Offset(o), Count(cnt), TexWeight(tw), Texture(t) {}
 };
