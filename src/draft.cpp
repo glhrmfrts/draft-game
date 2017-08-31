@@ -426,11 +426,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
 
 #ifdef DRAFT_DEBUG
-    for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
+    if (Global_Collision_DrawBounds)
     {
-        // @TODO: time to move debug render bounds to use renderables
-        //auto Entity = Game.ShapedEntities[i];
-        //DebugRenderBounds(Game.RenderState, Game.Camera, Entity->Shape->BoundingBox, Entity->NumCollisions > 0);
+        Println(Global_Collision_DrawBounds);
+        for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
+        {
+            auto Entity = Game.ShapedEntities[i];
+            PushDebugBounds(Game.RenderState, *Entity->Bounds, Entity->NumCollisions > 0);
+        }
     }
 #endif
 

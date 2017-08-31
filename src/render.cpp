@@ -67,7 +67,7 @@ InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
 
 // PushVertex pushes a single vertex to the buffer, the vertex size
 // is known by the VertexSize field
-static void
+inline static void
 PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
 {
     EnsureCapacity(Buffer, Buffer.VertexSize);
@@ -78,6 +78,23 @@ PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
     }
     Buffer.RawIndex += Buffer.VertexSize;
     Buffer.VertexCount++;
+}
+
+struct mesh_vertex
+{
+    vec3 Position;
+    vec2 Uv;
+    color Color;
+    vec3 Normal;
+};
+inline static void
+PushVertex(vertex_buffer &Buffer, const mesh_vertex &Vertex)
+{
+    vec3 p = Vertex.Position;
+    vec2 uv = Vertex.Uv;
+    color c = Vertex.Color;
+    vec3 n = Vertex.Normal;
+    PushVertex(Buffer, {p.x, p.y, p.z, uv.x, uv.y, c.r, c.g, c.b, c.a, n.x, n.y, n.z});
 }
 
 void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
@@ -514,6 +531,23 @@ CompileFXAAProgram(fxaa_program &Program)
     UnbindShaderProgram();
 }
 
+// returns the index of the next available renderable
+static size_t
+NextRenderable(render_state &RenderState)
+{
+    size_t Size = RenderState.Renderables.size();
+    if (RenderState.RenderableCount >= Size)
+    {
+        size_t NewSize = Size*2;
+        if (!NewSize)
+        {
+            NewSize = 4;
+        }
+        RenderState.Renderables.resize(NewSize);
+    }
+    return RenderState.RenderableCount++;
+}
+
 void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 {
     RenderState.Width = Width;
@@ -562,6 +596,10 @@ void RenderBegin(render_state &RenderState)
     RenderState.RenderableCount = 0;
     RenderState.FrameSolidRenderables.clear();
     RenderState.FrameTransparentRenderables.clear();
+
+#ifdef DRAFT_DEBUG
+    ResetBuffer(RenderState.DebugBuffer);
+#endif
 }
 
 static void
@@ -639,9 +677,29 @@ void RenderBlur(render_state &RenderState, texture &Texture, blur_orientation Or
     UnbindShaderProgram();
 }
 
+static material BlankMaterial{Color_white, 0, 0, NULL};
+
 void RenderEnd(render_state &RenderState, camera &Camera)
 {
     assert(Camera.Updated);
+
+#ifdef DRAFT_DEBUG
+    // push debug renderable
+    {
+        size_t i = NextRenderable(RenderState);
+        auto &r = RenderState.Renderables[i];
+        r.VAO = RenderState.DebugBuffer.VAO;
+        r.VertexOffset = 0;
+        r.VertexCount = RenderState.DebugBuffer.VertexCount;
+        r.Material = &BlankMaterial;
+        r.Position = vec3(0.0f);
+        r.Scale = vec3(1.0f);
+        r.Rotation = vec3(0.0f);
+        r.PrimitiveType = GL_LINES;
+        RenderState.FrameSolidRenderables.push_back(i);
+        UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
+    }
+#endif
 
     if (Global_Renderer_DoPostFX)
     {
@@ -740,22 +798,6 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     // @TODO: cleanup textures
 }
 
-// returns the index of the next available renderable
-size_t NextRenderable(render_state &RenderState)
-{
-    size_t Size = RenderState.Renderables.size();
-    if (RenderState.RenderableCount >= Size)
-    {
-        size_t NewSize = Size*2;
-        if (!NewSize)
-        {
-            NewSize = 4;
-        }
-        RenderState.Renderables.resize(NewSize);
-    }
-    return RenderState.RenderableCount++;
-}
-
 void PushModel(render_state &RenderState, model &Model, const vec3 &Position, const vec3 &Scale, const vec3 &Rotation)
 {
     mesh *Mesh = Model.Mesh;
@@ -791,6 +833,47 @@ void PushModel(render_state &RenderState, model &Model, const vec3 &Position, co
     }
 }
 
+#ifdef DRAFT_DEBUG
+void PushDebugBounds(render_state &RenderState, const bounding_box &Box, bool Colliding)
+{
+    color Color = Color_green;
+    if (Colliding)
+    {
+        Color = Color_red;
+    }
+    vec3 a = Box.Center - Box.Half;
+    vec3 b = Box.Center + Box.Half;
+
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+}
+#endif
+
+#if 0
 void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sprite, vec3 Position)
 {
     assert(Camera.Updated);
@@ -851,69 +934,5 @@ void RenderSprite(render_state &RenderState, camera &Camera, animated_sprite &Sp
     glDisable(GL_DEPTH_TEST);
     Unbind(*Sprite.Texture, 0);
     UnbindShaderProgram();
-}
-
-#ifdef DRAFT_DEBUG
-void DebugRenderBounds(render_state &RenderState, camera &Camera, const bounding_box &Box, bool Colliding)
-{
-    assert(Camera.Updated);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glBindVertexArray(RenderState.DebugBuffer.VAO);
-
-    auto &Program = RenderState.ModelProgram;
-    Bind(Program.ShaderProgram);
-    SetUniform(Program.ProjectionView, Camera.ProjectionView);
-    SetUniform(Program.Transform, mat4(1.0));
-    SetUniform(Program.TexWeight, 0.0f);
-    SetUniform(Program.Emission, 0.0f);
-
-    color DiffuseColor = Color_green;
-    if (Colliding)
-    {
-        DiffuseColor = Color_red;
-    }
-    SetUniform(Program.DiffuseColor, DiffuseColor);
-
-    vec3 a = Box.Center - Box.Half;
-    vec3 b = Box.Center + Box.Half;
-    ResetBuffer(RenderState.DebugBuffer);
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, a.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-
-    PushVertex(RenderState.DebugBuffer, {b.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {b.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-
-    PushVertex(RenderState.DebugBuffer, {a.x, a.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    PushVertex(RenderState.DebugBuffer, {a.x, b.y, b.z, 0, 0, 1, 1, 1, 1, 0, 0, 0});
-    UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
-
-    glDrawArrays(GL_LINES, 0, RenderState.DebugBuffer.VertexCount);
-
-    UnbindShaderProgram();
-    glBindVertexArray(0);
-    glDisable(GL_DEPTH_TEST);
 }
 #endif
