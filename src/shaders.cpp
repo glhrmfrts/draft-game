@@ -100,55 +100,30 @@ static string BlurFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_sampler;
-uniform vec2 u_texelSize;
 uniform int u_orientation;
-uniform int u_amount;
-uniform float u_scale;
-uniform float u_strength;
+uniform float u_offset;
+uniform vec3 u_coefficients;
 
 smooth in vec2 v_uv;
 
 out vec4 outColor;
 
-float gaussian(float x, float deviation) {
-	return (1.0 / sqrt(2.0 * 3.141592 * deviation)) * exp(-((x * x) / (2.0 * deviation)));
-}
-
 void main() {
-	float halfBlur = float(u_amount) * 0.5;
-	vec4 colour = vec4(0.0);
-	vec4 texColour = vec4(0.0);
-
-	// gaussian deviation
-	float deviation = halfBlur * 0.35;
-	deviation *= deviation;
-	float strength = 1.0 - u_strength;
+	vec2 offset = vec2(0, 0);
 
 	if (u_orientation == 0) {
-		// horizontal blur
-		for (int i = 0; i < 10; ++i) {
-			if (i >= u_amount)
-				break;
-
-			float offset = float(i) - halfBlur;
-			texColour = texture2D(u_sampler, v_uv + vec2(offset * u_texelSize.x * u_scale, 0.0)) * gaussian(offset * strength, deviation);
-			colour += texColour;
-		}
+		offset.x = u_offset;
 	}
 	else {
-		// vertical blur
-		for (int i = 0; i < 10; ++i) {
-			if (i >= u_amount)
-				break;
-
-			float offset = float(i) - halfBlur;
-			texColour = texture2D(u_sampler, v_uv + vec2(0.0, offset * u_texelSize.y * u_scale)) * gaussian(offset * strength, deviation);
-			colour += texColour;
-		}
+		offset.y = u_offset;
 	}
 
-	// apply colour
-	outColor = colour;
+  vec4 c;
+	c  = u_coefficients.x * texture2D(u_sampler, v_uv - offset);
+  c += u_coefficients.y * texture2D(u_sampler, v_uv);
+  c += u_coefficients.z * texture2D(u_sampler, v_uv + offset);
+
+  outColor = c;
 }
 )FOO";
 
@@ -171,97 +146,6 @@ void main() {
   vec4 scene = texture(u_Scene, v_uv);
 
   outColor = scene + pass0 + pass1 + pass2;
-}
-)FOO";
-
-static string FXAAFragmentShader = R"FOO(
-#version 330
-
-uniform sampler2D u_sampler;
-uniform vec2 u_resolution;
-
-smooth in vec2 v_uv;
-
-#ifndef FXAA_REDUCE_MIN
-#define FXAA_REDUCE_MIN   (1.0/ 128.0)
-#endif
-#ifndef FXAA_REDUCE_MUL
-#define FXAA_REDUCE_MUL   (1.0 / 8.0)
-#endif
-#ifndef FXAA_SPAN_MAX
-#define FXAA_SPAN_MAX     8.0
-#endif
-
-//optimized version for mobile, where dependent
-//texture reads can be a bottleneck
-vec4 fxaa(sampler2D tex, vec2 fragCoord, vec2 resolution,
-          vec2 v_rgbNW, vec2 v_rgbNE,
-          vec2 v_rgbSW, vec2 v_rgbSE,
-          vec2 v_rgbM)
-{
-  vec4 color;
-  vec2 inverseVP = vec2(1.0 / resolution.x, 1.0 / resolution.y);
-  vec3 rgbNW = texture2D(tex, v_rgbNW).xyz;
-  vec3 rgbNE = texture2D(tex, v_rgbNE).xyz;
-  vec3 rgbSW = texture2D(tex, v_rgbSW).xyz;
-  vec3 rgbSE = texture2D(tex, v_rgbSE).xyz;
-  vec4 texColor = texture2D(tex, v_rgbM);
-  vec3 rgbM  = texColor.xyz;
-  vec3 luma = vec3(0.299, 0.587, 0.114);
-  float lumaNW = dot(rgbNW, luma);
-  float lumaNE = dot(rgbNE, luma);
-  float lumaSW = dot(rgbSW, luma);
-  float lumaSE = dot(rgbSE, luma);
-  float lumaM  = dot(rgbM,  luma);
-  float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
-  float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
-
-  vec2 dir;
-  dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
-  dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
-
-  float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) *
-                        (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
-
-  float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
-  dir = min(vec2(FXAA_SPAN_MAX, FXAA_SPAN_MAX),
-            max(vec2(-FXAA_SPAN_MAX, -FXAA_SPAN_MAX),
-                dir * rcpDirMin)) * inverseVP;
-
-  vec3 rgbA = 0.5 * (
-                     texture2D(tex, fragCoord * inverseVP + dir * (1.0 / 3.0 - 0.5)).xyz +
-                     texture2D(tex, fragCoord * inverseVP + dir * (2.0 / 3.0 - 0.5)).xyz);
-  vec3 rgbB = rgbA * 0.5 + 0.25 * (
-                                   texture2D(tex, fragCoord * inverseVP + dir * -0.5).xyz +
-                                   texture2D(tex, fragCoord * inverseVP + dir * 0.5).xyz);
-
-  float lumaB = dot(rgbB, luma);
-  if ((lumaB < lumaMin) || (lumaB > lumaMax))
-    color = vec4(rgbA, texColor.a);
-  else
-    color = vec4(rgbB, texColor.a);
-  return color;
-}
-
-out vec4 BlendUnitColor;
-
-void main()
-{
-  vec2 v_rgbNW;
-  vec2 v_rgbNE;
-  vec2 v_rgbSW;
-  vec2 v_rgbSE;
-  vec2 v_rgbM;
-
-  vec2 fragCoord = v_uv * u_resolution;
-  vec2 inverseVP = 1.0 / u_resolution.xy;
-  v_rgbNW = (fragCoord + vec2(-1.0, -1.0)) * inverseVP;
-  v_rgbNE = (fragCoord + vec2(1.0, -1.0)) * inverseVP;
-  v_rgbSW = (fragCoord + vec2(-1.0, 1.0)) * inverseVP;
-  v_rgbSE = (fragCoord + vec2(1.0, 1.0)) * inverseVP;
-  v_rgbM = vec2(fragCoord * inverseVP);
-
-  BlendUnitColor = fxaa(u_sampler, fragCoord, u_resolution, v_rgbNW, v_rgbNE, v_rgbSW, v_rgbSE, v_rgbM);
 }
 )FOO";
 

@@ -195,18 +195,8 @@ struct model_program
 struct blur_program
 {
     shader_program ShaderProgram;
-    int TexelSize;
     int Orientation;
-    int Amount;
-    int Scale;
-    int Strength;
-    int Sampler;
-};
-
-struct fxaa_program
-{
-    shader_program ShaderProgram;
-    int Resolution;
+    int Offset;
 };
 
 struct resolve_multisample_program
@@ -249,20 +239,19 @@ struct renderable
     GLuint PrimitiveType;
 };
 
-#define BloomBlurPassCount 2
+#define BloomBlurPassCount 3
 struct render_state
 {
     model_program ModelProgram;
     blur_program BlurProgram;
-    fxaa_program FXAAProgram;
     shader_program BlendProgram;
+    shader_program BlitProgram;
     resolve_multisample_program ResolveMultisampleProgram;
 
     framebuffer MultisampledSceneFramebuffer;
     framebuffer SceneFramebuffer;
-    framebuffer FXAAFramebuffer[2];
-    framebuffer BlurHorizontalFramebuffer[BloomBlurPassCount];
-    framebuffer BlurVerticalFramebuffer[BloomBlurPassCount];
+    framebuffer BlurHorizontalFramebuffers[BloomBlurPassCount];
+    framebuffer BlurVerticalFramebuffers[BloomBlurPassCount];
 
     vertex_buffer SpriteBuffer;
     vertex_buffer ScreenBuffer;

@@ -24,10 +24,5 @@ void DrawDebugUI(float DeltaTime)
             ImGui::SliderFloat("Blur Strength", &Global_Renderer_BloomBlurStrength, 0.0f, 1.0f, "%.3f");
             ImGui::TreePop();
         }
-        if (ImGui::TreeNode("FXAA"))
-        {
-            ImGui::SliderInt("Passes", &Global_Renderer_FXAAPasses, 0, 10);
-            ImGui::TreePop();
-        }
     }
 }
