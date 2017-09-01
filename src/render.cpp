@@ -610,8 +610,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
         size_t BlurWidth = Width >> i;
         size_t BlurHeight = Height >> i;
 
-        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, 0, 1);
-        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, 0, 1);
+        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
+        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
     }
 
 #ifdef DRAFT_DEBUG
