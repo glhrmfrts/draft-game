@@ -19,9 +19,7 @@ void DrawDebugUI(float DeltaTime)
 
         if (ImGui::TreeNode("Bloom"))
         {
-            ImGui::SliderInt("Blur Amount", &Global_Renderer_BloomBlurAmount, 0, 10);
-            ImGui::SliderFloat("Blur Scale", &Global_Renderer_BloomBlurScale, 0.0f, 5.0f, "%.2f");
-            ImGui::SliderFloat("Blur Strength", &Global_Renderer_BloomBlurStrength, 0.0f, 1.0f, "%.3f");
+            ImGui::SliderFloat("Blur Offset", &Global_Renderer_BloomBlurOffset, 0.0f, 10.0f, "%.2f");
             ImGui::TreePop();
         }
     }

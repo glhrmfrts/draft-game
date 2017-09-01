@@ -173,9 +173,10 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
+    Entity->Size *= 0.75f;
     Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
     AddEntity(Game, Entity);
-    return Entity; 
+    return Entity;
 }
 
 #define SkyboxScale vec3(500.0f)
@@ -622,7 +623,7 @@ int main(int argc, char **argv)
         }
 
         ImGui_ImplSdlGL3_NewFrame(Window);
-        UpdateAndRenderLevel(Game, Elapsed);
+        UpdateAndRenderLevel(Game, DeltaTime);
 
         DrawDebugUI(Elapsed);
 
@@ -645,7 +646,7 @@ int main(int argc, char **argv)
 
         if (Elapsed*1000.0f < DeltaTimeMS)
         {
-            //SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
+            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
         PreviousTime = CurrentTime;

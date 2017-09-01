@@ -118,12 +118,20 @@ void main() {
 		offset.y = u_offset;
 	}
 
-  vec4 c;
-	c  = u_coefficients.x * texture2D(u_sampler, v_uv - offset);
-  c += u_coefficients.y * texture2D(u_sampler, v_uv);
-  c += u_coefficients.z * texture2D(u_sampler, v_uv + offset);
+    vec4 c = vec4(0.0f);
+    c += u_coefficients.x * 0.25f * texture2D(u_sampler, v_uv - offset);
+    c += u_coefficients.x * 0.5f  * texture2D(u_sampler, v_uv - offset*0.75f);
+    c += u_coefficients.x * 0.75f * texture2D(u_sampler, v_uv - offset*0.5f);
+	c += u_coefficients.x * 1.0f  * texture2D(u_sampler, v_uv - offset*0.25f);
 
-  outColor = c;
+    c += u_coefficients.y * 1.0f  * texture2D(u_sampler, v_uv);
+
+    c += u_coefficients.z * 1.0f  * texture2D(u_sampler, v_uv + offset*0.25f);
+    c += u_coefficients.z * 0.75f * texture2D(u_sampler, v_uv + offset*0.5f);
+    c += u_coefficients.z * 0.5f  * texture2D(u_sampler, v_uv + offset*0.75f);
+    c += u_coefficients.z * 0.25f * texture2D(u_sampler, v_uv + offset);
+
+    outColor = c;
 }
 )FOO";
 

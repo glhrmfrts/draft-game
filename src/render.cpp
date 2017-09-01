@@ -704,7 +704,7 @@ RenderBlur(render_state &RenderState, blur_program &Program, blur_orientation Or
     SetUniform(Program.Orientation, int(Orientation));
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
-        SetUniform(Program.Offset, 1.2f / float(Sources[i].Width));
+        SetUniform(Program.Offset, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
         BindFramebuffer(Dests[i]);
 
         glClear(GL_COLOR_BUFFER_BIT);
@@ -790,7 +790,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         UnbindShaderProgram();
 
         // perform blur
-        Bind(RenderState.BlurProgram.ShaderProgram);      
+        Bind(RenderState.BlurProgram.ShaderProgram);
         RenderBlur(RenderState, RenderState.BlurProgram, Blur_Horizontal);
         framebuffer *BlurOutput = RenderBlur(RenderState, RenderState.BlurProgram, Blur_Vertical);
 
