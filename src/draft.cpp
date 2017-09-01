@@ -1,14 +1,8 @@
 /*
   Current TODOs:
-  - (Renderer) Need to implement a custom shader to resolve from
-  multisampled buffer, because multiple color attachments need to be blited
-
   - (Game)     Create the ship's "trail"
 
   - (Renderer) Fix order of rendering (sort the renderables)
-
-  - (Renderer) Fix the bloom effect, it seems to not work properly
-  with multisampling (maybe TODO 1 solves this as well)
  */
 
 #include <iostream>
@@ -124,6 +118,10 @@ AddEntity(game_state &Game, entity *Entity)
     {
         Game.TrackEntities.push_back(Entity);
     }
+    if (Entity->Trail)
+    {
+        Game.TrailEntities.push_back(Entity);
+    }
 }
 
 inline static void
@@ -165,20 +163,44 @@ AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, 
     AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
 }
 
+static trail *
+CreateTrail(memory_arena &Arena)
+{
+    trail *Result = PushStruct<trail>(Arena);
+    InitMeshBuffer(Result->Mesh.Buffer);
+    Result->Model.Mesh = &Result->Mesh;
+    AddPart(Result->Mesh, {{Color_white, 0, 0, NULL}, 0, 2, GL_LINES});
+    AddPart(Result->Mesh, {{Color_white, 0, 0, NULL}, 2, TrailCount*2 - 2, GL_LINES});
+
+    for (int i = 0; i < TrailCount; i++)
+    {
+        Result->Pos[i] = vec3(0.0f);
+    }
+    return Result;
+}
+
 static entity *
-CreateShipEntity(game_state &Game, color Color, color OutlineColor)
+CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
     Entity->Size *= 0.75f;
     Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
+    Entity->Trail = CreateTrail(Game.Arena);
+    Entity->Trail->Model.Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.2f, 0, NULL, Material_PolygonLines));
+    Entity->Trail->Model.Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.2f, 0, NULL, Material_PolygonLines));
     AddEntity(Game, Entity);
     return Entity;
 }
 
+#define TrackSegmentLength 20
+#define TrackSegmentWidth  5
+#define TrackLaneWidth     2.5f
+#define TrackSegmentCount  20
+#define TrackSegmentPadding 0.5f
 #define SkyboxScale vec3(500.0f)
 static void
 StartLevel(game_state &Game)
@@ -189,7 +211,7 @@ StartLevel(game_state &Game)
         auto &FloorMesh = Game.FloorMesh;
         InitMeshBuffer(FloorMesh.Buffer);
 
-        material FloorMaterial = {IntColor(0, 0.25f), 0, 0, NULL};
+        material FloorMaterial = {IntColor(FirstPalette.Colors[0], 1), 0, 1, LoadTextureFile(Game.AssetCache, "data/textures/checker.png")};
         material LaneMaterial = {Color_white, 0, 0, NULL};
 
         float w = TrackSegmentWidth * TrackLaneWidth;
@@ -258,7 +280,7 @@ StartLevel(game_state &Game)
     Game.Gravity = vec3(0, 0, 0);
 
     Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
-    Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]));
+    Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
     Game.PlayerEntity->Rotation.y = 20.0f;
 
     Game.EnemyEntity->Position.x = 4;
@@ -312,6 +334,7 @@ Interp(float c, float t, float a, float dt)
 }
 
 #define ShipMaxVel  50.0f
+#define PlayerMaxVel 55.0f
 #define ShipAcceleration 20.0f
 #define ShipBreakAcceleration 30.0f
 #define ShipSteerSpeed 10.0f
@@ -320,9 +343,15 @@ Interp(float c, float t, float a, float dt)
 #define CameraOffsetY 5.0f
 #define CameraOffsetZ 2.0f
 static void
-MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
+MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime, bool IsPlayer = false)
 {
-    if (MoveV > 0.0f && Entity->Velocity.y < ShipMaxVel)
+    float MaxVel = ShipMaxVel;
+    if (IsPlayer)
+    {
+        MaxVel = PlayerMaxVel;
+    }
+
+    if (MoveV > 0.0f && Entity->Velocity.y < MaxVel)
     {
         Entity->Velocity.y += MoveV * ShipAcceleration * DeltaTime;
     }
@@ -335,7 +364,7 @@ MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     {
         Entity->Velocity.y -= ShipFriction * DeltaTime;
     }
-    Entity->Velocity.y = std::max(0.0f, std::min(ShipMaxVel, Entity->Velocity.y));
+    Entity->Velocity.y = std::max(0.0f, std::min(MaxVel, Entity->Velocity.y));
 
     float SteerTarget = MoveH * ShipSteerSpeed;
     Entity->Velocity.x = Interp(Entity->Velocity.x,
@@ -348,6 +377,23 @@ MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
                                 5.0f * MoveV,
                                 20.0f,
                                 DeltaTime);
+}
+
+inline static void
+PushPosition(trail *Trail, vec3 Pos)
+{
+    if (Trail->PositionStackIndex >= TrailCount)
+    {
+        vec3 PosSave = Trail->Pos[TrailCount - 1];
+        for (int i = TrailCount - 1; i > 0; i--)
+        {
+            vec3 NewPos = PosSave;
+            PosSave = Trail->Pos[i - 1];
+            Trail->Pos[i - 1] = NewPos;
+        }
+        Trail->PositionStackIndex -= 1;
+    }
+    Trail->Pos[Trail->PositionStackIndex++] = Pos;
 }
 
 static void
@@ -387,8 +433,11 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     float MoveH = GetAxisValue(Game.Input, Action_horizontal);
     float MoveV = GetAxisValue(Game.Input, Action_vertical);
-    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime);
-    MoveShipEntity(Game.EnemyEntity, 0, 0.4f, DeltaTime);
+    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
+
+    static float EnemyMoveH = 0.0f;
+    EnemyMoveH += DeltaTime;
+    MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
 
     size_t FrameCollisionCount = 0;
     DetectCollisions(Game.ShapedEntities, Game.CollisionCache, FrameCollisionCount);
@@ -422,6 +471,49 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState);
+
+    for (auto Entity : Game.TrailEntities)
+    {
+        auto Trail = Entity->Trail;
+        Trail->Timer += DeltaTime;
+
+        if (Trail->FirstFrame)
+        {
+            Trail->FirstFrame = false;
+            for (int i = 0; i < TrailCount; i++)
+            {
+                Trail->Pos[i] = Entity->Position;
+            }
+        }
+
+        if (Trail->Timer > TrailRecordTimer)
+        {
+            Trail->Timer = 0;
+            PushPosition(Trail, Entity->Position);
+        }
+
+        Trail->Model.Materials[0]->DiffuseColor.a = 1.0f - (Trail->Timer/TrailRecordTimer);
+        mesh &Mesh = Trail->Mesh;
+        ResetBuffer(Mesh.Buffer);
+        for (int i = 0; i < TrailCount; i++)
+        {
+            vec3 p1 = Trail->Pos[i];
+            vec3 p2;
+            if (i == TrailCount - 1)
+            {
+                p2 = Entity->Position;
+            }
+            else
+            {
+                p2 = Trail->Pos[i + 1];
+            }
+
+            AddLine(Mesh.Buffer, p1, p2);
+        }
+        UploadVertices(Mesh.Buffer, GL_DYNAMIC_DRAW);
+
+        PushModel(Game.RenderState, Trail->Model, vec3(0.0f), vec3(1.0f), vec3(0.0f));
+    }
 
     for (auto Entity : Game.TrackEntities)
     {

@@ -18,7 +18,6 @@ static string ModelVertexShader = R"FOO(
     uniform mat4 u_ProjectionView;
     uniform mat4 u_Transform;
     uniform mat4 u_NormalTransform;
-    uniform int u_Materials;
 
     smooth out vec2  v_Uv;
     smooth out vec4  v_Color;
@@ -41,10 +40,13 @@ static string ModelVertexShader = R"FOO(
 static string ModelFragmentShader = R"FOO(
 #version 330
 
+#define Material_Glow 0x4
+
     uniform sampler2D u_Sampler;
     uniform vec4 u_DiffuseColor;
     uniform float u_Emission;
     uniform float u_TexWeight;
+    uniform int u_MaterialFlags;
 
     smooth in vec2  v_Uv;
     smooth in vec4  v_Color;

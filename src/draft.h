@@ -56,6 +56,18 @@ struct track_segment
     int NothingForNow;
 };
 
+#define TrailCount 4
+#define TrailRecordTimer 0.075f
+struct trail
+{
+    mesh Mesh;
+    model Model;
+    vec3 Pos[TrailCount];
+    float Timer = 0;
+    int PositionStackIndex = 0;
+    bool FirstFrame = true;
+};
+
 #define EntityFlag_Kinematic 0x1
 struct entity
 {
@@ -67,16 +79,11 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
+    trail *Trail = NULL;
     track_segment *TrackSegment = NULL;
     bounding_box *Bounds = NULL;
     model *Model = NULL;
 };
-
-#define TrackSegmentLength 20
-#define TrackSegmentWidth  7
-#define TrackLaneWidth     2.5f
-#define TrackSegmentCount  20
-#define TrackSegmentPadding 0.25f
 
 struct game_state
 {
@@ -97,6 +104,7 @@ struct game_state
     vector<entity *> ModelEntities;
     vector<entity *> ShapedEntities;
     vector<entity *> TrackEntities;
+    vector<entity *> TrailEntities;
     vector<collision> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;
