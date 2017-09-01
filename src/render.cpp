@@ -230,9 +230,17 @@ void ApplyTextureParameters(texture &Texture, int TextureUnit)
     Unbind(Texture, TextureUnit);
 }
 
-void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data)
+void UploadTexture(texture &Texture, GLenum SrcFormat, GLenum DstFormat, GLenum Type, uint8 *Data, int MaxMultiSampleCount = 0)
 {
-    glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
+    if (Texture.Target == GL_TEXTURE_2D_MULTISAMPLE)
+    {
+        glTexImage2DMultisample(Texture.Target, MaxMultiSampleCount, SrcFormat,
+                                Texture.Width, Texture.Height, GL_FALSE);
+    }
+    else
+    {
+        glTexImage2D(Texture.Target, 0, SrcFormat, Texture.Width, Texture.Height, 0, DstFormat, Type, Data);
+    }
 }
 
 vector<texture_rect> SplitTexture(texture &Texture, int Width, int Height, bool FlipV = false)
@@ -359,7 +367,7 @@ static GLenum FramebufferColorAttachments[] = {
 };
 
 static void
-CreateFramebufferTexture(texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
+CreateFramebufferTexture(render_state &RenderState, texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
 {
     Texture.Target = Target;
     Texture.Width = Width;
@@ -368,12 +376,15 @@ CreateFramebufferTexture(texture &Texture, GLuint Target, uint32 Width, uint32 H
     Texture.Wrap = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE};
     ApplyTextureParameters(Texture, 0);
     Bind(Texture, 0);
-    UploadTexture(Texture, Format, (Format == OPENGL_DEPTH_COMPONENT_TYPE) ? GL_DEPTH_COMPONENT : GL_BGRA_EXT, GL_UNSIGNED_BYTE, NULL);
+    UploadTexture(Texture, Format,
+                  (Format == OPENGL_DEPTH_COMPONENT_TYPE) ? GL_DEPTH_COMPONENT : GL_BGRA_EXT,
+                  GL_UNSIGNED_BYTE, NULL,
+                  RenderState.MaxMultiSampleCount);
     Unbind(Texture, 0);
 }
 
 static void
-InitFramebuffer(framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Flags, size_t ColorTextureCount)
+InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Flags, size_t ColorTextureCount)
 {
     Framebuffer.Width = Width;
     Framebuffer.Height = Height;
@@ -383,22 +394,25 @@ InitFramebuffer(framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Fl
     glGenFramebuffers(1, &Framebuffer.ID);
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
 
+    bool Multisampled = Flags & Framebuffer_Multisampled;
+    GLuint Target = Multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     GLint Filter = (Flags & Framebuffer_Filtered) ? GL_LINEAR : GL_NEAREST;
     GLuint Format = (Flags & Framebuffer_IsFloat) ? GL_RGBA16F : GL_RGBA8;
     for (size_t i = 0; i < ColorTextureCount; i++)
     {
-        CreateFramebufferTexture(Framebuffer.ColorTextures[i], GL_TEXTURE_2D, Width, Height, Filter, Format);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, Framebuffer.ColorTextures[i].ID, 0);
+        CreateFramebufferTexture(RenderState, Framebuffer.ColorTextures[i], Target, Width, Height, Filter, Format);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, Target, Framebuffer.ColorTextures[i].ID, 0);
     }
     glDrawBuffers(ColorTextureCount, FramebufferColorAttachments);
 
     if (Flags & Framebuffer_HasDepth)
     {
-        CreateFramebufferTexture(Framebuffer.DepthTexture, GL_TEXTURE_2D, Width, Height, Filter, OPENGL_DEPTH_COMPONENT_TYPE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Framebuffer.DepthTexture.ID, 0);
+        CreateFramebufferTexture(RenderState, Framebuffer.DepthTexture, Target, Width, Height, Filter, OPENGL_DEPTH_COMPONENT_TYPE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, Target, Framebuffer.DepthTexture.ID, 0);
     }
 
     GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    printf("0x%x\n", Status);
     assert(Status == GL_FRAMEBUFFER_COMPLETE);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -550,6 +564,13 @@ NextRenderable(render_state &RenderState)
 
 void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 {
+    glLineWidth(2);
+    glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &RenderState.MaxMultiSampleCount);
+    if (RenderState.MaxMultiSampleCount > 16)
+    {
+        RenderState.MaxMultiSampleCount = 16;
+    }
+
     RenderState.Width = Width;
     RenderState.Height = Height;
 
@@ -570,20 +591,19 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
     UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
 
-    InitFramebuffer(RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
-    InitFramebuffer(RenderState.FXAAFramebuffer[0], Width, Height, 0, 1);
-    InitFramebuffer(RenderState.FXAAFramebuffer[1], Width, Height, 0, 1);
+    InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, Framebuffer_HasDepth | Framebuffer_Multisampled, ColorTexture_Count);
+    InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
+    InitFramebuffer(RenderState, RenderState.FXAAFramebuffer[0], Width, Height, 0, 1);
+    InitFramebuffer(RenderState, RenderState.FXAAFramebuffer[1], Width, Height, 0, 1);
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
         // @TODO: maybe it is not necessary to scale down
-        size_t BlurWidth = Width;// >> i;
-        size_t BlurHeight = Height;// >> i;
+        size_t BlurWidth = Width >> i;
+        size_t BlurHeight = Height >> i;
 
-        InitFramebuffer(RenderState.BlurHorizontalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
-        InitFramebuffer(RenderState.BlurVerticalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
+        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
+        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffer[i], BlurWidth, BlurHeight, 0, 1);
     }
-
-    glLineWidth(2);
 
 #ifdef DRAFT_DEBUG
     InitMeshBuffer(RenderState.DebugBuffer);
@@ -703,7 +723,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 
     if (Global_Renderer_DoPostFX)
     {
-        BindFramebuffer(RenderState.SceneFramebuffer);
+        BindFramebuffer(RenderState.MultisampledSceneFramebuffer);
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -725,6 +745,15 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     if (Global_Renderer_DoPostFX)
     {
         UnbindFramebuffer(RenderState);
+
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, RenderState.MultisampledSceneFramebuffer.ID);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, RenderState.SceneFramebuffer.ID);
+        glViewport(0, 0, RenderState.Width, RenderState.Height);
+        glBlitFramebuffer(0, 0, RenderState.Width, RenderState.Height,
+                          0, 0, RenderState.Width, RenderState.Height,
+                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+                          GL_NEAREST);
+
         glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
         for (int i = 0; i < BloomBlurPassCount; i++)
@@ -744,7 +773,9 @@ void RenderEnd(render_state &RenderState, camera &Camera)
             UnbindFramebuffer(RenderState);
         }
 
+
         // blend scene and blur
+        Global_Renderer_FXAAPasses = 0;
         if (Global_Renderer_FXAAPasses)
         {
             BindFramebuffer(RenderState.FXAAFramebuffer[0]);

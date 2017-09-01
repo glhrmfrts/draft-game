@@ -51,6 +51,11 @@ struct game_input
     action_state Actions[Action_count];
 };
 
+struct track_segment
+{
+    int NothingForNow;
+};
+
 #define EntityFlag_Kinematic 0x1
 struct entity
 {
@@ -62,6 +67,7 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
+    track_segment *TrackSegment = NULL;
     bounding_box *Bounds = NULL;
     model *Model = NULL;
 };
@@ -71,10 +77,6 @@ struct entity
 #define TrackLaneWidth     2.5f
 #define TrackSegmentCount  20
 #define TrackSegmentPadding 0.25f
-struct track_segment
-{
-    vec3 Position;
-};
 
 struct game_state
 {
@@ -94,8 +96,8 @@ struct game_state
     vec3 Gravity;
     vector<entity *> ModelEntities;
     vector<entity *> ShapedEntities;
+    vector<entity *> TrackEntities;
     vector<collision> CollisionCache;
-    track_segment Segments[TrackSegmentCount];
     entity *SkyboxEntity;
     entity *PlayerEntity;
     entity *EnemyEntity;

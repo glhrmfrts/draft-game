@@ -1,8 +1,14 @@
 /*
   Current TODOs:
-  - (Renderer) Framebuffers need to support multisampling
-  - (Renderer) Fix order of rendering (by creating the renderer buffer & sorting renderables)
+  - (Renderer) Need to implement a custom shader to resolve from
+  multisampled buffer, because multiple color attachments need to be blited
+
   - (Game)     Create the ship's "trail"
+
+  - (Renderer) Fix order of rendering (sort the renderables)
+
+  - (Renderer) Fix the bloom effect, it seems to not work properly
+  with multisampling (maybe TODO 1 solves this as well)
  */
 
 #include <iostream>
@@ -114,6 +120,10 @@ AddEntity(game_state &Game, entity *Entity)
     {
         Game.ShapedEntities.push_back(Entity);
     }
+    if (Entity->TrackSegment)
+    {
+        Game.TrackEntities.push_back(Entity);
+    }
 }
 
 inline static void
@@ -160,7 +170,7 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.5f), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
     Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
@@ -178,8 +188,8 @@ StartLevel(game_state &Game)
         auto &FloorMesh = Game.FloorMesh;
         InitMeshBuffer(FloorMesh.Buffer);
 
-        material FloorMaterial = {IntColor(FirstPalette.Colors[2], 0.25f), 0, 0, NULL};
-        material LaneMaterial = {IntColor(FirstPalette.Colors[3]), 0.5f, 0, NULL};
+        material FloorMaterial = {IntColor(0, 0.25f), 0, 0, NULL};
+        material LaneMaterial = {Color_white, 0, 0, NULL};
 
         float w = TrackSegmentWidth * TrackLaneWidth;
         float l = -w/2;
@@ -246,7 +256,7 @@ StartLevel(game_state &Game)
     Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
-    Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[2]), IntColor(SecondPalette.Colors[3]));
+    Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]));
     Game.PlayerEntity->Rotation.y = 20.0f;
 
@@ -254,8 +264,12 @@ StartLevel(game_state &Game)
 
     for (size_t i = 0; i < TrackSegmentCount; i++)
     {
-        auto &TrackSegment = Game.Segments[i];
-        TrackSegment.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
+        auto Entity = PushStruct<entity>(Game.Arena);
+        Entity->TrackSegment = PushStruct<track_segment>(Game.Arena);
+        Entity->Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
+        Entity->Size = vec3(1, TrackSegmentLength, 0);
+        Entity->Model = CreateModel(Game.Arena, &Game.FloorMesh);
+        AddEntity(Game, Entity);
     }
 }
 
@@ -408,16 +422,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState);
 
-    for (auto &Segment : Game.Segments)
+    for (auto Entity : Game.TrackEntities)
     {
-        size_t i = &Segment - &Game.Segments[0];
-        if (Segment.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
+        size_t i = &Entity - &Game.TrackEntities[0];
+        if (Entity->Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
         {
-            Segment.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
+            Entity->Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
         }
-
-        model TmpModel = {{}, &Game.FloorMesh};
-        PushModel(Game.RenderState, TmpModel, Segment.Position, vec3(1, TrackSegmentLength, 0), vec3(0.0f));
     }
 
     for (auto Entity : Game.ModelEntities)

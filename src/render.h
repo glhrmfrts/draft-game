@@ -219,6 +219,7 @@ enum color_texture_type
 #define Framebuffer_HasDepth 0x1
 #define Framebuffer_IsFloat  0x2
 #define Framebuffer_Filtered 0x4
+#define Framebuffer_Multisampled 0x8
 struct framebuffer
 {
     uint32 Flags;
@@ -250,6 +251,7 @@ struct render_state
     fxaa_program FXAAProgram;
     shader_program BlendProgram;
 
+    framebuffer MultisampledSceneFramebuffer;
     framebuffer SceneFramebuffer;
     framebuffer FXAAFramebuffer[2];
     framebuffer BlurHorizontalFramebuffer[BloomBlurPassCount];
@@ -267,6 +269,7 @@ struct render_state
     uint32 Width;
     uint32 Height;
 
+    GLint MaxMultiSampleCount;
     GLint LastVAO;
 
 #ifdef DRAFT_DEBUG
