@@ -12,11 +12,12 @@ endif
 INCLUDE_PATHS = -Ideps -IC:/c-cpp/libs/include -IC:/c-cpp/pl/lua/src -IC:/c-cpp/LuaBridge/Source
 
 CC = clang++
-CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DGLEW_STATIC -DDRAFT_DEBUG
+CFLAGS = -O3 -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DGLEW_STATIC -DDRAFT_DEBUG
 LDFLAGS = -LC:/c-cpp/libs/lib/x64 $(LIBS)
 
 OUT = build/draft
 ifdef SystemRoot
+  CC = g++
 	OUT = build/draft.exe
 endif
 

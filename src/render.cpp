@@ -545,6 +545,18 @@ CompileFXAAProgram(fxaa_program &Program)
     UnbindShaderProgram();
 }
 
+static void
+CompileResolveMultisampleProgram(resolve_multisample_program &Program)
+{
+    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), ResolveMultisampleFragmentShader.c_str());
+    Program.SampleCount = glGetUniformLocation(Program.ShaderProgram.ID, "u_SampleCount");
+
+    Bind(Program.ShaderProgram);
+    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_SurfaceReflectSampler"), 0);
+    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_EmitSampler"), 1);
+    UnbindShaderProgram();
+}
+
 // returns the index of the next available renderable
 static size_t
 NextRenderable(render_state &RenderState)
@@ -566,9 +578,9 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 {
     glLineWidth(2);
     glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &RenderState.MaxMultiSampleCount);
-    if (RenderState.MaxMultiSampleCount > 16)
+    if (RenderState.MaxMultiSampleCount > 8)
     {
-        RenderState.MaxMultiSampleCount = 16;
+        RenderState.MaxMultiSampleCount = 8;
     }
 
     RenderState.Width = Width;
@@ -578,6 +590,7 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     CompileBlurProgram(RenderState.BlurProgram);
     CompileBlendProgram(RenderState.BlendProgram);
     CompileFXAAProgram(RenderState.FXAAProgram);
+    CompileResolveMultisampleProgram(RenderState.ResolveMultisampleProgram);
 
     InitMeshBuffer(RenderState.SpriteBuffer);
     InitBuffer(RenderState.ScreenBuffer, 4, 2,
@@ -745,16 +758,17 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     if (Global_Renderer_DoPostFX)
     {
         UnbindFramebuffer(RenderState);
-
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, RenderState.MultisampledSceneFramebuffer.ID);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, RenderState.SceneFramebuffer.ID);
-        glViewport(0, 0, RenderState.Width, RenderState.Height);
-        glBlitFramebuffer(0, 0, RenderState.Width, RenderState.Height,
-                          0, 0, RenderState.Width, RenderState.Height,
-                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
-                          GL_NEAREST);
-
         glBindVertexArray(RenderState.ScreenBuffer.VAO);
+
+        BindFramebuffer(RenderState.SceneFramebuffer);
+        Bind(RenderState.ResolveMultisampleProgram.ShaderProgram);
+        SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
+        for (size_t i = 0; i < ColorTexture_Count; i++)
+        {
+            Bind(RenderState.MultisampledSceneFramebuffer.ColorTextures[i], i);
+        }
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        UnbindFramebuffer(RenderState);
 
         for (int i = 0; i < BloomBlurPassCount; i++)
         {
@@ -772,7 +786,6 @@ void RenderEnd(render_state &RenderState, camera &Camera)
             RenderBlur(RenderState, RenderState.BlurHorizontalFramebuffer[i].ColorTextures[ColorTexture_SurfaceReflect], Blur_Vertical);
             UnbindFramebuffer(RenderState);
         }
-
 
         // blend scene and blur
         Global_Renderer_FXAAPasses = 0;

@@ -1,6 +1,6 @@
 // Copyright
 
-static std::string ModelVertexShader = R"FOO(
+static string ModelVertexShader = R"FOO(
 #version 330
 
 // In this game we use only one forward directional light
@@ -38,7 +38,7 @@ static std::string ModelVertexShader = R"FOO(
     }
 )FOO";
 
-static std::string ModelFragmentShader = R"FOO(
+static string ModelFragmentShader = R"FOO(
 #version 330
 
     uniform sampler2D u_Sampler;
@@ -68,7 +68,7 @@ static std::string ModelFragmentShader = R"FOO(
     }
 )FOO";
 
-static std::string BlitVertexShader = R"FOO(
+static string BlitVertexShader = R"FOO(
 #version 330
 
 layout (location = 0) in vec2 a_position;
@@ -82,7 +82,7 @@ void main() {
 }
 )FOO";
 
-static std::string BlitFragmentShader = R"FOO(
+static string BlitFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_Sampler;
@@ -96,7 +96,7 @@ void main() {
 }
 )FOO";
 
-static std::string BlurFragmentShader = R"FOO(
+static string BlurFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_sampler;
@@ -152,7 +152,7 @@ void main() {
 }
 )FOO";
 
-static std::string BlendFragmentShader = R"FOO(
+static string BlendFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_Pass0;
@@ -174,7 +174,7 @@ void main() {
 }
 )FOO";
 
-static std::string FXAAFragmentShader = R"FOO(
+static string FXAAFragmentShader = R"FOO(
 #version 330
 
 uniform sampler2D u_sampler;
@@ -262,5 +262,31 @@ void main()
   v_rgbM = vec2(fragCoord * inverseVP);
 
   BlendUnitColor = fxaa(u_sampler, fragCoord, u_resolution, v_rgbNW, v_rgbNE, v_rgbSW, v_rgbSE, v_rgbM);
+}
+)FOO";
+
+static string ResolveMultisampleFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2DMS u_SurfaceReflectSampler;
+uniform sampler2DMS u_EmitSampler;
+uniform int u_SampleCount;
+
+smooth in vec2 v_uv;
+
+layout (location = 0) out vec4 BlendUnitColor[2];
+
+void main()
+{
+  vec4 CombinedColor = vec4(0.0f);
+  vec4 CombinedEmit = vec4(0.0f);
+  for (int i = 0; i < u_SampleCount; i++)
+  {
+    CombinedColor += texelFetch(u_SurfaceReflectSampler, ivec2(gl_FragCoord.xy), i);
+    CombinedEmit += texelFetch(u_EmitSampler, ivec2(gl_FragCoord.xy), i);
+  }
+  float InvSampleCount = 1.0f / float(u_SampleCount);
+  BlendUnitColor[0] = InvSampleCount * CombinedColor;
+  BlendUnitColor[1] = InvSampleCount * CombinedEmit;
 }
 )FOO";

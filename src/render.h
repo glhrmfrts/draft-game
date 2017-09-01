@@ -209,6 +209,12 @@ struct fxaa_program
     int Resolution;
 };
 
+struct resolve_multisample_program
+{
+    shader_program ShaderProgram;
+    int SampleCount;
+};
+
 enum color_texture_type
 {
     ColorTexture_SurfaceReflect,
@@ -243,13 +249,14 @@ struct renderable
     GLuint PrimitiveType;
 };
 
-#define BloomBlurPassCount 3
+#define BloomBlurPassCount 2
 struct render_state
 {
     model_program ModelProgram;
     blur_program BlurProgram;
     fxaa_program FXAAProgram;
     shader_program BlendProgram;
+    resolve_multisample_program ResolveMultisampleProgram;
 
     framebuffer MultisampledSceneFramebuffer;
     framebuffer SceneFramebuffer;

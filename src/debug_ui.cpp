@@ -4,7 +4,7 @@ void DrawDebugUI(float DeltaTime)
 {
     if (!Global_DebugUI) return;
 
-    ImGui::Text("FPS: %.5f", 1.0f/DeltaTime / 10.0f);
+    ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);

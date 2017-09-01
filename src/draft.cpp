@@ -170,12 +170,12 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.5f), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 1, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1, 0, NULL, Material_PolygonLines));
     Entity->Size.y = 3;
     Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
     AddEntity(Game, Entity);
-    return Entity;
+    return Entity; 
 }
 
 #define SkyboxScale vec3(500.0f)
@@ -439,7 +439,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 #ifdef DRAFT_DEBUG
     if (Global_Collision_DrawBounds)
     {
-        Println(Global_Collision_DrawBounds);
         for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
         {
             auto Entity = Game.ShapedEntities[i];
@@ -460,7 +459,7 @@ int main(int argc, char **argv)
 
     int Width = 1280;
     int Height = 720;
-    SDL_Window *Window = SDL_CreateWindow("RGB", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           Width, Height, SDL_WINDOW_OPENGL);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -479,6 +478,10 @@ int main(int argc, char **argv)
         std::cout << "Error loading GL extensions" << std::endl;
         exit(EXIT_FAILURE);
     }
+
+    printf("%s\n", glGetString(GL_VERSION));
+    printf("%s\n", glGetString(GL_VENDOR));
+    printf("%s\n", glGetString(GL_RENDERER));
 
     glEnable(GL_MULTISAMPLE);
     glViewport(0, 0, Width, Height);
@@ -619,7 +622,7 @@ int main(int argc, char **argv)
         }
 
         ImGui_ImplSdlGL3_NewFrame(Window);
-        UpdateAndRenderLevel(Game, DeltaTime);
+        UpdateAndRenderLevel(Game, Elapsed);
 
         DrawDebugUI(Elapsed);
 
@@ -642,7 +645,7 @@ int main(int argc, char **argv)
 
         if (Elapsed*1000.0f < DeltaTimeMS)
         {
-            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
+            //SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
         PreviousTime = CurrentTime;
