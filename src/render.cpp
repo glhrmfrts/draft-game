@@ -67,7 +67,7 @@ InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
 
 // PushVertex pushes a single vertex to the buffer, the vertex size
 // is known by the VertexSize field
-inline static void
+inline void
 PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
 {
     EnsureCapacity(Buffer, Buffer.VertexSize);
@@ -156,43 +156,51 @@ void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const 
     glDeleteShader(FragmentShader);
 }
 
-void SetUniform(GLuint Location, int Value)
+inline void
+SetUniform(GLuint Location, int Value)
 {
     glUniform1i(Location, Value);
 }
 
-void SetUniform(GLuint Location, float Value)
+inline void
+SetUniform(GLuint Location, float Value)
 {
     glUniform1fv(Location, 1, &Value);
 }
 
-void SetUniform(GLuint Location, const vec2 &Value)
+inline void
+SetUniform(GLuint Location, const vec2 &Value)
 {
     glUniform2fv(Location, 1, &Value[0]);
 }
 
-void SetUniform(GLuint Location, const vec3 &Value)
+inline void
+SetUniform(GLuint Location, const vec3 &Value)
 {
     glUniform3fv(Location, 1, &Value[0]);
 }
 
-void SetUniform(GLuint Location, const vec4 &Value)
+inline void
+SetUniform(GLuint Location, const vec4 &Value)
 {
     glUniform4fv(Location, 1, &Value[0]);
 }
 
 #define MatrixRowMajor false
-void SetUniform(GLuint Location, const mat4 &Value)
+inline void
+SetUniform(GLuint Location, const mat4 &Value)
 {
     glUniformMatrix4fv(Location, 1, MatrixRowMajor, (float *)&Value);
 }
 
-void Bind(shader_program &Prog)
+inline void
+Bind(shader_program &Prog)
 {
     glUseProgram(Prog.ID);
 }
 
-void UnbindShaderProgram()
+inline void
+UnbindShaderProgram()
 {
     glUseProgram(0);
 }

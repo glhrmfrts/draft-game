@@ -13,6 +13,14 @@ void DrawDebugUI(float DeltaTime)
     {
         ImGui::Checkbox("Draw Bounds", &Global_Collision_DrawBounds);
     }
+    if (ImGui::CollapsingHeader("Game"))
+    {
+        if (ImGui::TreeNode("Trail"))
+        {
+            ImGui::SliderFloat("Record Timer", &Global_Game_TrailRecordTimer, 0.0f, 4.0f, "%.3f");
+            ImGui::TreePop();
+        }
+    }
     if (ImGui::CollapsingHeader("Renderer"))
     {
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);

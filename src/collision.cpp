@@ -20,7 +20,7 @@ UpdateEntityBounds(entity *Entity)
 inline static void
 ApplyVelocity(entity *Entity, vec3 Velocity)
 {
-    if (Entity->Flags & EntityFlag_Kinematic)
+    if (Entity->Flags & Entity_Kinematic)
     {
         return;
     }
@@ -30,7 +30,7 @@ ApplyVelocity(entity *Entity, vec3 Velocity)
 inline static void
 ApplyCorrection(entity *Entity, vec3 Correction)
 {
-    if (Entity->Flags & EntityFlag_Kinematic)
+    if (Entity->Flags & Entity_Kinematic)
     {
         return;
     }
@@ -124,7 +124,7 @@ void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
     for (size_t i = 0; i < EntityCount; i++)
     {
         auto Entity = Entities[i];
-        if (!(Entity->Flags & EntityFlag_Kinematic))
+        if (!(Entity->Flags & Entity_Kinematic))
         {
             Entity->Velocity += Gravity * DeltaTime;
         }

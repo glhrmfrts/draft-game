@@ -21,87 +21,9 @@
 #include "asset.cpp"
 #include "gui.cpp"
 #include "debug_ui.cpp"
+#include "entity.cpp"
 
 #undef main
-
-static void
-RegisterInputActions(game_input &Input)
-{
-    Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
-    Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
-    Input.Actions[Action_debugFreeCam] = {SDLK_SPACE, 0, 0, 0};
-    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
-    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
-}
-
-#define CameraOffsetY 4.0f
-#define CameraOffsetZ 5.0f
-
-static void
-AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
-{
-    PushVertex(Buffer, {p1.x, p1.y, p1.z, 0, 0,  c.r, c.g, c.b, c.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p2.x, p2.y, p2.z, 0, 0,  c.r, c.g, c.b, c.a,  n.x, n.y, n.z});
-}
-
-static void
-AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1 = Color_white, vec3 n = vec3(0), bool FlipV = false)
-{
-    color c2 = c1;
-    color c3 = c1;
-    color c4 = c1;
-
-    texture_rect Uv = {0, 0, 1, 1};
-    if (FlipV)
-    {
-        Uv.v = 1;
-        Uv.v2 = 0;
-    }
-    PushVertex(Buffer, {p1.x, p1.y, p1.z, Uv.u,  Uv.v,   c1.r, c1.g, c1.b, c1.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p2.x, p2.y, p2.z, Uv.u2, Uv.v,   c2.r, c2.g, c2.b, c2.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p4.x, p4.y, p4.z, Uv.u,  Uv.v2,  c4.r, c4.g, c4.b, c4.a,  n.x, n.y, n.z});
-
-    PushVertex(Buffer, {p2.x, p2.y, p2.z, Uv.u2, Uv.v,   c2.r, c2.g, c2.b, c2.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p3.x, p3.y, p3.z, Uv.u2, Uv.v2,  c3.r, c3.g, c3.b, c3.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p4.x, p4.y, p4.z, Uv.u,  Uv.v2,  c4.r, c4.g, c4.b, c4.a,  n.x, n.y, n.z});
-}
-
-inline static vec3
-GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
-{
-    vec3 v1 = p2 - p1;
-    vec3 v2 = p3 - p1;
-    return glm::normalize(glm::cross(v1, v2));
-}
-
-static void
-AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, color c1 = Color_white)
-{
-    color c2 = c1;
-    color c3 = c1;
-
-    vec3 n = GenerateNormal(p1, p2, p3);
-    PushVertex(Buffer, {p1.x, p1.y, p1.z, 0, 0,   c1.r, c1.g, c1.b, c1.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p2.x, p2.y, p2.z, 0, 0,   c2.r, c2.g, c2.b, c2.a,  n.x, n.y, n.z});
-    PushVertex(Buffer, {p3.x, p3.y, p3.z, 0, 0,   c3.r, c3.g, c3.b, c3.a,  n.x, n.y, n.z});
-}
-
-static void
-AddCube(vertex_buffer &Buffer, float height)
-{
-    float y = -0.5;
-    float h = y + height;
-    float x = -0.5f;
-    float w = x+1;
-    float z = 0.5f;
-    float d = z-1;
-    AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, h, z), vec3(x, h, z), Color_white, vec3(0, 0, 1));
-    AddQuad(Buffer, vec3(w, y, z), vec3(w, y, d), vec3(w, h, d), vec3(w, h, z), Color_white, vec3(1, 0, 0));
-    AddQuad(Buffer, vec3(w, y, d), vec3(x, y, d), vec3(x, h, d), vec3(w, h, d), Color_white, vec3(0, 0, -1));
-    AddQuad(Buffer, vec3(x, y, d), vec3(x, y, z), vec3(x, h, z), vec3(x, h, d), Color_white, vec3(-1, 0, 0));
-    AddQuad(Buffer, vec3(x, h, z), vec3(w, h, z), vec3(w, h, d), vec3(x, h, d), Color_white, vec3(0, 1, 0));
-}
 
 static void
 AddEntity(game_state &Game, entity *Entity)
@@ -124,78 +46,8 @@ AddEntity(game_state &Game, entity *Entity)
     }
 }
 
-inline static void
-AddFlags(entity *Entity, uint32 Flags)
-{
-    Entity->Flags |= Flags;
-}
-
-static material *
-CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
-{
-    material *Result = PushStruct<material>(Arena);
-    Result->DiffuseColor = Color;
-    Result->Emission = Emission;
-    Result->TexWeight = TexWeight;
-    Result->Texture = Texture;
-    Result->Flags = Flags;
-    return Result;
-}
-
-static model *
-CreateModel(memory_arena &Arena, mesh *Mesh)
-{
-    model *Result = PushStruct<model>(Arena);
-    Result->Mesh = Mesh;
-    return Result;
-}
-
-inline static void
-AddPart(mesh &Mesh, const mesh_part &MeshPart)
-{
-    Mesh.Parts.push_back(MeshPart);
-}
-
-static void
-AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
-{
-    AddQuad(Mesh.Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
-    AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
-}
-
-static trail *
-CreateTrail(memory_arena &Arena)
-{
-    trail *Result = PushStruct<trail>(Arena);
-    InitMeshBuffer(Result->Mesh.Buffer);
-    Result->Model.Mesh = &Result->Mesh;
-    AddPart(Result->Mesh, {{Color_white, 0, 0, NULL}, 0, 2, GL_LINES});
-    AddPart(Result->Mesh, {{Color_white, 0, 0, NULL}, 2, TrailCount*2 - 2, GL_LINES});
-
-    for (int i = 0; i < TrailCount; i++)
-    {
-        Result->Pos[i] = vec3(0.0f);
-    }
-    return Result;
-}
-
-static entity *
-CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
-{
-    auto Entity = PushStruct<entity>(Game.Arena);
-    Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
-    Entity->Size.y = 3;
-    Entity->Size *= 0.75f;
-    Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
-    Entity->Trail = CreateTrail(Game.Arena);
-    Entity->Trail->Model.Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.2f, 0, NULL, Material_PolygonLines));
-    Entity->Trail->Model.Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.2f, 0, NULL, Material_PolygonLines));
-    AddEntity(Game, Entity);
-    return Entity;
-}
-
+#define CameraOffsetY 8.0f
+#define CameraOffsetZ 3.0f
 #define TrackSegmentLength 20
 #define TrackSegmentWidth  5
 #define TrackLaneWidth     2.5f
@@ -212,7 +64,7 @@ StartLevel(game_state &Game)
         InitMeshBuffer(FloorMesh.Buffer);
 
         material FloorMaterial = {IntColor(FirstPalette.Colors[0], 1), 0, 1, LoadTextureFile(Game.AssetCache, "data/textures/checker.png")};
-        material LaneMaterial = {Color_white, 0, 0, NULL};
+        material LaneMaterial = {Color_white, 0.1f, 0, NULL};
 
         float w = TrackSegmentWidth * TrackLaneWidth;
         float l = -w/2;
@@ -285,6 +137,9 @@ StartLevel(game_state &Game)
 
     Game.EnemyEntity->Position.x = 4;
 
+    AddEntity(Game, Game.PlayerEntity);
+    AddEntity(Game, Game.EnemyEntity);
+
     for (size_t i = 0; i < TrackSegmentCount; i++)
     {
         auto Entity = PushStruct<entity>(Game.Arena);
@@ -319,81 +174,6 @@ inline static bool
 HandleCollision(entity *First, entity *Second)
 {
     return true;
-}
-
-static float
-Interp(float c, float t, float a, float dt)
-{
-    if (c == t)
-    {
-        return t;
-    }
-    float dir = std::copysign(1, t - c);
-    c += a * dir * dt;
-    return (dir == std::copysign(1, t - c)) ? c : t;
-}
-
-#define ShipMaxVel  50.0f
-#define PlayerMaxVel 55.0f
-#define ShipAcceleration 20.0f
-#define ShipBreakAcceleration 30.0f
-#define ShipSteerSpeed 10.0f
-#define ShipSteerAcceleration 50.0f
-#define ShipFriction 2.0f
-#define CameraOffsetY 5.0f
-#define CameraOffsetZ 2.0f
-static void
-MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime, bool IsPlayer = false)
-{
-    float MaxVel = ShipMaxVel;
-    if (IsPlayer)
-    {
-        MaxVel = PlayerMaxVel;
-    }
-
-    if (MoveV > 0.0f && Entity->Velocity.y < MaxVel)
-    {
-        Entity->Velocity.y += MoveV * ShipAcceleration * DeltaTime;
-    }
-    else if (MoveV < 0.0f && Entity->Velocity.y > 0)
-    {
-        Entity->Velocity.y = std::max(0.0f, Entity->Velocity.y + (MoveV * ShipBreakAcceleration * DeltaTime));
-    }
-
-    if (MoveV <= 0.0f)
-    {
-        Entity->Velocity.y -= ShipFriction * DeltaTime;
-    }
-    Entity->Velocity.y = std::max(0.0f, std::min(MaxVel, Entity->Velocity.y));
-
-    float SteerTarget = MoveH * ShipSteerSpeed;
-    Entity->Velocity.x = Interp(Entity->Velocity.x,
-                                SteerTarget,
-                                ShipSteerAcceleration,
-                                DeltaTime);
-
-    Entity->Rotation.y = 20.0f * (Entity->Velocity.x / ShipSteerSpeed);
-    Entity->Rotation.x = Interp(Entity->Rotation.x,
-                                5.0f * MoveV,
-                                20.0f,
-                                DeltaTime);
-}
-
-inline static void
-PushPosition(trail *Trail, vec3 Pos)
-{
-    if (Trail->PositionStackIndex >= TrailCount)
-    {
-        vec3 PosSave = Trail->Pos[TrailCount - 1];
-        for (int i = TrailCount - 1; i > 0; i--)
-        {
-            vec3 NewPos = PosSave;
-            PosSave = Trail->Pos[i - 1];
-            Trail->Pos[i - 1] = NewPos;
-        }
-        Trail->PositionStackIndex -= 1;
-    }
-    Trail->Pos[Trail->PositionStackIndex++] = Pos;
 }
 
 static void
@@ -436,7 +216,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
 
     static float EnemyMoveH = 0.0f;
-    EnemyMoveH += DeltaTime;
+    //EnemyMoveH += DeltaTime;
     MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
 
     size_t FrameCollisionCount = 0;
@@ -486,29 +266,59 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             }
         }
 
-        if (Trail->Timer > TrailRecordTimer)
+        if (Trail->Timer > Global_Game_TrailRecordTimer)
         {
             Trail->Timer = 0;
             PushPosition(Trail, Entity->Position);
         }
 
-        Trail->Model.Materials[0]->DiffuseColor.a = 1.0f - (Trail->Timer/TrailRecordTimer);
         mesh &Mesh = Trail->Mesh;
         ResetBuffer(Mesh.Buffer);
+
+        // First store the quads, then the lines
+        vec3 PointCache[TrailCount*4];
         for (int i = 0; i < TrailCount; i++)
         {
-            vec3 p1 = Trail->Pos[i];
-            vec3 p2;
+            vec3 c1 = Trail->Pos[i];
+            vec3 c2;
             if (i == TrailCount - 1)
             {
-                p2 = Entity->Position;
+                c2 = Entity->Position;
             }
             else
             {
-                p2 = Trail->Pos[i + 1];
+                c2 = Trail->Pos[i + 1];
             }
 
-            AddLine(Mesh.Buffer, p1, p2);
+            if (i == 0)
+            {
+                c1 += (c2 - c1) * (Trail->Timer/Global_Game_TrailRecordTimer);
+            }
+
+            const float r = 0.5f;
+            const float min2 =  0.4f * ((TrailCount - i) / TrailCount);
+            const float min1 =  0.4f * ((TrailCount - i+1) / TrailCount);
+            vec3 p1 = c2 - vec3(r - min2, 0, 0);
+            vec3 p2 = c2 + vec3(r - min2, 0, 0);
+            vec3 p3 = c1 - vec3(r - min1, 0, 0);
+            vec3 p4 = c1 + vec3(r - min1, 0, 0);
+            AddQuad(Mesh.Buffer, p2, p1, p3, p4);
+
+            const float lo = 0.05f;
+            PointCache[i*4] = p1 - vec3(lo, 0, 0);
+            PointCache[i*4 + 1] = p3 - vec3(lo, 0, 0);
+            PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
+            PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
+        }
+        for (int i = 0; i < TrailCount; i++)
+        {
+            vec3 *p = PointCache + i*4;
+            AddLine(Mesh.Buffer, *p++, *p++);
+        }
+        for (int i = 0; i < TrailCount; i++)
+        {
+            vec3 *p = PointCache + i*4 + 2;
+            AddLine(Mesh.Buffer, *p++, *p++);
         }
         UploadVertices(Mesh.Buffer, GL_DYNAMIC_DRAW);
 
@@ -541,6 +351,16 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 #endif
 
     RenderEnd(Game.RenderState, Game.Camera);
+}
+
+static void
+RegisterInputActions(game_input &Input)
+{
+    Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
+    Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
+    Input.Actions[Action_debugFreeCam] = {SDLK_SPACE, 0, 0, 0};
+    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
+    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
 }
 
 int main(int argc, char **argv)

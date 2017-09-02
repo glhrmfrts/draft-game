@@ -4,6 +4,7 @@
 static bool  Global_DebugUI = false;
 static bool  Global_Camera_FreeCam = false;
 static bool  Global_Collision_DrawBounds = false;
+static float Global_Game_TrailRecordTimer = 0.075f;
 static bool  Global_Renderer_DoPostFX = true;
 static float Global_Renderer_BloomBlurOffset = 8.0f;
 
