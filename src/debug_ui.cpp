@@ -8,10 +8,12 @@ void DrawDebugUI(float DeltaTime)
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);
+        ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Collision"))
     {
         ImGui::Checkbox("Draw Bounds", &Global_Collision_DrawBounds);
+        ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Game"))
     {
@@ -20,6 +22,8 @@ void DrawDebugUI(float DeltaTime)
             ImGui::SliderFloat("Record Timer", &Global_Game_TrailRecordTimer, 0.0f, 4.0f, "%.3f");
             ImGui::TreePop();
         }
+
+        ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Renderer"))
     {
@@ -30,5 +34,6 @@ void DrawDebugUI(float DeltaTime)
             ImGui::SliderFloat("Blur Offset", &Global_Renderer_BloomBlurOffset, 0.0f, 10.0f, "%.2f");
             ImGui::TreePop();
         }
+        ImGui::Spacing();
     }
 }

@@ -1,7 +1,6 @@
 /*
   Current TODOs:
   - (Game)     Create the ship's "trail"
-
   - (Renderer) Fix order of rendering (sort the renderables)
  */
 
@@ -188,7 +187,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         static float Pitch;
         static float Yaw;
-        float Speed = 20.0f;
+        float Speed = 50.0f;
         float AxisValue = GetAxisValue(Input, Action_camVertical);
 
         Camera.Position += CameraDir(Game.Camera) * AxisValue * Speed * DeltaTime;
@@ -213,11 +212,12 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     float MoveH = GetAxisValue(Game.Input, Action_horizontal);
     float MoveV = GetAxisValue(Game.Input, Action_vertical);
-    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
+    //MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
 
     static float EnemyMoveH = 0.0f;
-    //EnemyMoveH += DeltaTime;
+    EnemyMoveH += DeltaTime * 2;
     MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
+    MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
 
     size_t FrameCollisionCount = 0;
     DetectCollisions(Game.ShapedEntities, Game.CollisionCache, FrameCollisionCount);
@@ -290,14 +290,15 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
                 c2 = Trail->Pos[i + 1];
             }
 
+            float CurrentTrailTime = Trail->Timer/Global_Game_TrailRecordTimer;
             if (i == 0)
             {
-                c1 += (c2 - c1) * (Trail->Timer/Global_Game_TrailRecordTimer);
+                c1 += (c2 - c1) * CurrentTrailTime;
             }
 
             const float r = 0.5f;
-            const float min2 =  0.4f * ((TrailCount - i) / TrailCount);
-            const float min1 =  0.4f * ((TrailCount - i+1) / TrailCount);
+            const float min2 =  0.4f * ((TrailCount - i) / (float)TrailCount);
+            const float min1 =  0.4f * ((TrailCount - i+1) / (float)TrailCount);
             vec3 p1 = c2 - vec3(r - min2, 0, 0);
             vec3 p2 = c2 + vec3(r - min2, 0, 0);
             vec3 p3 = c1 - vec3(r - min1, 0, 0);
