@@ -1,8 +1,4 @@
-/*
-  Current TODOs:
-  - (Game)     Create the ship's "trail"
-  - (Renderer) Fix order of rendering (sort the renderables)
- */
+// Copyright
 
 #include <iostream>
 #include <cstdint>
