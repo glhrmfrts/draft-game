@@ -42,11 +42,13 @@ AddEntity(game_state &Game, entity *Entity)
     if (Entity->Trail)
     {
         Game.TrailEntities.push_back(Entity);
+        for (int i = 0; i < TrailCount; i++)
+        {
+            AddEntity(Game, Entity->Trail->Entities + i);
+        }
     }
 }
 
-#define CameraOffsetY 8.0f
-#define CameraOffsetZ 3.0f
 #define TrackSegmentLength 20
 #define TrackSegmentWidth  5
 #define TrackLaneWidth     2.5f
@@ -139,7 +141,7 @@ StartLevel(game_state &Game)
     AddEntity(Game, Game.PlayerEntity);
     AddEntity(Game, Game.EnemyEntity);
 
-    for (size_t i = 0; i < TrackSegmentCount; i++)
+    for (int i = 0; i < TrackSegmentCount; i++)
     {
         auto Entity = PushStruct<entity>(Game.Arena);
         Entity->TrackSegment = PushStruct<track_segment>(Game.Arena);
@@ -172,6 +174,10 @@ CameraDir(camera &Camera)
 inline static bool
 HandleCollision(entity *First, entity *Second)
 {
+    if (First->Type == EntityType_TrailPiece || Second->Type == EntityType_TrailPiece)
+    {
+        return false;
+    }
     return true;
 }
 
@@ -238,8 +244,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         auto PlayerPosition = Game.PlayerEntity->Position;
         Camera.Position = vec3(PlayerPosition.x,
-                               PlayerPosition.y - CameraOffsetY,
-                               PlayerPosition.z + CameraOffsetZ);
+                               PlayerPosition.y + Global_Camera_OffsetY,
+                               PlayerPosition.z + Global_Camera_OffsetZ);
         Camera.LookAt = Camera.Position + vec3(0, 10, 0);
     }
     {
@@ -262,7 +268,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             Trail->FirstFrame = false;
             for (int i = 0; i < TrailCount; i++)
             {
-                Trail->Pos[i] = Entity->Position;
+                Trail->Entities[i].Position = Entity->Position;
             }
         }
 
@@ -279,7 +285,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         vec3 PointCache[TrailCount*4];
         for (int i = 0; i < TrailCount; i++)
         {
-            vec3 c1 = Trail->Pos[i];
+            auto PieceEntity = Trail->Entities + i;
+            vec3 c1 = PieceEntity->Position;
             vec3 c2;
             if (i == TrailCount - 1)
             {
@@ -287,7 +294,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             }
             else
             {
-                c2 = Trail->Pos[i + 1];
+                c2 = Trail->Entities[i + 1].Position;
             }
 
             float CurrentTrailTime = Trail->Timer/Global_Game_TrailRecordTimer;
@@ -310,6 +317,10 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             PointCache[i*4 + 1] = p3 - vec3(lo, 0, 0);
             PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
             PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
+
+            auto Bounds = PieceEntity->Bounds;
+            Bounds->Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
+            Bounds->Center = vec3(c1.x, c1.y + Bounds->Half.y, c1.z + Bounds->Half.z);
         }
         for (int i = 0; i < TrailCount; i++)
         {
@@ -444,15 +455,19 @@ int main(int argc, char **argv)
 
             case SDL_KEYDOWN: {
                 SDL_Keycode Key = Event.key.keysym.sym;
-                for (int i = 0; i < Action_count; i++) {
+                for (int i = 0; i < Action_count; i++)
+                {
                     auto &Action = Input.Actions[i];
-                    if (Action.Positive == Key || Action.Negative == Key) {
+                    if (Action.Positive == Key || Action.Negative == Key)
+                    {
                         Action.Pressed++;
 
-                        if (Action.Positive == Key) {
+                        if (Action.Positive == Key)
+                        {
                             Action.AxisValue = 1;
                         }
-                        else if (Action.Negative == Key) {
+                        else if (Action.Negative == Key)
+                        {
                             Action.AxisValue = -1;
                         }
                     }
@@ -467,14 +482,17 @@ int main(int argc, char **argv)
 
             case SDL_KEYUP: {
                 SDL_Keycode Key = Event.key.keysym.sym;
-                for (int i = 0; i < Action_count; i++) {
+                for (int i = 0; i < Action_count; i++)
+                {
                     auto &Action = Input.Actions[i];
-                    if (Action.Positive == Key && Action.AxisValue == 1) {
+                    if (Action.Positive == Key && Action.AxisValue == 1)
+                    {
                         Action.Pressed = 0;
                         Action.AxisValue = 0;
                         break;
                     }
-                    else if (Action.Negative == Key && Action.AxisValue == -1) {
+                    else if (Action.Negative == Key && Action.AxisValue == -1)
+                    {
                         Action.Pressed = 0;
                         Action.AxisValue = 0;
                     }

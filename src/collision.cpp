@@ -12,8 +12,8 @@ UpdateEntityBounds(entity *Entity)
     }
     else
     {
-        Entity->Bounds->Center = Entity->Position;
-        Entity->Bounds->Half = Entity->Size*0.5f;
+        //Entity->Bounds->Center = Entity->Position;
+        //Entity->Bounds->Half = Entity->Size*0.5f;
     }
 }
 

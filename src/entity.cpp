@@ -128,12 +128,13 @@ CreateTrail(memory_arena &Arena, color Color)
     AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
     AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
 
-    //Result->Model.Materials.push_back(CreateMaterial(Game.Arena, Color, 0, 0, NULL, 0));
-    //Result->Model.Materials.push_back(CreateMaterial(Game.Arena, Color, 0.2f, 0, NULL, 0));
-
     for (int i = 0; i < TrailCount; i++)
     {
-        Result->Pos[i] = vec3(0.0f);
+        auto Entity = Result->Entities + i;
+        Entity->Type = EntityType_TrailPiece;
+        Entity->Position = vec3(0.0f);
+        Entity->Bounds = PushStruct<bounding_box>(Arena);
+        AddFlags(Entity, Entity_Kinematic);
     }
     return Result;
 }
@@ -142,6 +143,7 @@ static entity *
 CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
+    Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
@@ -213,14 +215,14 @@ PushPosition(trail *Trail, vec3 Pos)
 {
     if (Trail->PositionStackIndex >= TrailCount)
     {
-        vec3 PosSave = Trail->Pos[TrailCount - 1];
+        vec3 PosSave = Trail->Entities[TrailCount - 1].Position;
         for (int i = TrailCount - 1; i > 0; i--)
         {
             vec3 NewPos = PosSave;
-            PosSave = Trail->Pos[i - 1];
-            Trail->Pos[i - 1] = NewPos;
+            PosSave = Trail->Entities[i - 1].Position;
+            Trail->Entities[i - 1].Position = NewPos;
         }
         Trail->PositionStackIndex -= 1;
     }
-    Trail->Pos[Trail->PositionStackIndex++] = Pos;
+    Trail->Entities[Trail->PositionStackIndex++].Position = Pos;
 }
