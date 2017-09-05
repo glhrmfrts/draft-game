@@ -1,6 +1,9 @@
 #ifndef DRAFT_DRAFT_H
 #define DRAFT_DRAFT_H
 
+#include <GL/glew.h>
+#include <SDL2/SDL.h>
+#include <AL/alc.h>
 #include "config.h"
 #include "common.h"
 #include "memory.h"
@@ -25,18 +28,34 @@ enum game_mode
     GameMode_level,
 };
 
+// @TODO: this will probably only work for linux
+enum game_controller_axis_id
+{
+    Axis_Invalid = -1,
+    Axis_LeftX = 0,
+    Axis_LeftY = 1,
+    Axis_LeftTrigger = 2,
+    Axis_RightTrigger = 5,
+    Axis_RightX = 3,
+    Axis_RightY = 4,
+};
+struct game_controller
+{
+    SDL_Joystick *Joystick;
+};
+
 struct action_state
 {
     int Positive;
     int Negative;
     int Pressed = 0;
-    float AxisValue;
+    float AxisValue = 0;
+    game_controller_axis_id AxisID = Axis_Invalid;
 };
 
 #define MouseButton_left 0x1
 #define MouseButton_middle 0x2
 #define MouseButton_right 0x4
-
 struct mouse_state
 {
     int X, Y;
@@ -50,6 +69,7 @@ struct game_input
 {
     mouse_state MouseState;
     action_state Actions[Action_count];
+    game_controller Controller;
 };
 
 struct game_state

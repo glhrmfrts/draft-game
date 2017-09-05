@@ -16,6 +16,13 @@ enum entity_type
     EntityType_TrailPiece,
 };
 
+struct player_ship
+{
+    float CurrentDraftTime = 0;
+    float DraftCharge = 0;
+    int NumTrailCollisions = 0;
+};
+
 struct entity
 {
     vec3 Position;
@@ -27,6 +34,7 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
+    player_ship *PlayerShip;
     trail *Trail = NULL;
     track_segment *TrackSegment = NULL;
     bounding_box *Bounds = NULL;
@@ -42,6 +50,7 @@ struct trail
     float Timer = 0;
     int PositionStackIndex = 0;
     bool FirstFrame = true;
+    entity *Owner;
 };
 
 /*

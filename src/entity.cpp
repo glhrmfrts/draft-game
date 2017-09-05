@@ -106,9 +106,11 @@ AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, 
 }
 
 static trail *
-CreateTrail(memory_arena &Arena, color Color)
+CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 {
     trail *Result = PushStruct<trail>(Arena);
+    Result->Owner = Owner;
+
     InitMeshBuffer(Result->Mesh.Buffer);
     Result->Model.Mesh = &Result->Mesh;
 
@@ -150,7 +152,14 @@ CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlaye
     Entity->Size.y = 3;
     Entity->Size *= 0.75f;
     Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
-    Entity->Trail = CreateTrail(Game.Arena, OutlineColor);
+    if (!IsPlayer)
+    {
+        Entity->Trail = CreateTrail(Game.Arena, Entity, OutlineColor);
+    }
+    else
+    {
+        Entity->PlayerShip = PushStruct<player_ship>(Game.Arena);
+    }
     return Entity;
 }
 

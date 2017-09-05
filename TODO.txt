@@ -1,5 +1,6 @@
 Current TODOs:
 
+- (Input) Gamepad input
 - (Game) Give the trail an owner and detect when player is on another ship's trail
 - (Renderer) Fix order of rendering (sort by distance)
 - (Renderer) Frustum culling

@@ -4,9 +4,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
-#include <GL/glew.h>
-#include <SDL2/SDL.h>
-#include <AL/alc.h>
 #include "imgui.h"
 #include "imgui_impl_sdl_gl3.h"
 #include "draft.h"
@@ -75,7 +72,7 @@ StartLevel(game_state &Game)
             AddLine(FloorMesh.Buffer, vec3(l+i*TrackLaneWidth, 0, 0), vec3(l+i*TrackLaneWidth, 1, 0), Color_white, vec3(1.0f));
             LineVertexCount += 2;
         }
-        AddPart(FloorMesh, {LaneMaterial, 6, LineVertexCount, GL_LINES});
+        //AddPart(FloorMesh, {LaneMaterial, 6, LineVertexCount, GL_LINES});
 
         EndMesh(FloorMesh, GL_STATIC_DRAW);
     }
@@ -168,10 +165,25 @@ CameraDir(camera &Camera)
 }
 
 inline static bool
-HandleCollision(entity *First, entity *Second)
+HandleCollision(entity *First, entity *Second, float DeltaTime)
 {
     if (First->Type == EntityType_TrailPiece || Second->Type == EntityType_TrailPiece)
     {
+        player_ship *PlayerShip = NULL;
+        if (First->PlayerShip)
+        {
+            PlayerShip = First->PlayerShip;
+        }
+        else if (Second->PlayerShip)
+        {
+            PlayerShip = Second->PlayerShip;
+        }
+
+        if (PlayerShip)
+        {
+            PlayerShip->CurrentDraftTime += DeltaTime;
+            PlayerShip->NumTrailCollisions++;
+        }
         return false;
     }
     return true;
@@ -183,6 +195,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto &Input = Game.Input;
     auto &Camera = Game.Camera;
     auto CamDir = CameraDir(Camera);
+    auto PlayerShip = Game.PlayerEntity->PlayerShip;
 
 #ifdef DRAFT_DEBUG
     if (Global_Camera_FreeCam)
@@ -214,14 +227,18 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     float MoveH = GetAxisValue(Game.Input, Action_horizontal);
     float MoveV = GetAxisValue(Game.Input, Action_vertical);
-    //MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
+    //Println(MoveV);
+    //MoveV = 0.3f;
+    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
 
     static float EnemyMoveH = 0.0f;
-    EnemyMoveH += DeltaTime * 2;
+    //EnemyMoveH += DeltaTime * 2;
     MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
-    MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
+    //MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f,
+    //DeltaTime);
 
     size_t FrameCollisionCount = 0;
+    PlayerShip->NumTrailCollisions = 0;
     DetectCollisions(Game.ShapedEntities, Game.CollisionCache, FrameCollisionCount);
     for (size_t i = 0; i < FrameCollisionCount; i++)
     {
@@ -229,12 +246,17 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         Col.First->NumCollisions++;
         Col.Second->NumCollisions++;
 
-        if (HandleCollision(Col.First, Col.Second))
+        if (HandleCollision(Col.First, Col.Second, DeltaTime))
         {
             ResolveCollision(Col);
         }
     }
     Integrate(Game.ShapedEntities, Game.Gravity, DeltaTime);
+    if (PlayerShip->NumTrailCollisions == 0)
+    {
+        PlayerShip->CurrentDraftTime -= DeltaTime;
+    }
+    PlayerShip->CurrentDraftTime = std::max(0.0f, std::min(PlayerShip->CurrentDraftTime, Global_Game_DraftChargeTime));
 
     if (!Global_Camera_FreeCam)
     {
@@ -244,10 +266,11 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
                                PlayerPosition.z + Global_Camera_OffsetZ);
         Camera.LookAt = Camera.Position + vec3(0, 10, 0);
     }
-    {
-        Game.SkyboxEntity->Position.y = Game.PlayerEntity->Position.y;
-        float dx = Game.PlayerEntity->Position.x - Game.SkyboxEntity->Position.x;
 
+    {
+        auto Entity = Game.PlayerEntity;
+        Game.SkyboxEntity->Position.y = Entity->Position.y;
+        float dx = Entity->Position.x - Game.SkyboxEntity->Position.x;
         Game.SkyboxEntity->Position.x += dx * 0.25f;
     }
 
@@ -359,6 +382,16 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 #endif
 
     RenderEnd(Game.RenderState, Game.Camera);
+
+    {
+        float DraftCharge = Game.PlayerEntity->PlayerShip->CurrentDraftTime / Global_Game_DraftChargeTime;
+        DraftCharge = std::min(DraftCharge, 1.0f);
+        UpdateProjectionView(Game.GUICamera);
+        Begin(Game.GUI, Game.GUICamera);
+        PushRect(Game.GUI, rect{20,20,200,20}, Color_white, GL_LINE_LOOP, false);
+        PushRect(Game.GUI, rect{25,25,190 * DraftCharge,10}, Color_red, GL_TRIANGLES, false);
+        End(Game.GUI);
+    }
 }
 
 static void
@@ -367,13 +400,52 @@ RegisterInputActions(game_input &Input)
     Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
     Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
     Input.Actions[Action_debugFreeCam] = {SDLK_SPACE, 0, 0, 0};
-    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0};
-    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0};
+    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX};
+    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger};
+}
+
+static void
+OpenGameController(game_input &Input)
+{
+    Input.Controller.Joystick = SDL_JoystickOpen(0);
+    if (Input.Controller.Joystick)
+    {
+        printf("Joystick name: %s\n", SDL_JoystickNameForIndex(0));
+    }
+    else
+    {
+        fprintf(stderr, "Could not open joystick %i: %s\n", 0, SDL_GetError());
+    }
+}
+
+#define GameControllerAxisDeadzone 5000
+static void
+ProcessAxisEvent(game_input &Input, SDL_JoyAxisEvent &Event)
+{
+    int Value = Event.value;
+    if (Event.axis == Axis_RightTrigger || Event.axis == Axis_LeftTrigger)
+    {
+        float fv = (Value + 32768) / float(65535);
+        Value = short(fv * 32767);
+    }
+    if (std::abs(Value) < GameControllerAxisDeadzone)
+    {
+        Value = 0;
+    }
+    for (int i = 0; i < Action_count; i++)
+    {
+        auto &Action = Input.Actions[i];
+        if (Action.AxisID == Event.axis)
+        {
+            Action.AxisValue = Value / float(32767);
+            break;
+        }
+    }
 }
 
 int main(int argc, char **argv)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
     {
         std::cout << "Failed to init display SDL" << std::endl;
     }
@@ -423,6 +495,11 @@ int main(int argc, char **argv)
 
     auto &Input = Game.Input;
     RegisterInputActions(Input);
+    if (SDL_NumJoysticks() > 0)
+    {
+        OpenGameController(Input);
+    }
+
     InitGUI(Game.GUI, Input);
     MakeCameraOrthographic(Game.GUICamera, 0, Width, 0, Height, -1, 1);
     InitRenderState(Game.RenderState, Width, Height);
@@ -544,6 +621,23 @@ int main(int argc, char **argv)
                     Input.MouseState.Buttons &= ~MouseButton_right;
                     break;
                 }
+                break;
+            }
+
+            case SDL_JOYDEVICEADDED: {
+                OpenGameController(Input);
+                break;
+            }
+
+            case SDL_JOYDEVICEREMOVED: {
+                SDL_JoystickClose(Input.Controller.Joystick);
+                Input.Controller.Joystick = NULL;
+                printf("Controller removed\n");
+                break;
+            }
+
+            case SDL_JOYAXISMOTION: {
+                ProcessAxisEvent(Input, Event.jaxis);
                 break;
             }
             }

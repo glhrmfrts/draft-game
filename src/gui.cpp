@@ -116,8 +116,8 @@ PushDrawCommand(gui &GUI)
 
 static uint32
 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
-         texture *Texture, texture_rect TexRect, float TexWeight,
-         bool FlipV, GLuint PrimType, bool CheckState)
+         texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
+         bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     auto &Curr = GUI.CurrentDrawCommand;
     if (Curr.Texture != Texture ||
@@ -162,6 +162,10 @@ PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
         PushVertex(GUI.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
         PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
         break;
+
+    default:
+        assert(!"Invalid primitive type");
+        break;
     }
 
     if (CheckState)
@@ -171,18 +175,18 @@ PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
     return GUIElementState_none;
 }
 
-uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType, bool CheckState)
+uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType, bool CheckState = true)
 {
     return PushRect(GUI, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState)
+uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
 {
     return PushRect(GUI, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
 #if 0
-uint32 PushText(gui &GUI, font &Font, const string &Text, rect R, color C, bool CheckState)
+uint32 PushText(gui &GUI, font &Font, const string &Text, rect R, color C, bool CheckState = true)
 {
     vec2 Size(0, 0);
     RenderText(GUI, Font, Text, R, C, &Size);
