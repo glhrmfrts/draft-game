@@ -6,12 +6,13 @@
 #include <AL/alc.h>
 #include "config.h"
 #include "common.h"
-#include "memory.h"
 #include "collision.h"
+#include "memory.h"
 #include "render.h"
 #include "asset.h"
 #include "gui.h"
 #include "entity.h"
+#include "random.h"
 
 enum action_type
 {
@@ -20,6 +21,7 @@ enum action_type
     Action_debugFreeCam,
     Action_horizontal,
     Action_vertical,
+    Action_boost,
     Action_count,
 };
 
@@ -88,15 +90,19 @@ struct game_state
     mesh ShipMesh;
     mesh SkyboxMesh;
     vec3 Gravity;
-    vector<entity *> ModelEntities;
-    vector<entity *> ShapedEntities;
-    vector<entity *> TrackEntities;
-    vector<entity *> TrailEntities;
-    vector<collision> CollisionCache;
+
+    std::list<entity *> ModelEntities;
+    std::list<entity *> ShapedEntities;
+    std::list<entity *> TrackEntities;
+    std::list<entity *> TrailEntities;
+    std::list<entity *> ExplosionEntities;
+    std::vector<collision> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;
     entity *EnemyEntity;
     int CurrentLevel = 0;
+
+    random_series ExplosionEntropy;
 
     int Width;
     int Height;

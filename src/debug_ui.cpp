@@ -1,10 +1,11 @@
 #include "config.h"
 
-void DrawDebugUI(float DeltaTime)
+void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
 {
     if (!Global_DebugUI) return;
 
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
+    ImGui::Text("Player Velocity: %s", ToString(PlayerEntity->Transform.Velocity).c_str());
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);

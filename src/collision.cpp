@@ -6,9 +6,9 @@ UpdateEntityBounds(entity *Entity)
     // TODO: this is not good
     if (Entity->Model)
     {
-        *Entity->Bounds = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Size,
-                                           Entity->Model->Mesh->Max*Entity->Size);
-        Entity->Bounds->Center += Entity->Position;
+        Entity->Bounds->Box = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Transform.Scale,
+                                               Entity->Model->Mesh->Max*Entity->Transform.Scale);
+        Entity->Bounds->Box.Center += Entity->Transform.Position;
     }
     else
     {
@@ -24,7 +24,7 @@ ApplyVelocity(entity *Entity, vec3 Velocity)
     {
         return;
     }
-    Entity->Velocity += Velocity;
+    Entity->Transform.Velocity += Velocity;
 }
 
 inline static void
@@ -34,11 +34,11 @@ ApplyCorrection(entity *Entity, vec3 Correction)
     {
         return;
     }
-    Entity->Position += Correction;
+    Entity->Transform.Position += Correction;
 }
 
 #define ClimbHeight 0.26f
-void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions)
+void DetectCollisions(const std::list<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions)
 {
     // The entities' bounding boxes only get updated in the integration
     // phase, which happens after the collision detection so we need
@@ -60,8 +60,8 @@ void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collis
         for (size_t j = i+1; j < EntityCount; j++)
         {
             auto EntityB = Entities[j];
-            auto &First = *EntityA->Bounds;
-            auto &Second = *EntityB->Bounds;
+            auto &First = EntityA->Bounds->Box;
+            auto &Second = EntityB->Bounds->Box;
             vec3 Dif = Second.Center - First.Center;
             float dx = First.Half.x + Second.Half.x - std::abs(Dif.x);
             if (dx <= 0)
@@ -118,7 +118,7 @@ void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collis
     }
 }
 
-void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
+void Integrate(const std::list<entity *> Entities, vec3 Gravity, float DeltaTime)
 {
     size_t EntityCount = Entities.size();
     for (size_t i = 0; i < EntityCount; i++)
@@ -126,16 +126,16 @@ void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
         auto Entity = Entities[i];
         if (!(Entity->Flags & Entity_Kinematic))
         {
-            Entity->Velocity += Gravity * DeltaTime;
+            Entity->Transform.Velocity += Gravity * DeltaTime;
         }
-        Entity->Position += Entity->Velocity * DeltaTime;
+        Entity->Transform.Position += Entity->Transform.Velocity * DeltaTime;
         UpdateEntityBounds(Entity);
     }
 }
 
 void ResolveCollision(collision &Col)
 {
-    vec3 rv = Col.Second->Velocity - Col.First->Velocity;
+    vec3 rv = Col.Second->Transform.Velocity - Col.First->Transform.Velocity;
     float VelNormal = glm::dot(rv, Col.Normal);
     if (VelNormal > 0.0f)
     {

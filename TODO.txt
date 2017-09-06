@@ -1,6 +1,7 @@
 Current TODOs:
 
-- (Input) Gamepad input
-- (Game) Give the trail an owner and detect when player is on another ship's trail
+- (Game) Implement boost when draft charge is full
+- (Game) Implement ship explosions
+- (Game) Work on the camera movement to be more dynamic
 - (Renderer) Fix order of rendering (sort by distance)
 - (Renderer) Frustum culling

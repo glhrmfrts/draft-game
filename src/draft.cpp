@@ -22,23 +22,61 @@ AddEntity(game_state &Game, entity *Entity)
 {
     if (Entity->Model)
     {
+        Entity->Model->ID = Game.ModelEntities.size();
         Game.ModelEntities.push_back(Entity);
     }
     if (Entity->Bounds)
     {
+        Entity->Bounds->ID = Game.ShapedEntities.size();
         Game.ShapedEntities.push_back(Entity);
     }
     if (Entity->TrackSegment)
     {
+        Entity->TrackSegment->ID = Game.TrackEntities.size();
         Game.TrackEntities.push_back(Entity);
     }
     if (Entity->Trail)
     {
+        Entity->Trail->ID = Game.TrailEntities.size();
         Game.TrailEntities.push_back(Entity);
         for (int i = 0; i < TrailCount; i++)
         {
             AddEntity(Game, Entity->Trail->Entities + i);
         }
+    }
+    if (Entity->Explosion)
+    {
+        Entity->Explosion->ID = Game.ExplosionEntities.size();
+        Game.ExplosionEntities.push_back(Entity);
+    }
+}
+
+static void
+RemoveEntity(game_state &Game, entity *Entity)
+{
+    if (Entity->Model)
+    {
+        Game.ModelEntities.erase(Game.ModelEntities.begin() + Entity->Model->ID);
+    }
+    if (Entity->Bounds)
+    {
+        Game.ShapedEntities.erase(Game.ShapedEntities.begin() + Entity->Bounds->ID);
+    }
+    if (Entity->TrackSegment)
+    {
+        Game.TrackEntities.erase(Game.TrackEntities.begin() + Entity->TrackSegment->ID);
+    }
+    if (Entity->Trail)
+    {
+        Game.TrailEntities.erase(Game.TrailEntities.begin() + Entity->Trail->ID);
+        for (int i = 0; i < TrailCount; i++)
+        {
+            RemoveEntity(Game, Entity->Trail->Entities + i);
+        }
+    }
+    if (Entity->Explosion)
+    {
+        Game.ExplosionEntities.erase(Game.ExplosionEntities.begin() + Entity->Explosion->ID);
     }
 }
 
@@ -115,7 +153,7 @@ StartLevel(game_state &Game)
 
         auto Entity = PushStruct<entity>(Game.Arena);
         Entity->Model = CreateModel(Game.Arena, &SkyboxMesh);
-        Entity->Size = SkyboxScale;
+        Entity->Transform.Scale = SkyboxScale;
         AddEntity(Game, Entity);
         Game.SkyboxEntity = Entity;
     }
@@ -127,9 +165,9 @@ StartLevel(game_state &Game)
 
     Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
-    Game.PlayerEntity->Rotation.y = 20.0f;
+    Game.PlayerEntity->Transform.Rotation.y = 20.0f;
 
-    Game.EnemyEntity->Position.x = 4;
+    Game.EnemyEntity->Transform.Position.x = 4;
 
     AddEntity(Game, Game.PlayerEntity);
     AddEntity(Game, Game.EnemyEntity);
@@ -138,8 +176,8 @@ StartLevel(game_state &Game)
     {
         auto Entity = PushStruct<entity>(Game.Arena);
         Entity->TrackSegment = PushStruct<track_segment>(Game.Arena);
-        Entity->Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
-        Entity->Size = vec3(1, TrackSegmentLength, 0);
+        Entity->Transform.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
+        Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
         Entity->Model = CreateModel(Game.Arena, &Game.FloorMesh);
         AddEntity(Game, Entity);
     }
@@ -164,27 +202,51 @@ CameraDir(camera &Camera)
     return glm::normalize(Camera.LookAt - Camera.Position);
 }
 
-inline static bool
-HandleCollision(entity *First, entity *Second, float DeltaTime)
+static bool
+HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime)
 {
     if (First->Type == EntityType_TrailPiece || Second->Type == EntityType_TrailPiece)
     {
-        player_ship *PlayerShip = NULL;
-        if (First->PlayerShip)
+        ship *Ship = NULL;
+        if (First->Ship)
         {
-            PlayerShip = First->PlayerShip;
+            Ship = First->Ship;
         }
-        else if (Second->PlayerShip)
+        else if (Second->Ship)
         {
-            PlayerShip = Second->PlayerShip;
+            Ship = Second->Ship;
         }
 
-        if (PlayerShip)
+        if (Ship && Ship->NumTrailCollisions == 0)
         {
-            PlayerShip->CurrentDraftTime += DeltaTime;
-            PlayerShip->NumTrailCollisions++;
+            Ship->CurrentDraftTime += DeltaTime;
+            Ship->NumTrailCollisions++;
         }
         return false;
+    }
+    if (First->Type == EntityType_Ship && Second->Type == EntityType_Ship)
+    {
+        vec3 rv = First->Transform.Velocity - Second->Transform.Velocity;
+        if (std::abs(rv.y) > 20.0f)
+        {
+            entity *EntityToExplode = NULL;
+            if (rv.y < 0.0f)
+            {
+                EntityToExplode = First;
+            }
+            if (rv.y > 0.0f)
+            {
+                EntityToExplode = Second;
+            }
+
+            auto *Explosion = CreateExplosionEntity(Game,
+                                                    EntityToExplode->Transform.Position,
+                                                    Color_black,
+                                                    Color_white,
+                                                    vec3{0,1,0});
+            AddEntity(Game, Explosion);
+            RemoveEntity(Game, EntityToExplode);
+        }
     }
     return true;
 }
@@ -195,7 +257,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto &Input = Game.Input;
     auto &Camera = Game.Camera;
     auto CamDir = CameraDir(Camera);
-    auto PlayerShip = Game.PlayerEntity->PlayerShip;
+    auto PlayerShip = Game.PlayerEntity->Ship;
 
 #ifdef DRAFT_DEBUG
     if (Global_Camera_FreeCam)
@@ -229,13 +291,22 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     float MoveV = GetAxisValue(Game.Input, Action_vertical);
     //Println(MoveV);
     //MoveV = 0.3f;
-    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime, true);
+    MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime);
 
     static float EnemyMoveH = 0.0f;
-    //EnemyMoveH += DeltaTime * 2;
+    EnemyMoveH += DeltaTime * 2;
     MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
     //MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f,
     //DeltaTime);
+
+    if (PlayerShip->DraftCharge == 1.0f)
+    {
+        if (IsJustPressed(Game, Action_boost))
+        {
+            Game.PlayerEntity->Transform.Velocity.y = Global_Game_BoostVelocity;
+            PlayerShip->DraftCharge = 0.0f;
+        }
+    }
 
     size_t FrameCollisionCount = 0;
     PlayerShip->NumTrailCollisions = 0;
@@ -246,7 +317,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         Col.First->NumCollisions++;
         Col.Second->NumCollisions++;
 
-        if (HandleCollision(Col.First, Col.Second, DeltaTime))
+        if (HandleCollision(Game, Col.First, Col.Second, DeltaTime))
         {
             ResolveCollision(Col);
         }
@@ -257,10 +328,11 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         PlayerShip->CurrentDraftTime -= DeltaTime;
     }
     PlayerShip->CurrentDraftTime = std::max(0.0f, std::min(PlayerShip->CurrentDraftTime, Global_Game_DraftChargeTime));
+    PlayerShip->DraftCharge = PlayerShip->CurrentDraftTime / Global_Game_DraftChargeTime;
 
     if (!Global_Camera_FreeCam)
     {
-        auto PlayerPosition = Game.PlayerEntity->Position;
+        auto PlayerPosition = Game.PlayerEntity->Transform.Position;
         Camera.Position = vec3(PlayerPosition.x,
                                PlayerPosition.y + Global_Camera_OffsetY,
                                PlayerPosition.z + Global_Camera_OffsetZ);
@@ -269,15 +341,15 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     {
         auto Entity = Game.PlayerEntity;
-        Game.SkyboxEntity->Position.y = Entity->Position.y;
-        float dx = Entity->Position.x - Game.SkyboxEntity->Position.x;
-        Game.SkyboxEntity->Position.x += dx * 0.25f;
+        Game.SkyboxEntity->Transform.Position.y = Entity->Transform.Position.y;
+        float dx = Entity->Transform.Position.x - Game.SkyboxEntity->Transform.Position.x;
+        Game.SkyboxEntity->Transform.Position.x += dx * 0.25f;
     }
 
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState);
 
-    for (auto Entity : Game.TrailEntities)
+    for (auto *Entity : Game.TrailEntities)
     {
         auto Trail = Entity->Trail;
         Trail->Timer += DeltaTime;
@@ -287,14 +359,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             Trail->FirstFrame = false;
             for (int i = 0; i < TrailCount; i++)
             {
-                Trail->Entities[i].Position = Entity->Position;
+                Trail->Entities[i].Transform.Position = Entity->Transform.Position;
             }
         }
 
         if (Trail->Timer > Global_Game_TrailRecordTimer)
         {
             Trail->Timer = 0;
-            PushPosition(Trail, Entity->Position);
+            PushPosition(Trail, Entity->Transform.Position);
         }
 
         mesh &Mesh = Trail->Mesh;
@@ -305,15 +377,15 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         for (int i = 0; i < TrailCount; i++)
         {
             auto PieceEntity = Trail->Entities + i;
-            vec3 c1 = PieceEntity->Position;
+            vec3 c1 = PieceEntity->Transform.Position;
             vec3 c2;
             if (i == TrailCount - 1)
             {
-                c2 = Entity->Position;
+                c2 = Entity->Transform.Position;
             }
             else
             {
-                c2 = Trail->Entities[i + 1].Position;
+                c2 = Trail->Entities[i + 1].Transform.Position;
             }
 
             float CurrentTrailTime = Trail->Timer/Global_Game_TrailRecordTimer;
@@ -337,9 +409,9 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
             PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
 
-            auto Bounds = PieceEntity->Bounds;
-            Bounds->Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
-            Bounds->Center = vec3(c1.x, c1.y + Bounds->Half.y, c1.z + Bounds->Half.z);
+            auto &Box = PieceEntity->Bounds->Box;
+            Box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
+            Box.Center = vec3(c1.x, c1.y + Box.Half.y, c1.z + Box.Half.z);
         }
         for (int i = 0; i < TrailCount; i++)
         {
@@ -356,18 +428,34 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         PushModel(Game.RenderState, Trail->Model, vec3(0.0f), vec3(1.0f), vec3(0.0f));
     }
 
-    for (auto Entity : Game.TrackEntities)
+    for (auto *Entity : Game.ExplosionEntities)
     {
-        size_t i = &Entity - &Game.TrackEntities[0];
-        if (Entity->Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
+        auto *Explosion = Entity->Explosion;
+        ResetBuffer(Explosion->Mesh.Buffer);
+        for (int i = 0; i < ExplosionPieceCount; i++)
         {
-            Entity->Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
+            auto &Piece = Explosion->Pieces[i];
+            Piece.Position += Piece.Velocity * DeltaTime;
+            mat4 Transform = GetTransformMatrix(Piece);
+            vec3 p1 = vec3(Transform * vec4(-1.0f, 0.0f, -1.0f, 1.0f));
+            vec3 p2 = vec3(Transform * vec4(1.0f, 0.0f, -1.0f, 1.0f));
+            vec3 p3 = vec3(Transform * vec4(0.0f, 0.0f, 1.0f, 1.0f));
+            AddTriangle(Explosion->Mesh.Buffer, p1, p2, p3);
+        }
+        UploadVertices(Explosion->Mesh.Buffer, GL_DYNAMIC_DRAW);
+    }
+
+    for (auto *Entity : Game.TrackEntities)
+    {
+        if (Entity->Transform.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
+        {
+            Entity->Transform.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
         }
     }
 
-    for (auto Entity : Game.ModelEntities)
+    for (auto *Entity : Game.ModelEntities)
     {
-        PushModel(Game.RenderState, *Entity->Model, Entity->Position, Entity->Size, Entity->Rotation);
+        PushModel(Game.RenderState, *Entity->Model, Entity->Transform.Position, Entity->Transform.Scale, Entity->Transform.Rotation);
     }
 
 #ifdef DRAFT_DEBUG
@@ -375,7 +463,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
         {
-            auto Entity = Game.ShapedEntities[i];
+            auto *Entity = Game.ShapedEntities[i];
             PushDebugBounds(Game.RenderState, *Entity->Bounds, Entity->NumCollisions > 0);
         }
     }
@@ -384,12 +472,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     RenderEnd(Game.RenderState, Game.Camera);
 
     {
-        float DraftCharge = Game.PlayerEntity->PlayerShip->CurrentDraftTime / Global_Game_DraftChargeTime;
-        DraftCharge = std::min(DraftCharge, 1.0f);
         UpdateProjectionView(Game.GUICamera);
         Begin(Game.GUI, Game.GUICamera);
-        PushRect(Game.GUI, rect{20,20,200,20}, Color_white, GL_LINE_LOOP, false);
-        PushRect(Game.GUI, rect{25,25,190 * DraftCharge,10}, Color_red, GL_TRIANGLES, false);
+        PushRect(Game.GUI, rect{20,20,200,20},
+                 IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
+
+        PushRect(Game.GUI, rect{25,25,190 * PlayerShip->DraftCharge,10},
+                 IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
         End(Game.GUI);
     }
 }
@@ -399,9 +488,9 @@ RegisterInputActions(game_input &Input)
 {
     Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
     Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
-    Input.Actions[Action_debugFreeCam] = {SDLK_SPACE, 0, 0, 0};
     Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX};
     Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger};
+    Input.Actions[Action_boost] = {SDLK_SPACE, 0, 0, 0};
 }
 
 static void
@@ -492,6 +581,7 @@ int main(int argc, char **argv)
     game_state Game;
     Game.Width = Width;
     Game.Height = Height;
+    Game.ExplosionEntropy = RandomSeed(1234);
 
     auto &Input = Game.Input;
     RegisterInputActions(Input);
@@ -646,7 +736,7 @@ int main(int argc, char **argv)
         ImGui_ImplSdlGL3_NewFrame(Window);
         UpdateAndRenderLevel(Game, DeltaTime);
 
-        DrawDebugUI(Elapsed);
+        DrawDebugUI(Game.PlayerEntity, Elapsed);
 
 #if 0
         // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()

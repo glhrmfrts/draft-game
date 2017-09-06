@@ -648,7 +648,6 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
     }
 
     auto &Program = RenderState.ModelProgram;
-    Bind(Program.ShaderProgram);
     SetUniform(Program.ProjectionView, Camera.ProjectionView);
 
     mat4 TransformMatrix = glm::translate(mat4(1.0f), r.Position);
@@ -754,6 +753,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         BindFramebuffer(RenderState.MultisampledSceneFramebuffer);
     }
 
+    Bind(RenderState.ModelProgram.ShaderProgram);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);

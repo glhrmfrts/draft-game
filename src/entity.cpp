@@ -134,33 +134,81 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     {
         auto Entity = Result->Entities + i;
         Entity->Type = EntityType_TrailPiece;
-        Entity->Position = vec3(0.0f);
-        Entity->Bounds = PushStruct<bounding_box>(Arena);
+        Entity->Transform.Position = vec3(0.0f);
+        Entity->Bounds = PushStruct<collision_bounds>(Arena);
         AddFlags(Entity, Entity_Kinematic);
     }
     return Result;
 }
 
-static entity *
-CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
+entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
 {
     auto Entity = PushStruct<entity>(Game.Arena);
     Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
-    Entity->Size.y = 3;
-    Entity->Size *= 0.75f;
-    Entity->Bounds = PushStruct<bounding_box>(Game.Arena);
+    Entity->Transform.Scale.y = 3;
+    Entity->Transform.Scale *= 0.75f;
+    Entity->Bounds = PushStruct<collision_bounds>(Game.Arena);
+    Entity->Ship = PushStruct<ship>(Game.Arena);
     if (!IsPlayer)
     {
         Entity->Trail = CreateTrail(Game.Arena, Entity, OutlineColor);
     }
     else
     {
-        Entity->PlayerShip = PushStruct<player_ship>(Game.Arena);
+        AddFlags(Entity, Entity_IsPlayer);
     }
     return Entity;
+}
+
+#define MinExplosionRot 1.0f
+#define MaxExplosionRot 90.0f
+#define MinExplosionVel 2.0f
+#define MaxExplosionVel 10.0f
+#define RandomRotation(Series)  RandomBetween(Series, MinExplosionRot, MaxExplosionRot)
+#define RandomVel(Series, Sign) (Sign * RandomBetween(Series, MinExplosionVel, MaxExplosionVel))
+inline static float
+RandomExplosionVel(random_series &Series, vec3 Sign, int i)
+{
+    if (Sign[i] == 0)
+    {
+        return RandomVel(Series, RandomBetween(Series, -1, 1));
+    }
+    else
+    {
+        return RandomVel(Series, Sign[i]);
+    }
+}
+
+entity *CreateExplosionEntity(game_state &Game, vec3 Position, color Color, color OutlineColor, vec3 Sign = vec3{0,1,0})
+{
+    auto *Explosion = PushStruct<explosion>(Game.Arena);
+    InitMeshBuffer(Explosion->Mesh.Buffer);
+    AddPart(Explosion->Mesh, {{Color, 0, 0, NULL}, 0, 6, GL_TRIANGLES});
+    AddPart(Explosion->Mesh, {{OutlineColor, 0, 0, NULL, Material_PolygonLines}, 0, 6, GL_TRIANGLES});
+
+    for (int i = 0; i < Global_Game_ExplosionPieceCount; i++)
+    {
+        auto &Piece = Explosion->Pieces[i];
+        auto &Series = Game.ExplosionEntropy;
+        Piece.Position = Position;
+        for (int i = 0; i < 2; i++)
+        {
+            Piece.Velocity[i] = RandomExplosionVel(Series, Sign, i);
+        }
+        Piece.Rotation = vec3{
+            RandomRotation(Series),
+            RandomRotation(Series),
+            RandomRotation(Series),
+        };
+    }
+
+    auto *Result = PushStruct<entity>(Game.Arena);
+    Result->Explosion = Explosion;
+    Result->Model = CreateModel(Game.Arena, &Explosion->Mesh);
+    return Result;
 }
 
 static float
@@ -183,40 +231,39 @@ Interp(float c, float t, float a, float dt)
 #define ShipSteerAcceleration 50.0f
 #define ShipFriction 2.0f
 static void
-MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime, bool IsPlayer = false)
+MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
     float MaxVel = ShipMaxVel;
-    if (IsPlayer)
+    if (Entity->Flags & Entity_IsPlayer)
     {
         MaxVel = PlayerMaxVel;
     }
 
-    if (MoveV > 0.0f && Entity->Velocity.y < MaxVel)
+    if (MoveV > 0.0f && Entity->Transform.Velocity.y < MaxVel)
     {
-        Entity->Velocity.y += MoveV * ShipAcceleration * DeltaTime;
+        Entity->Transform.Velocity.y += MoveV * ShipAcceleration * DeltaTime;
     }
-    else if (MoveV < 0.0f && Entity->Velocity.y > 0)
+    else if (MoveV < 0.0f && Entity->Transform.Velocity.y > 0)
     {
-        Entity->Velocity.y = std::max(0.0f, Entity->Velocity.y + (MoveV * ShipBreakAcceleration * DeltaTime));
+        Entity->Transform.Velocity.y = std::max(0.0f, Entity->Transform.Velocity.y + (MoveV * ShipBreakAcceleration * DeltaTime));
     }
 
-    if (MoveV <= 0.0f)
+    if ((MoveV <= 0.0f && Entity->Transform.Velocity.y > 0) || Entity->Transform.Velocity.y > MaxVel)
     {
-        Entity->Velocity.y -= ShipFriction * DeltaTime;
+        Entity->Transform.Velocity.y -= ShipFriction * DeltaTime;
     }
-    Entity->Velocity.y = std::max(0.0f, std::min(MaxVel, Entity->Velocity.y));
 
     float SteerTarget = MoveH * ShipSteerSpeed;
-    Entity->Velocity.x = Interp(Entity->Velocity.x,
+    Entity->Transform.Velocity.x = Interp(Entity->Transform.Velocity.x,
                                 SteerTarget,
                                 ShipSteerAcceleration,
                                 DeltaTime);
 
-    Entity->Rotation.y = 20.0f * (Entity->Velocity.x / ShipSteerSpeed);
-    Entity->Rotation.x = Interp(Entity->Rotation.x,
-                                5.0f * MoveV,
-                                20.0f,
-                                DeltaTime);
+    Entity->Transform.Rotation.y = 20.0f * (Entity->Transform.Velocity.x / ShipSteerSpeed);
+    Entity->Transform.Rotation.x = Interp(Entity->Transform.Rotation.x,
+                                          5.0f * MoveV,
+                                          20.0f,
+                                          DeltaTime);
 }
 
 static void
@@ -224,14 +271,14 @@ PushPosition(trail *Trail, vec3 Pos)
 {
     if (Trail->PositionStackIndex >= TrailCount)
     {
-        vec3 PosSave = Trail->Entities[TrailCount - 1].Position;
+        vec3 PosSave = Trail->Entities[TrailCount - 1].Transform.Position;
         for (int i = TrailCount - 1; i > 0; i--)
         {
             vec3 NewPos = PosSave;
-            PosSave = Trail->Entities[i - 1].Position;
-            Trail->Entities[i - 1].Position = NewPos;
+            PosSave = Trail->Entities[i - 1].Transform.Position;
+            Trail->Entities[i - 1].Transform.Position = NewPos;
         }
         Trail->PositionStackIndex -= 1;
     }
-    Trail->Entities[Trail->PositionStackIndex++].Position = Pos;
+    Trail->Entities[Trail->PositionStackIndex++].Transform.Position = Pos;
 }

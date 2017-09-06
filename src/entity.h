@@ -1,48 +1,75 @@
 #ifndef DRAFT_ENTITY_H
 #define DRAFT_ENTITY_H
 
-struct track_segment
+struct component
+{
+    int ID;
+};
+
+struct model : component
+{
+    vector<material *> Materials;
+    mesh *Mesh;
+};
+
+struct collision_bounds : component
+{
+    bounding_box Box;
+};
+
+struct track_segment : component
 {
     int NothingForNow;
 };
 
-struct trail;
-
-#define Entity_Kinematic 0x1
-
-enum entity_type
-{
-    EntityType_Ship,
-    EntityType_TrailPiece,
-};
-
-struct player_ship
+struct ship : component
 {
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
 };
 
-struct entity
+struct trail;
+
+struct transform
 {
     vec3 Position;
     vec3 Velocity;
-    vec3 Size = vec3(1.0f);
+    vec3 Scale = vec3(1.0f);
     vec3 Rotation = vec3(0.0f);
+};
 
+#define ExplosionPieceCount 10
+struct explosion : component
+{
+    mesh Mesh;
+    transform Pieces[ExplosionPieceCount];
+};
+
+#define Entity_Kinematic 0x1
+#define Entity_IsPlayer  0x2
+enum entity_type
+{
+    EntityType_Ship,
+    EntityType_TrailPiece,
+};
+struct entity
+{
+    transform Transform;
     entity_type Type;
     uint32 Flags = 0;
     int NumCollisions = 0;
 
-    player_ship *PlayerShip;
+    explosion *Explosion = NULL;
+    ship *Ship = NULL;
     trail *Trail = NULL;
     track_segment *TrackSegment = NULL;
-    bounding_box *Bounds = NULL;
+    collision_bounds *Bounds = NULL;
     model *Model = NULL;
 };
 
 #define TrailCount 6
-struct trail
+struct trail : component
 {
     entity Entities[TrailCount];
     mesh Mesh;

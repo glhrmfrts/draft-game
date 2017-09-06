@@ -174,12 +174,6 @@ struct mesh
     vector<mesh_part> Parts;
 };
 
-struct model
-{
-    vector<material *> Materials;
-    mesh *Mesh;
-};
-
 struct model_program
 {
     shader_program ShaderProgram;
