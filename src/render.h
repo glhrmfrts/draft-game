@@ -221,12 +221,18 @@ struct framebuffer
     texture ColorTextures[ColorTexture_Count];
 };
 
+struct transform
+{
+    vec3 Position;
+    vec3 Velocity;
+    vec3 Scale = vec3(1.0f);
+    vec3 Rotation = vec3(0.0f);
+};
+
 struct renderable
 {
+    transform Transform;
     bounding_box Bounds;
-    vec3 Position;
-    vec3 Scale;
-    vec3 Rotation;
     material *Material;
     size_t VertexOffset;
     size_t VertexCount;

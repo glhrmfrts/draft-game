@@ -420,7 +420,6 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
     }
 
     GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    printf("0x%x\n", Status);
     assert(Status == GL_FRAMEBUFFER_COMPLETE);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -639,6 +638,26 @@ void RenderBegin(render_state &RenderState)
 #endif
 }
 
+mat4 GetTransformMatrix(transform &t)
+{
+    mat4 TransformMatrix = glm::translate(mat4(1.0f), t.Position);
+    TransformMatrix = glm::scale(TransformMatrix, t.Scale);
+    if (t.Rotation.x != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(t.Rotation.x), vec3(1,0,0));
+    }
+    if (t.Rotation.y != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(t.Rotation.y), vec3(0,1,0));
+    }
+    if (t.Rotation.z != 0.0f)
+    {
+        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(t.Rotation.z), vec3(0,0,1));
+    }
+    return TransformMatrix;
+}
+
+
 static void
 RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 {
@@ -649,22 +668,7 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 
     auto &Program = RenderState.ModelProgram;
     SetUniform(Program.ProjectionView, Camera.ProjectionView);
-
-    mat4 TransformMatrix = glm::translate(mat4(1.0f), r.Position);
-    TransformMatrix = glm::scale(TransformMatrix, r.Scale);
-    if (r.Rotation.x != 0.0f)
-    {
-        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.x), vec3(1,0,0));
-    }
-    if (r.Rotation.y != 0.0f)
-    {
-        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.y), vec3(0,1,0));
-    }
-    if (r.Rotation.z != 0.0f)
-    {
-        TransformMatrix = glm::rotate(TransformMatrix, glm::radians(r.Rotation.z), vec3(0,0,1));
-    }
-    SetUniform(Program.Transform, TransformMatrix);
+    SetUniform(Program.Transform, GetTransformMatrix(r.Transform));
 
     // @TODO: check why this breaks the floor model
     SetUniform(Program.NormalTransform, mat4(1.0f));
@@ -739,9 +743,6 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         r.VertexOffset = 0;
         r.VertexCount = RenderState.DebugBuffer.VertexCount;
         r.Material = &BlankMaterial;
-        r.Position = vec3(0.0f);
-        r.Scale = vec3(1.0f);
-        r.Rotation = vec3(0.0f);
         r.PrimitiveType = GL_LINES;
         RenderState.FrameSolidRenderables.push_back(i);
         UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
@@ -815,7 +816,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     // @TODO: cleanup textures
 }
 
-void PushModel(render_state &RenderState, model &Model, const vec3 &Position, const vec3 &Scale, const vec3 &Rotation)
+void PushModel(render_state &RenderState, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
     for (auto &Part : Mesh->Parts)
@@ -834,11 +835,9 @@ void PushModel(render_state &RenderState, model &Model, const vec3 &Position, co
         r.VertexCount = Part.Count;
         r.VAO = Mesh->Buffer.VAO;
         r.Material = Material;
-        r.Position = Position;
-        r.Scale = Scale;
-        r.Rotation = Rotation;
-        r.Bounds = BoundsFromMinMax(Mesh->Min*Scale, Mesh->Max*Scale);
-        r.Bounds.Center += r.Position;
+        r.Transform = Transform;
+        r.Bounds = BoundsFromMinMax(Mesh->Min*Transform.Scale, Mesh->Max*Transform.Scale);
+        r.Bounds.Center += Transform.Position;
         if (Material->DiffuseColor.a < 1.0f)
         {
             RenderState.FrameTransparentRenderables.push_back(Index);

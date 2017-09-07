@@ -33,6 +33,8 @@ using std::string;
 using std::vector;
 using std::unordered_map;
 
+#define ArrayCount(Arr) (sizeof(Arr)/sizeof(Arr[0]))
+
 enum direction
 {
     Direction_right,
@@ -42,7 +44,7 @@ enum direction
 #ifdef DRAFT_DEBUG
 #include <sstream>
 
-inline static string
+inline string
 ToString(vec3 v3)
 {
     std::ostringstream stream;
@@ -54,11 +56,17 @@ ToString(vec3 v3)
 }
 
 template<typename T>
-inline static void
+inline void
 Println(T Arg)
 {
     std::cout << Arg << std::endl;
 }
 #endif
+
+inline float
+Lerp(float A, float t, float B)
+{
+    return (1.0f - t)*A + t*B;
+}
 
 #endif

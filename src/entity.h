@@ -1,29 +1,26 @@
 #ifndef DRAFT_ENTITY_H
 #define DRAFT_ENTITY_H
 
-struct component
-{
-    int ID;
-};
-
-struct model : component
+struct model
 {
     vector<material *> Materials;
     mesh *Mesh;
 };
 
-struct collision_bounds : component
+struct collision_bounds
 {
     bounding_box Box;
 };
 
-struct track_segment : component
+struct track_segment
 {
     int NothingForNow;
 };
 
-struct ship : component
+struct ship
 {
+    color Color;
+    color OutlineColor;
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
@@ -31,16 +28,8 @@ struct ship : component
 
 struct trail;
 
-struct transform
-{
-    vec3 Position;
-    vec3 Velocity;
-    vec3 Scale = vec3(1.0f);
-    vec3 Rotation = vec3(0.0f);
-};
-
 #define ExplosionPieceCount 10
-struct explosion : component
+struct explosion
 {
     mesh Mesh;
     transform Pieces[ExplosionPieceCount];
@@ -69,7 +58,7 @@ struct entity
 };
 
 #define TrailCount 6
-struct trail : component
+struct trail
 {
     entity Entities[TrailCount];
     mesh Mesh;

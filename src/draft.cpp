@@ -17,28 +17,41 @@
 
 #undef main
 
+// Finds the first free slot on the list and insert the entity
+inline static void
+AddEntityToList(std::list<entity *> &List, entity *Entity)
+{
+    for (auto it = List.begin(), end = List.end(); it != end; it++)
+    {
+        if (!(*it))
+        {
+            *it = Entity;
+            return;
+        }
+    }
+
+    // no free slot, insert at the end
+    List.push_back(Entity);
+}
+
 static void
 AddEntity(game_state &Game, entity *Entity)
 {
     if (Entity->Model)
     {
-        Entity->Model->ID = Game.ModelEntities.size();
-        Game.ModelEntities.push_back(Entity);
+        AddEntityToList(Game.ModelEntities, Entity);
     }
     if (Entity->Bounds)
     {
-        Entity->Bounds->ID = Game.ShapedEntities.size();
-        Game.ShapedEntities.push_back(Entity);
+        AddEntityToList(Game.ShapedEntities, Entity);
     }
     if (Entity->TrackSegment)
     {
-        Entity->TrackSegment->ID = Game.TrackEntities.size();
-        Game.TrackEntities.push_back(Entity);
+        AddEntityToList(Game.TrackEntities, Entity);
     }
     if (Entity->Trail)
     {
-        Entity->Trail->ID = Game.TrailEntities.size();
-        Game.TrailEntities.push_back(Entity);
+        AddEntityToList(Game.TrailEntities, Entity);
         for (int i = 0; i < TrailCount; i++)
         {
             AddEntity(Game, Entity->Trail->Entities + i);
@@ -46,8 +59,20 @@ AddEntity(game_state &Game, entity *Entity)
     }
     if (Entity->Explosion)
     {
-        Entity->Explosion->ID = Game.ExplosionEntities.size();
-        Game.ExplosionEntities.push_back(Entity);
+        AddEntityToList(Game.ExplosionEntities, Entity);
+    }
+}
+
+inline static void
+RemoveEntityFromList(std::list<entity *> &List, entity *Entity)
+{
+    for (auto it = List.begin(), end = List.end(); it != end; it++)
+    {
+        if (*it == Entity)
+        {
+            *it = NULL;
+            return;
+        }
     }
 }
 
@@ -56,19 +81,19 @@ RemoveEntity(game_state &Game, entity *Entity)
 {
     if (Entity->Model)
     {
-        Game.ModelEntities.erase(Game.ModelEntities.begin() + Entity->Model->ID);
+        RemoveEntityFromList(Game.ModelEntities, Entity);
     }
     if (Entity->Bounds)
     {
-        Game.ShapedEntities.erase(Game.ShapedEntities.begin() + Entity->Bounds->ID);
+        RemoveEntityFromList(Game.ShapedEntities, Entity);
     }
     if (Entity->TrackSegment)
     {
-        Game.TrackEntities.erase(Game.TrackEntities.begin() + Entity->TrackSegment->ID);
+        RemoveEntityFromList(Game.TrackEntities, Entity);
     }
     if (Entity->Trail)
     {
-        Game.TrailEntities.erase(Game.TrailEntities.begin() + Entity->Trail->ID);
+        RemoveEntityFromList(Game.TrailEntities, Entity);
         for (int i = 0; i < TrailCount; i++)
         {
             RemoveEntity(Game, Entity->Trail->Entities + i);
@@ -76,7 +101,7 @@ RemoveEntity(game_state &Game, entity *Entity)
     }
     if (Entity->Explosion)
     {
-        Game.ExplosionEntities.erase(Game.ExplosionEntities.begin() + Entity->Explosion->ID);
+        RemoveEntityFromList(Game.ExplosionEntities, Entity);
     }
 }
 
@@ -174,7 +199,7 @@ StartLevel(game_state &Game)
 
     for (int i = 0; i < TrackSegmentCount; i++)
     {
-        auto Entity = PushStruct<entity>(Game.Arena);
+        auto *Entity = PushStruct<entity>(Game.Arena);
         Entity->TrackSegment = PushStruct<track_segment>(Game.Arena);
         Entity->Transform.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
         Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
@@ -240,12 +265,13 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
             }
 
             auto *Explosion = CreateExplosionEntity(Game,
-                                                    EntityToExplode->Transform.Position,
-                                                    Color_black,
-                                                    Color_white,
+                                                    EntityToExplode->Transform,
+                                                    EntityToExplode->Ship->Color,
+                                                    EntityToExplode->Ship->OutlineColor,
                                                     vec3{0,1,0});
             AddEntity(Game, Explosion);
             RemoveEntity(Game, EntityToExplode);
+            return false;
         }
     }
     return true;
@@ -256,8 +282,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 {
     auto &Input = Game.Input;
     auto &Camera = Game.Camera;
-    auto CamDir = CameraDir(Camera);
-    auto PlayerShip = Game.PlayerEntity->Ship;
+    auto *PlayerShip = Game.PlayerEntity->Ship;
+    vec3 CamDir = CameraDir(Camera);
 
 #ifdef DRAFT_DEBUG
     if (Global_Camera_FreeCam)
@@ -294,7 +320,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime);
 
     static float EnemyMoveH = 0.0f;
-    EnemyMoveH += DeltaTime * 2;
+    //EnemyMoveH += DeltaTime * 2;
     MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
     //MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f,
     //DeltaTime);
@@ -351,7 +377,9 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     for (auto *Entity : Game.TrailEntities)
     {
-        auto Trail = Entity->Trail;
+        if (!Entity) continue;
+
+        auto *Trail = Entity->Trail;
         Trail->Timer += DeltaTime;
 
         if (Trail->FirstFrame)
@@ -376,7 +404,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         vec3 PointCache[TrailCount*4];
         for (int i = 0; i < TrailCount; i++)
         {
-            auto PieceEntity = Trail->Entities + i;
+            auto *PieceEntity = Trail->Entities + i;
             vec3 c1 = PieceEntity->Transform.Position;
             vec3 c2;
             if (i == TrailCount - 1)
@@ -425,11 +453,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         }
         UploadVertices(Mesh.Buffer, GL_DYNAMIC_DRAW);
 
-        PushModel(Game.RenderState, Trail->Model, vec3(0.0f), vec3(1.0f), vec3(0.0f));
+        PushModel(Game.RenderState, Trail->Model, transform{});
     }
 
     for (auto *Entity : Game.ExplosionEntities)
     {
+        if (!Entity) continue;
+
         auto *Explosion = Entity->Explosion;
         ResetBuffer(Explosion->Mesh.Buffer);
         for (int i = 0; i < ExplosionPieceCount; i++)
@@ -440,13 +470,15 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             vec3 p1 = vec3(Transform * vec4(-1.0f, 0.0f, -1.0f, 1.0f));
             vec3 p2 = vec3(Transform * vec4(1.0f, 0.0f, -1.0f, 1.0f));
             vec3 p3 = vec3(Transform * vec4(0.0f, 0.0f, 1.0f, 1.0f));
-            AddTriangle(Explosion->Mesh.Buffer, p1, p2, p3);
+            AddTriangle(Explosion->Mesh.Buffer, p1, p2, p3, vec3{1,1,1});
         }
         UploadVertices(Explosion->Mesh.Buffer, GL_DYNAMIC_DRAW);
     }
 
     for (auto *Entity : Game.TrackEntities)
     {
+        if (!Entity) continue;
+
         if (Entity->Transform.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
         {
             Entity->Transform.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
@@ -455,16 +487,19 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     for (auto *Entity : Game.ModelEntities)
     {
-        PushModel(Game.RenderState, *Entity->Model, Entity->Transform.Position, Entity->Transform.Scale, Entity->Transform.Rotation);
+        if (!Entity) continue;
+
+        PushModel(Game.RenderState, *Entity->Model, Entity->Transform);
     }
 
 #ifdef DRAFT_DEBUG
     if (Global_Collision_DrawBounds)
     {
-        for (size_t i = 0; i < Game.ShapedEntities.size(); i++)
+        for (auto *Entity : Game.ShapedEntities)
         {
-            auto *Entity = Game.ShapedEntities[i];
-            PushDebugBounds(Game.RenderState, *Entity->Bounds, Entity->NumCollisions > 0);
+            if (!Entity) continue;
+
+            PushDebugBounds(Game.RenderState, Entity->Bounds->Box, Entity->NumCollisions > 0);
         }
     }
 #endif
@@ -490,7 +525,7 @@ RegisterInputActions(game_input &Input)
     Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
     Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX};
     Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger};
-    Input.Actions[Action_boost] = {SDLK_SPACE, 0, 0, 0};
+    Input.Actions[Action_boost] = {SDLK_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X};
 }
 
 static void
@@ -527,6 +562,27 @@ ProcessAxisEvent(game_input &Input, SDL_JoyAxisEvent &Event)
         if (Action.AxisID == Event.axis)
         {
             Action.AxisValue = Value / float(32767);
+            break;
+        }
+    }
+}
+
+static void
+ProcessButtonEvent(game_input &Input, SDL_JoyButtonEvent &Event, bool Down)
+{
+    for (int i = 0; i < Action_count; i++)
+    {
+        auto &Action = Input.Actions[i];
+        if (Action.ButtonID == Event.button)
+        {
+            if (Down)
+            {
+                Action.Pressed++;
+            }
+            else
+            {
+                Action.Pressed = 0;
+            }
             break;
         }
     }
@@ -728,6 +784,16 @@ int main(int argc, char **argv)
 
             case SDL_JOYAXISMOTION: {
                 ProcessAxisEvent(Input, Event.jaxis);
+                break;
+            }
+
+            case SDL_JOYBUTTONDOWN: {
+                ProcessButtonEvent(Input, Event.jbutton, true);
+                break;
+            }
+
+            case SDL_JOYBUTTONUP: {
+                ProcessButtonEvent(Input, Event.jbutton, false);
                 break;
             }
             }

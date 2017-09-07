@@ -1,7 +1,7 @@
 Current TODOs:
 
-- (Game) Implement boost when draft charge is full
-- (Game) Implement ship explosions
+- (Audio) Implement audio system and ship engine sounds
+- (Game) Improve ship explosions visuals
 - (Game) Work on the camera movement to be more dynamic
 - (Renderer) Fix order of rendering (sort by distance)
 - (Renderer) Frustum culling

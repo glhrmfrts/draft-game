@@ -51,15 +51,20 @@ void DetectCollisions(const std::list<entity *> Entities, vector<collision> &Col
     }
 
     NumCollisions = 0;
-    size_t EntityCount = Entities.size();
-    for (size_t i = 0; i < EntityCount; i++)
+    for (auto it = Entities.begin(); it != Entities.end(); it++)
     {
-        auto EntityA = Entities[i];
+        auto *EntityA = *it;
+        if (!EntityA) continue;
+
         EntityA->NumCollisions = 0;
 
-        for (size_t j = i+1; j < EntityCount; j++)
+        auto it2 = it;
+        it2++;
+        for (; it2 != Entities.end(); it2++)
         {
-            auto EntityB = Entities[j];
+            auto *EntityB = *it2;
+            if (!EntityB) continue;
+
             auto &First = EntityA->Bounds->Box;
             auto &Second = EntityB->Bounds->Box;
             vec3 Dif = Second.Center - First.Center;
@@ -121,9 +126,10 @@ void DetectCollisions(const std::list<entity *> Entities, vector<collision> &Col
 void Integrate(const std::list<entity *> Entities, vec3 Gravity, float DeltaTime)
 {
     size_t EntityCount = Entities.size();
-    for (size_t i = 0; i < EntityCount; i++)
+    for (auto *Entity : Entities)
     {
-        auto Entity = Entities[i];
+        if (!Entity) continue;
+
         if (!(Entity->Flags & Entity_Kinematic))
         {
             Entity->Transform.Velocity += Gravity * DeltaTime;

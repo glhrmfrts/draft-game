@@ -38,16 +38,19 @@ GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
     return glm::normalize(glm::cross(v1, v2));
 }
 
-static void
-AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, color c1 = Color_white)
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
 {
     color c2 = c1;
     color c3 = c1;
 
-    vec3 n = GenerateNormal(p1, p2, p3);
     PushVertex(Buffer, {p1.x, p1.y, p1.z, 0, 0,   c1.r, c1.g, c1.b, c1.a,  n.x, n.y, n.z});
     PushVertex(Buffer, {p2.x, p2.y, p2.z, 0, 0,   c2.r, c2.g, c2.b, c2.a,  n.x, n.y, n.z});
     PushVertex(Buffer, {p3.x, p3.y, p3.z, 0, 0,   c3.r, c3.g, c3.b, c3.a,  n.x, n.y, n.z});
+}
+
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
+{
+    AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
 }
 
 static void
@@ -143,7 +146,7 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 
 entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
 {
-    auto Entity = PushStruct<entity>(Game.Arena);
+    auto *Entity = PushStruct<entity>(Game.Arena);
     Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
@@ -152,6 +155,8 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     Entity->Transform.Scale *= 0.75f;
     Entity->Bounds = PushStruct<collision_bounds>(Game.Arena);
     Entity->Ship = PushStruct<ship>(Game.Arena);
+    Entity->Ship->Color = Color;
+    Entity->Ship->OutlineColor = OutlineColor;
     if (!IsPlayer)
     {
         Entity->Trail = CreateTrail(Game.Arena, Entity, OutlineColor);
@@ -174,7 +179,13 @@ RandomExplosionVel(random_series &Series, vec3 Sign, int i)
 {
     if (Sign[i] == 0)
     {
-        return RandomVel(Series, RandomBetween(Series, -1, 1));
+        int s = RandomBetween(Series, 0, 1);
+        int rs = 1;
+        if (s == 0)
+        {
+            rs = -1;
+        }
+        return RandomVel(Series, rs);
     }
     else
     {
@@ -182,22 +193,24 @@ RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreateExplosionEntity(game_state &Game, vec3 Position, color Color, color OutlineColor, vec3 Sign = vec3{0,1,0})
+entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color Color, color OutlineColor, vec3 Sign = vec3{0,1,1})
 {
     auto *Explosion = PushStruct<explosion>(Game.Arena);
     InitMeshBuffer(Explosion->Mesh.Buffer);
-    AddPart(Explosion->Mesh, {{Color, 0, 0, NULL}, 0, 6, GL_TRIANGLES});
-    AddPart(Explosion->Mesh, {{OutlineColor, 0, 0, NULL, Material_PolygonLines}, 0, 6, GL_TRIANGLES});
+    AddPart(Explosion->Mesh, {{Color, 0, 0, NULL}, 0, 3 * ExplosionPieceCount, GL_TRIANGLES});
+    AddPart(Explosion->Mesh, {{OutlineColor, 0.1f, 0, NULL, Material_PolygonLines}, 0, 3 * ExplosionPieceCount, GL_TRIANGLES});
 
-    for (int i = 0; i < Global_Game_ExplosionPieceCount; i++)
+    for (int i = 0; i < ExplosionPieceCount; i++)
     {
         auto &Piece = Explosion->Pieces[i];
         auto &Series = Game.ExplosionEntropy;
-        Piece.Position = Position;
-        for (int i = 0; i < 2; i++)
+        Piece.Position = BaseTransform.Position;
+        Piece.Scale = vec3(0.25f);
+        for (int i = 0; i < 3; i++)
         {
             Piece.Velocity[i] = RandomExplosionVel(Series, Sign, i);
         }
+        Piece.Velocity += BaseTransform.Velocity;
         Piece.Rotation = vec3{
             RandomRotation(Series),
             RandomRotation(Series),
@@ -230,8 +243,7 @@ Interp(float c, float t, float a, float dt)
 #define ShipSteerSpeed 10.0f
 #define ShipSteerAcceleration 50.0f
 #define ShipFriction 2.0f
-static void
-MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
+void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
     float MaxVel = ShipMaxVel;
     if (Entity->Flags & Entity_IsPlayer)
@@ -266,8 +278,7 @@ MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
                                           DeltaTime);
 }
 
-static void
-PushPosition(trail *Trail, vec3 Pos)
+void PushPosition(trail *Trail, vec3 Pos)
 {
     if (Trail->PositionStackIndex >= TrailCount)
     {

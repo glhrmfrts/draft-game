@@ -14,22 +14,6 @@
 #include "entity.h"
 #include "random.h"
 
-enum action_type
-{
-    Action_camHorizontal,
-    Action_camVertical,
-    Action_debugFreeCam,
-    Action_horizontal,
-    Action_vertical,
-    Action_boost,
-    Action_count,
-};
-
-enum game_mode
-{
-    GameMode_level,
-};
-
 // @TODO: this will probably only work for linux
 enum game_controller_axis_id
 {
@@ -41,11 +25,32 @@ enum game_controller_axis_id
     Axis_RightX = 3,
     Axis_RightY = 4,
 };
+enum game_controller_button_id
+{
+    Button_Invalid = -1,
+
+    XboxButton_A = 0,
+    XboxButton_B = 1,
+    XboxButton_X = 2,
+    XboxButton_Y = 3,
+    XboxButton_Left = 4,
+    XboxButton_Right = 5,
+};
 struct game_controller
 {
     SDL_Joystick *Joystick;
 };
 
+enum action_type
+{
+    Action_camHorizontal,
+    Action_camVertical,
+    Action_debugFreeCam,
+    Action_horizontal,
+    Action_vertical,
+    Action_boost,
+    Action_count,
+};
 struct action_state
 {
     int Positive;
@@ -53,6 +58,7 @@ struct action_state
     int Pressed = 0;
     float AxisValue = 0;
     game_controller_axis_id AxisID = Axis_Invalid;
+    game_controller_button_id ButtonID = Button_Invalid;
 };
 
 #define MouseButton_left 0x1
@@ -74,6 +80,10 @@ struct game_input
     game_controller Controller;
 };
 
+enum game_mode
+{
+    GameMode_level,
+};
 struct game_state
 {
     game_input Input;
