@@ -113,12 +113,12 @@ RemoveEntity(game_state &Game, entity *Entity)
     }
 }
 
-#define TrackSegmentLength 20
-#define TrackSegmentWidth  5
-#define TrackLaneWidth     2.5f
-#define TrackSegmentCount  20
+#define TrackSegmentLength  20
+#define TrackSegmentWidth   5
+#define TrackLaneWidth      2.5f
+#define TrackSegmentCount   20
 #define TrackSegmentPadding 0.5f
-#define SkyboxScale vec3(500.0f)
+#define SkyboxScale         vec3(500.0f)
 static void
 StartLevel(game_state &Game)
 {
