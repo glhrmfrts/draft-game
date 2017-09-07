@@ -106,10 +106,10 @@ struct game_state
     std::list<entity *> TrackEntities;
     std::list<entity *> TrailEntities;
     std::list<entity *> ExplosionEntities;
+    std::list<entity *> ShipEntities;
     std::vector<collision> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;
-    entity *EnemyEntity;
     int CurrentLevel = 0;
 
     random_series ExplosionEntropy;

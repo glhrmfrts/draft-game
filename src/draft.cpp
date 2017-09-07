@@ -61,6 +61,10 @@ AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ExplosionEntities, Entity);
     }
+    if (Entity->Ship && !(Entity->Flags & Entity_IsPlayer))
+    {
+        AddEntityToList(Game.ShipEntities, Entity);
+    }
 }
 
 inline static void
@@ -102,6 +106,10 @@ RemoveEntity(game_state &Game, entity *Entity)
     if (Entity->Explosion)
     {
         RemoveEntityFromList(Game.ExplosionEntities, Entity);
+    }
+    if (Entity->Ship)
+    {
+        RemoveEntityFromList(Game.ShipEntities, Entity);
     }
 }
 
@@ -188,14 +196,16 @@ StartLevel(game_state &Game)
     Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
-    Game.EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
+    for (int i = 0; i < 3; i++)
+    {
+        auto *EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
+        EnemyEntity->Transform.Position.x = i + 1;
+        AddEntity(Game, EnemyEntity);
+    }
+
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
     Game.PlayerEntity->Transform.Rotation.y = 20.0f;
-
-    Game.EnemyEntity->Transform.Position.x = 4;
-
     AddEntity(Game, Game.PlayerEntity);
-    AddEntity(Game, Game.EnemyEntity);
 
     for (int i = 0; i < TrackSegmentCount; i++)
     {
@@ -270,7 +280,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
                                                     EntityToExplode->Ship->OutlineColor,
                                                     vec3{0,1,0});
             AddEntity(Game, Explosion);
-            RemoveEntity(Game, EntityToExplode);
+            //RemoveEntity(Game, EntityToExplode);
             return false;
         }
     }
@@ -318,12 +328,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     //Println(MoveV);
     //MoveV = 0.3f;
     MoveShipEntity(Game.PlayerEntity, MoveH, MoveV, DeltaTime);
-
-    static float EnemyMoveH = 0.0f;
-    //EnemyMoveH += DeltaTime * 2;
-    MoveShipEntity(Game.EnemyEntity, sin(EnemyMoveH), 0.4f, DeltaTime);
-    //MoveShipEntity(Game.PlayerEntity, sin(EnemyMoveH), 0.4f,
-    //DeltaTime);
 
     if (PlayerShip->DraftCharge == 1.0f)
     {
@@ -374,6 +378,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState);
+
+    static float EnemyMoveH = 0.0f;
+    for (auto *Entity : Game.ShipEntities)
+    {
+        if (!Entity) continue;
+
+        MoveShipEntity(Entity, sin(EnemyMoveH), 0.4f, DeltaTime);
+    }
 
     for (auto *Entity : Game.TrailEntities)
     {

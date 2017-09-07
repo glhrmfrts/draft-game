@@ -3,5 +3,6 @@ Current TODOs:
 - (Audio) Implement audio system and ship engine sounds
 - (Game) Improve ship explosions visuals
 - (Game) Work on the camera movement to be more dynamic
+- (Renderer) Fix bloom artifacts
 - (Renderer) Fix order of rendering (sort by distance)
 - (Renderer) Frustum culling
