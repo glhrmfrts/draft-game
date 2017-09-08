@@ -9,7 +9,7 @@ AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n =
 
 static void
 AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1 = Color_white, vec3 n = vec3(0), bool FlipV = false)
+        color c1 = Color_white, vec3 n = vec3(1), bool FlipV = false)
 {
     color c2 = c1;
     color c3 = c1;
@@ -54,19 +54,33 @@ void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
 }
 
 static void
-AddCube(vertex_buffer &Buffer, float height)
+AddCube(vertex_buffer &Buffer, color c = Color_white, bool NoLight = false)
 {
-    float y = -0.5;
-    float h = y + height;
+    float z = -0.5;
+    float h = z+1;
     float x = -0.5f;
     float w = x+1;
-    float z = 0.5f;
-    float d = z-1;
-    AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, h, z), vec3(x, h, z), Color_white, vec3(0, 0, 1));
-    AddQuad(Buffer, vec3(w, y, z), vec3(w, y, d), vec3(w, h, d), vec3(w, h, z), Color_white, vec3(1, 0, 0));
-    AddQuad(Buffer, vec3(w, y, d), vec3(x, y, d), vec3(x, h, d), vec3(w, h, d), Color_white, vec3(0, 0, -1));
-    AddQuad(Buffer, vec3(x, y, d), vec3(x, y, z), vec3(x, h, z), vec3(x, h, d), Color_white, vec3(-1, 0, 0));
-    AddQuad(Buffer, vec3(x, h, z), vec3(w, h, z), vec3(w, h, d), vec3(x, h, d), Color_white, vec3(0, 1, 0));
+    float y = -0.5f;
+    float d = y+1;
+
+	if (NoLight)
+	{
+		AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1,1,1));
+		AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 1, 1));
+		AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(1, 1, 1));
+		AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(1, 1, 1));
+		AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(1, 1, 1));
+		AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(1, 1, 1));
+	}
+	else
+	{
+		AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(0, -1, 0));
+		AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 0, 0));
+		AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(0, 1, 0));
+		AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(-1, 0, 0));
+		AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(0, 0, 1));
+		AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(0, 0, -1));
+	}
 }
 
 inline static void
@@ -149,7 +163,7 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     auto *Entity = PushStruct<entity>(Game.Arena);
     Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.5f), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
@@ -193,12 +207,37 @@ RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color Color, color OutlineColor, vec3 Sign = vec3{0,1,1})
+entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color Color, color OutlineColor, vec3 Sign)
 {
     auto *Explosion = PushStruct<explosion>(Game.Arena);
+	Explosion->LifeTime = Global_Game_ExplosionLifeTime;
     InitMeshBuffer(Explosion->Mesh.Buffer);
-    AddPart(Explosion->Mesh, {{Color, 0, 0, NULL}, 0, 3 * ExplosionPieceCount, GL_TRIANGLES});
-    AddPart(Explosion->Mesh, {{OutlineColor, 0.1f, 0, NULL, Material_PolygonLines}, 0, 3 * ExplosionPieceCount, GL_TRIANGLES});
+	AddCube(Explosion->Mesh.Buffer, Color_white, true);
+	for (int i = 0; i < ExplosionPieceCount; i++)
+	{
+		vec3 p(0.0f);
+		AddTriangle(Explosion->Mesh.Buffer, p, p, p);
+	}
+	UploadVertices(Explosion->Mesh.Buffer, GL_DYNAMIC_DRAW);
+
+	AddPart(Explosion->Mesh,
+			mesh_part{
+				material{ Color_white, 0.0f, 0, NULL, 0 },
+				0,
+				36,
+				GL_TRIANGLES });
+    AddPart(Explosion->Mesh,
+			mesh_part{
+				material{Color, 0, 0, NULL, Material_ForceTransparent},
+				36,
+				3 * ExplosionPieceCount,
+				GL_TRIANGLES});
+    AddPart(Explosion->Mesh,
+			mesh_part{
+				material{OutlineColor, 0.1f, 0, NULL, Material_ForceTransparent | Material_PolygonLines},
+				36,
+				3 * ExplosionPieceCount,
+				GL_TRIANGLES});
 
     for (int i = 0; i < ExplosionPieceCount; i++)
     {
@@ -219,8 +258,8 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
     }
 
     auto *Result = PushStruct<entity>(Game.Arena);
+	Result->Transform.Position = BaseTransform.Position;
     Result->Explosion = Explosion;
-    Result->Model = CreateModel(Game.Arena, &Explosion->Mesh);
     return Result;
 }
 

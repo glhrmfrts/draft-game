@@ -54,10 +54,10 @@ enum action_type
 {
     Action_camHorizontal,
     Action_camVertical,
-    Action_debugFreeCam,
     Action_horizontal,
     Action_vertical,
     Action_boost,
+	Action_debugUI,
     Action_count,
 };
 struct action_state

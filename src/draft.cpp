@@ -201,7 +201,7 @@ StartLevel(game_state &Game)
 
     for (int i = 0; i < 3; i++)
     {
-        auto *EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[0]), IntColor(SecondPalette.Colors[3]));
+        auto *EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[3]), IntColor(SecondPalette.Colors[3]));
         EnemyEntity->Transform.Position.x = i + 1;
         AddEntity(Game, EnemyEntity);
     }
@@ -281,9 +281,9 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
                                                     EntityToExplode->Transform,
                                                     EntityToExplode->Ship->Color,
                                                     EntityToExplode->Ship->OutlineColor,
-                                                    vec3{0,1,0});
+                                                    vec3{0,1,1});
             AddEntity(Game, Explosion);
-            //RemoveEntity(Game, EntityToExplode);
+            RemoveEntity(Game, EntityToExplode);
             return false;
         }
     }
@@ -383,6 +383,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     RenderBegin(Game.RenderState);
 
     static float EnemyMoveH = 0.0f;
+	//EnemyMoveH += DeltaTime;
     for (auto *Entity : Game.ShipEntities)
     {
         if (!Entity) continue;
@@ -476,7 +477,15 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         if (!Entity) continue;
 
         auto *Explosion = Entity->Explosion;
-        ResetBuffer(Explosion->Mesh.Buffer);
+		Explosion->LifeTime -= DeltaTime;
+		if (Explosion->LifeTime <= 0)
+		{
+			RemoveEntity(Game, Entity);
+			continue;
+		}
+
+		float Alpha = Explosion->LifeTime / Global_Game_ExplosionLifeTime;
+        ResetBuffer(Explosion->Mesh.Buffer, 36);
         for (int i = 0; i < ExplosionPieceCount; i++)
         {
             auto &Piece = Explosion->Pieces[i];
@@ -485,9 +494,18 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             vec3 p1 = vec3(Transform * vec4(-1.0f, 0.0f, -1.0f, 1.0f));
             vec3 p2 = vec3(Transform * vec4(1.0f, 0.0f, -1.0f, 1.0f));
             vec3 p3 = vec3(Transform * vec4(0.0f, 0.0f, 1.0f, 1.0f));
-            AddTriangle(Explosion->Mesh.Buffer, p1, p2, p3, vec3{1,1,1});
+			AddTriangle(Explosion->Mesh.Buffer, p1, p2, p3, vec3{ 1, 1, 1 }, color{1, 1, 1, Alpha});
         }
-        UploadVertices(Explosion->Mesh.Buffer, GL_DYNAMIC_DRAW);
+        UploadVertices(Explosion->Mesh.Buffer, 36, ExplosionPieceCount * 3);
+
+		float Scale = (1.0f - std::max(0.0f, (Explosion->LifeTime - 1.8f) / (Global_Game_ExplosionLifeTime - 1.8f)));
+		Entity->Transform.Scale = vec3(4.0f) * Scale;
+		if (Scale < 1.0f)
+		{
+			PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[0], Entity->Transform);
+		}
+		PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
+		PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[2], transform{});
     }
 
     for (auto *Entity : Game.TrackEntities)
@@ -536,11 +554,12 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 static void
 RegisterInputActions(game_input &Input)
 {
-	Input.Actions[Action_camHorizontal] = action_state{ SDLK_d, SDLK_a, 0, 0, Axis_Invalid, Button_Invalid };
-	Input.Actions[Action_camVertical] = action_state{ SDLK_w, SDLK_s, 0, 0, Axis_Invalid, Button_Invalid};
-	Input.Actions[Action_horizontal] = action_state{ SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
-	Input.Actions[Action_vertical] = action_state{ SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
-	Input.Actions[Action_boost] = action_state{ SDLK_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
+	Input.Actions[Action_camHorizontal] = action_state{ SDL_SCANCODE_D, SDL_SCANCODE_A, 0, 0, Axis_Invalid, Button_Invalid };
+	Input.Actions[Action_camVertical] = action_state{ SDL_SCANCODE_W, SDL_SCANCODE_S, 0, 0, Axis_Invalid, Button_Invalid};
+	Input.Actions[Action_horizontal] = action_state{ SDL_SCANCODE_RIGHT, SDL_SCANCODE_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
+	Input.Actions[Action_vertical] = action_state{ SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
+	Input.Actions[Action_boost] = action_state{ SDL_SCANCODE_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
+	Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
 static void
@@ -625,7 +644,6 @@ int main(int argc, char **argv)
     ImVec4 clear_color = ImColor(114, 144, 154);
     bool show_test_window = true;
     bool show_another_window = false;
-
     clock_t PreviousTime = clock();
     float DeltaTime = 0.016f;
     float DeltaTimeMS = DeltaTime * 1000.0f;
@@ -633,6 +651,52 @@ int main(int argc, char **argv)
     {
         clock_t CurrentTime = clock();
         float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC);
+			
+		SDL_PumpEvents();
+		SDL_JoystickUpdate();
+		for (int i = 0; i < Action_count; i++)
+		{
+			auto &Action = Input.Actions[i];
+			Action.Pressed = 0;
+			Action.AxisValue = 0;
+			if (Action.AxisID != Axis_Invalid)
+			{
+				int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
+				if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
+				{
+					float fv = (Value + 32768) / float(65535);
+					Value = short(fv * 32767);
+				}
+				if (std::abs(Value) < GameControllerAxisDeadzone)
+				{
+					Value = 0;
+				}
+				Action.AxisValue = Value / float(32767);
+			}
+			if (Action.ButtonID != Button_Invalid)
+			{
+				if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
+				{
+					Action.Pressed++;
+				}
+				else
+				{
+					Action.Pressed = 0;
+				}
+			}
+			const uint8 *Keys = SDL_GetKeyboardState(NULL);
+			uint8 Positive = Keys[Action.Positive];
+			uint8 Negative = Keys[Action.Negative];
+			Action.Pressed += Positive + Negative;
+			if (Positive)
+			{
+				Action.AxisValue = 1;
+			}
+			else if (Negative)
+			{
+				Action.AxisValue = -1;
+			}
+		}
 
         SDL_Event Event;
         while (SDL_PollEvent(&Event))
@@ -642,57 +706,6 @@ int main(int argc, char **argv)
             case SDL_QUIT:
                 Game.Running = false;
                 break;
-
-            case SDL_KEYDOWN: {
-                SDL_Keycode Key = Event.key.keysym.sym;
-                for (int i = 0; i < Action_count; i++)
-                {
-                    auto &Action = Input.Actions[i];
-                    if (Action.Positive == Key || Action.Negative == Key)
-                    {
-                        Action.Pressed++;
-
-                        if (Action.Positive == Key)
-                        {
-                            Action.AxisValue = 1;
-                        }
-                        else if (Action.Negative == Key)
-                        {
-                            Action.AxisValue = -1;
-                        }
-                    }
-                }
-
-                if (Key == SDLK_BACKQUOTE)
-                {
-                    Global_DebugUI = !Global_DebugUI;
-                }
-				if (Key == SDLK_ESCAPE)
-				{
-					Game.Running = false;
-				}
-                break;
-            }
-
-            case SDL_KEYUP: {
-                SDL_Keycode Key = Event.key.keysym.sym;
-                for (int i = 0; i < Action_count; i++)
-                {
-                    auto &Action = Input.Actions[i];
-                    if (Action.Positive == Key && Action.AxisValue == 1)
-                    {
-                        Action.Pressed = 0;
-                        Action.AxisValue = 0;
-                        break;
-                    }
-                    else if (Action.Negative == Key && Action.AxisValue == -1)
-                    {
-                        Action.Pressed = 0;
-                        Action.AxisValue = 0;
-                    }
-                }
-                break;
-            }
 
             case SDL_MOUSEMOTION: {
                 auto &Motion = Event.motion;
@@ -747,39 +760,13 @@ int main(int argc, char **argv)
             }
         }
 
-		SDL_JoystickUpdate();
-		for (int i = 0; i < Action_count; i++)
+		if (IsJustPressed(Game, Action_debugUI))
 		{
-			auto &Action = Input.Actions[i];
-			if (Action.AxisID != Axis_Invalid)
-			{
-				int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
-				if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
-				{
-					float fv = (Value + 32768) / float(65535);
-					Value = short(fv * 32767);
-				}
-				if (std::abs(Value) < GameControllerAxisDeadzone)
-				{
-					Value = 0;
-				}
-				Action.AxisValue = Value / float(32767);
-			}
-			if (Action.ButtonID != Button_Invalid)
-			{
-				if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
-				{
-					Action.Pressed++;
-				}
-				else
-				{
-					Action.Pressed = 0;
-				}
-			}
+			Global_DebugUI = !Global_DebugUI;
 		}
 
         ImGui_ImplSdlGL3_NewFrame(Window);
-        UpdateAndRenderLevel(Game, DeltaTime);
+        UpdateAndRenderLevel(Game, Elapsed);
 
         DrawDebugUI(Game.PlayerEntity, Elapsed);
 

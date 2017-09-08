@@ -45,10 +45,10 @@ EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 }
 
 static void
-ResetBuffer(vertex_buffer &Buffer)
+ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 {
-    Buffer.VertexCount = 0;
-    Buffer.RawIndex = 0;
+    Buffer.VertexCount = Index;
+    Buffer.RawIndex = Index * Buffer.VertexSize;
 }
 
 // InitBuffer accepts a variadic number of vertex_attributes, it
@@ -107,6 +107,15 @@ void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
     glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
     glBufferData(GL_ARRAY_BUFFER, Buffer.VertexCount * Buffer.VertexSize * sizeof(float), Data, Usage);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void UploadVertices(vertex_buffer &Buffer, size_t Index, size_t Count)
+{
+	size_t ByteIndex = Index * Buffer.VertexSize * sizeof(float);
+	size_t ByteCount = Count * Buffer.VertexSize * sizeof(float);
+	glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
+	glBufferSubData(GL_ARRAY_BUFFER, ByteIndex, ByteCount, &Buffer.Vertices[Index]);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 static GLuint CompileShader(const char *Source, GLint Type)
@@ -463,10 +472,10 @@ void InitMeshBuffer(vertex_buffer &Buffer)
 {
     size_t Stride = MeshVertexSize*sizeof(float);
     InitBuffer(Buffer, 12, 4,
-               vertex_attribute({0, 3, GL_FLOAT, Stride, 0}), // position
-               vertex_attribute({1, 2, GL_FLOAT, Stride, 3*sizeof(float)}), // uv
-               vertex_attribute({2, 4, GL_FLOAT, Stride, 5*sizeof(float)}), // color
-               vertex_attribute({3, 3, GL_FLOAT, Stride, 9*sizeof(float)})); // normal
+               vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
+               vertex_attribute{1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
+               vertex_attribute{2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
+               vertex_attribute{3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
 }
 
 void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
@@ -604,8 +613,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
     InitMeshBuffer(RenderState.SpriteBuffer);
     InitBuffer(RenderState.ScreenBuffer, 4, 2,
-               vertex_attribute({0, 2, GL_FLOAT, 4*sizeof(float), 0}),
-               vertex_attribute({1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)}));
+               vertex_attribute{0, 2, GL_FLOAT, 4*sizeof(float), 0},
+               vertex_attribute{1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
     PushVertex(RenderState.ScreenBuffer, {-1, -1, 0, 0});
     PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
     PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
@@ -821,6 +830,34 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     // @TODO: cleanup textures
 }
 
+inline static void
+AddRenderable(render_state &RenderState, size_t Index, material *Material)
+{
+	if (Material->DiffuseColor.a < 1.0f || (Material->Flags & Material_ForceTransparent))
+	{
+		RenderState.FrameTransparentRenderables.push_back(Index);
+	}
+	else
+	{
+		RenderState.FrameSolidRenderables.push_back(Index);
+	}
+}
+
+void PushMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const transform &Transform)
+{
+	size_t Index = NextRenderable(RenderState);
+	auto &r = RenderState.Renderables[Index];
+	r.PrimitiveType = Part.PrimitiveType;
+	r.VertexOffset = Part.Offset;
+	r.VertexCount = Part.Count;
+	r.VAO = Mesh.Buffer.VAO;
+	r.Material = &Part.Material;
+	r.Transform = Transform;
+	r.Bounds = BoundsFromMinMax(Mesh.Min*Transform.Scale, Mesh.Max*Transform.Scale);
+	r.Bounds.Center += Transform.Position;
+	AddRenderable(RenderState, Index, &Part.Material);
+}
+
 void PushModel(render_state &RenderState, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
@@ -843,14 +880,7 @@ void PushModel(render_state &RenderState, model &Model, const transform &Transfo
         r.Transform = Transform;
         r.Bounds = BoundsFromMinMax(Mesh->Min*Transform.Scale, Mesh->Max*Transform.Scale);
         r.Bounds.Center += Transform.Position;
-        if (Material->DiffuseColor.a < 1.0f)
-        {
-            RenderState.FrameTransparentRenderables.push_back(Index);
-        }
-        else
-        {
-            RenderState.FrameSolidRenderables.push_back(Index);
-        }
+		AddRenderable(RenderState, Index, Material);
     }
 }
 
