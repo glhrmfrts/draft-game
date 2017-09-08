@@ -306,9 +306,9 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 
     float SteerTarget = MoveH * ShipSteerSpeed;
     Entity->Transform.Velocity.x = Interp(Entity->Transform.Velocity.x,
-                                SteerTarget,
-                                ShipSteerAcceleration,
-                                DeltaTime);
+										  SteerTarget,
+										  ShipSteerAcceleration,
+										  DeltaTime);
 
     Entity->Transform.Rotation.y = 20.0f * (Entity->Transform.Velocity.x / ShipSteerSpeed);
     Entity->Transform.Rotation.x = Interp(Entity->Transform.Rotation.x,

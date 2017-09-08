@@ -14,6 +14,21 @@
 #include "entity.h"
 #include "random.h"
 
+#define GAME_INIT(name) void name(game_state *Game)
+#define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
+#define GAME_DESTROY(name) void name(game_state *Game)
+#define GAME_PROCESS_EVENT(name) void name(game_state *Game, SDL_Event *Event)
+
+struct game_state;
+
+extern "C"
+{
+	typedef GAME_INIT(game_init_func);
+	typedef GAME_RENDER(game_render_func);
+	typedef GAME_DESTROY(game_destroy_func);
+	typedef GAME_PROCESS_EVENT(game_process_event_func);
+}
+
 // @TODO: this will probably only work for linux
 enum game_controller_axis_id
 {
@@ -132,6 +147,7 @@ struct game_state
 
     random_series ExplosionEntropy;
 
+	SDL_Window *Window;
     int Width;
     int Height;
     bool Running = true;

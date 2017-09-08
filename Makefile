@@ -24,6 +24,9 @@ endif
 $(OUT): $(SRC)
 	$(CC) $(CFLAGS) $(CFILES) -o $@ $(LDFLAGS)
 
+win64: src/platform.cpp
+	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o Draft\x64\Debug\platform.exe
+
 run: $(OUT)
 	@cd build && ./../$(OUT)
 

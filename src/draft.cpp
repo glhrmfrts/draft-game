@@ -1,7 +1,6 @@
 // Copyright
 
 #define DRAFT_DEBUG 1
-#define GLEW_STATIC 1
 
 #include <iostream>
 #include <cstdint>
@@ -324,6 +323,11 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
         Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
     }
+
+	if (IsJustPressed(Game, Action_debugUI))
+	{
+		Global_DebugUI = !Global_DebugUI;
+	}
 #endif
 
     float MoveH = GetAxisValue(Game.Input, Action_horizontal);
@@ -554,259 +558,46 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 static void
 RegisterInputActions(game_input &Input)
 {
-	Input.Actions[Action_camHorizontal] = action_state{ SDL_SCANCODE_D, SDL_SCANCODE_A, 0, 0, Axis_Invalid, Button_Invalid };
-	Input.Actions[Action_camVertical] = action_state{ SDL_SCANCODE_W, SDL_SCANCODE_S, 0, 0, Axis_Invalid, Button_Invalid};
-	Input.Actions[Action_horizontal] = action_state{ SDL_SCANCODE_RIGHT, SDL_SCANCODE_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
-	Input.Actions[Action_vertical] = action_state{ SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
-	Input.Actions[Action_boost] = action_state{ SDL_SCANCODE_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
-	Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
+    Input.Actions[Action_camHorizontal] = action_state{ SDL_SCANCODE_D, SDL_SCANCODE_A, 0, 0, Axis_Invalid, Button_Invalid };
+    Input.Actions[Action_camVertical] = action_state{ SDL_SCANCODE_W, SDL_SCANCODE_S, 0, 0, Axis_Invalid, Button_Invalid};
+    Input.Actions[Action_horizontal] = action_state{ SDL_SCANCODE_RIGHT, SDL_SCANCODE_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
+    Input.Actions[Action_vertical] = action_state{ SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
+    Input.Actions[Action_boost] = action_state{ SDL_SCANCODE_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
+    Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
-static void
-OpenGameController(game_input &Input)
+extern "C"
 {
-    Input.Controller.Joystick = SDL_JoystickOpen(0);
-    if (Input.Controller.Joystick)
-    {
-        printf("Joystick name: %s\n", SDL_JoystickNameForIndex(0));
-    }
-    else
-    {
-        fprintf(stderr, "Could not open joystick %i: %s\n", 0, SDL_GetError());
-    }
-	SDL_JoystickEventState(SDL_IGNORE);
-}
+	__declspec(dllexport) GAME_INIT(GameInit)
+	{
+		int Width = Game->Width;
+		int Height = Game->Height;
+		ImGui_ImplSdlGL3_Init(Game->Window);
 
-#define GameControllerAxisDeadzone 5000
-int main(int argc, char **argv)
-{
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
-    {
-        std::cout << "Failed to init display SDL" << std::endl;
-    }
+		RegisterInputActions(Game->Input);
+		InitGUI(Game->GUI, Game->Input);
+		MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
+		InitRenderState(Game->RenderState, Width, Height);
+		StartLevel(*Game);
+	}
 
-    int Width = 1280;
-    int Height = 720;
-    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          Width, Height, SDL_WINDOW_OPENGL);
+	__declspec(dllexport) GAME_PROCESS_EVENT(GameProcessEvent)
+	{
+		ImGui_ImplSdlGL3_ProcessEvent(Event);
+	}
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+	__declspec(dllexport) GAME_RENDER(GameRender)
+	{
+		ImGui_ImplSdlGL3_NewFrame(Game->Window);
+		UpdateAndRenderLevel(*Game, DeltaTime);
+		DrawDebugUI(Game->PlayerEntity, DeltaTime);
+		ImGui::Render();
+	}
 
-    SDL_GLContext Context = SDL_GL_CreateContext(Window);
-
-    SDL_GL_SetSwapInterval(0);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cout << "Error loading GL extensions" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    printf("%s\n", glGetString(GL_VERSION));
-    printf("%s\n", glGetString(GL_VENDOR));
-    printf("%s\n", glGetString(GL_RENDERER));
-
-    glEnable(GL_MULTISAMPLE);
-    glViewport(0, 0, Width, Height);
-
-    ALCdevice *AudioDevice = alcOpenDevice(NULL);
-    if (!AudioDevice)
-        std::cerr << "Error opening audio device" << std::endl;
-
-    ALCcontext *AudioContext = alcCreateContext(AudioDevice, NULL);
-    if (!alcMakeContextCurrent(AudioContext))
-        std::cerr << "Error setting audio context" << std::endl;
-
-    ImGui_ImplSdlGL3_Init(Window);
-
-    game_state Game;
-    Game.Width = Width;
-    Game.Height = Height;
-    Game.ExplosionEntropy = RandomSeed(1234);
-
-    auto &Input = Game.Input;
-    RegisterInputActions(Input);
-    if (SDL_NumJoysticks() > 0)
-    {
-        OpenGameController(Input);
-    }
-
-    InitGUI(Game.GUI, Input);
-    MakeCameraOrthographic(Game.GUICamera, 0, Width, 0, Height, -1, 1);
-    InitRenderState(Game.RenderState, Width, Height);
-    StartLevel(Game);
-
-    ImVec4 clear_color = ImColor(114, 144, 154);
-    bool show_test_window = true;
-    bool show_another_window = false;
-    clock_t PreviousTime = clock();
-    float DeltaTime = 0.016f;
-    float DeltaTimeMS = DeltaTime * 1000.0f;
-    while (Game.Running)
-    {
-        clock_t CurrentTime = clock();
-        float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC);
-			
-		SDL_PumpEvents();
-		SDL_JoystickUpdate();
-		for (int i = 0; i < Action_count; i++)
-		{
-			auto &Action = Input.Actions[i];
-			Action.Pressed = 0;
-			Action.AxisValue = 0;
-			if (Action.AxisID != Axis_Invalid)
-			{
-				int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
-				if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
-				{
-					float fv = (Value + 32768) / float(65535);
-					Value = short(fv * 32767);
-				}
-				if (std::abs(Value) < GameControllerAxisDeadzone)
-				{
-					Value = 0;
-				}
-				Action.AxisValue = Value / float(32767);
-			}
-			if (Action.ButtonID != Button_Invalid)
-			{
-				if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
-				{
-					Action.Pressed++;
-				}
-				else
-				{
-					Action.Pressed = 0;
-				}
-			}
-			const uint8 *Keys = SDL_GetKeyboardState(NULL);
-			uint8 Positive = Keys[Action.Positive];
-			uint8 Negative = Keys[Action.Negative];
-			Action.Pressed += Positive + Negative;
-			if (Positive)
-			{
-				Action.AxisValue = 1;
-			}
-			else if (Negative)
-			{
-				Action.AxisValue = -1;
-			}
-		}
-
-        SDL_Event Event;
-        while (SDL_PollEvent(&Event))
-        {
-            ImGui_ImplSdlGL3_ProcessEvent(&Event);
-            switch (Event.type) {
-            case SDL_QUIT:
-                Game.Running = false;
-                break;
-
-            case SDL_MOUSEMOTION: {
-                auto &Motion = Event.motion;
-                Input.MouseState.X = Motion.x;
-                Input.MouseState.Y = Motion.y;
-                Input.MouseState.dX = Motion.xrel;
-                Input.MouseState.dY = Motion.yrel;
-                break;
-            }
-
-            case SDL_MOUSEWHEEL: {
-                auto &Wheel = Event.wheel;
-                Input.MouseState.ScrollY = Wheel.y;
-                break;
-            }
-
-            case SDL_MOUSEBUTTONDOWN: {
-                auto &Button = Event.button;
-                switch (Button.button) {
-                case SDL_BUTTON_LEFT:
-                    Input.MouseState.Buttons |= MouseButton_left;
-                    break;
-
-                case SDL_BUTTON_MIDDLE:
-                    Input.MouseState.Buttons |= MouseButton_middle;
-                    break;
-
-                case SDL_BUTTON_RIGHT:
-                    Input.MouseState.Buttons |= MouseButton_right;
-                    break;
-                }
-                break;
-            }
-
-            case SDL_MOUSEBUTTONUP: {
-                auto &Button = Event.button;
-                switch (Button.button) {
-                case SDL_BUTTON_LEFT:
-                    Input.MouseState.Buttons &= ~MouseButton_left;
-                    break;
-
-                case SDL_BUTTON_MIDDLE:
-                    Input.MouseState.Buttons &= ~MouseButton_middle;
-                    break;
-
-                case SDL_BUTTON_RIGHT:
-                    Input.MouseState.Buttons &= ~MouseButton_right;
-                    break;
-                }
-                break;
-            }
-            }
-        }
-
-		if (IsJustPressed(Game, Action_debugUI))
-		{
-			Global_DebugUI = !Global_DebugUI;
-		}
-
-        ImGui_ImplSdlGL3_NewFrame(Window);
-        UpdateAndRenderLevel(Game, Elapsed);
-
-        DrawDebugUI(Game.PlayerEntity, Elapsed);
-
-#if 0
-        // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-        if (show_test_window)
-        {
-            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiCond_FirstUseEver);
-            ImGui::ShowTestWindow(&show_test_window);
-        }
-#endif
-
-        ImGui::Render();
-
-        memcpy(&Game.PrevInput, &Game.Input, sizeof(game_input));
-        Input.MouseState.dX = 0;
-        Input.MouseState.dY = 0;
-
-        SDL_GL_SwapWindow(Window);
-
-        if (Elapsed*1000.0f < DeltaTimeMS)
-        {
-            //SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
-        }
-
-        PreviousTime = CurrentTime;
-    }
-
-    ImGui_ImplSdlGL3_Shutdown();
-
-    FreeArena(Game.Arena);
-    FreeArena(Game.AssetCache.Arena);
-
-    alcMakeContextCurrent(NULL);
-    alcDestroyContext(AudioContext);
-    alcCloseDevice(AudioDevice);
-
-    SDL_GL_DeleteContext(Context);
-    SDL_DestroyWindow(Window);
-    SDL_Quit();
-
-    return 0;
+	__declspec(dllexport) GAME_DESTROY(GameDestroy)
+	{
+		ImGui_ImplSdlGL3_Shutdown();
+		FreeArena(Game->Arena);
+		FreeArena(Game->AssetCache.Arena);
+	}
 }
