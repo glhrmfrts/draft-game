@@ -1,5 +1,8 @@
 // Copyright
 
+#define DRAFT_DEBUG 1
+#define GLEW_STATIC 1
+
 #include <iostream>
 #include <cstdint>
 #include <cstdlib>
@@ -533,11 +536,11 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 static void
 RegisterInputActions(game_input &Input)
 {
-    Input.Actions[Action_camHorizontal] = {SDLK_d, SDLK_a, 0, 0};
-    Input.Actions[Action_camVertical] = {SDLK_w, SDLK_s, 0, 0};
-    Input.Actions[Action_horizontal] = {SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX};
-    Input.Actions[Action_vertical] = {SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger};
-    Input.Actions[Action_boost] = {SDLK_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X};
+	Input.Actions[Action_camHorizontal] = action_state{ SDLK_d, SDLK_a, 0, 0, Axis_Invalid, Button_Invalid };
+	Input.Actions[Action_camVertical] = action_state{ SDLK_w, SDLK_s, 0, 0, Axis_Invalid, Button_Invalid};
+	Input.Actions[Action_horizontal] = action_state{ SDLK_RIGHT, SDLK_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
+	Input.Actions[Action_vertical] = action_state{ SDLK_UP, SDLK_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
+	Input.Actions[Action_boost] = action_state{ SDLK_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
 }
 
 static void
@@ -552,54 +555,10 @@ OpenGameController(game_input &Input)
     {
         fprintf(stderr, "Could not open joystick %i: %s\n", 0, SDL_GetError());
     }
+	SDL_JoystickEventState(SDL_IGNORE);
 }
 
 #define GameControllerAxisDeadzone 5000
-static void
-ProcessAxisEvent(game_input &Input, SDL_JoyAxisEvent &Event)
-{
-    int Value = Event.value;
-    if (Event.axis == Axis_RightTrigger || Event.axis == Axis_LeftTrigger)
-    {
-        float fv = (Value + 32768) / float(65535);
-        Value = short(fv * 32767);
-    }
-    if (std::abs(Value) < GameControllerAxisDeadzone)
-    {
-        Value = 0;
-    }
-    for (int i = 0; i < Action_count; i++)
-    {
-        auto &Action = Input.Actions[i];
-        if (Action.AxisID == Event.axis)
-        {
-            Action.AxisValue = Value / float(32767);
-            break;
-        }
-    }
-}
-
-static void
-ProcessButtonEvent(game_input &Input, SDL_JoyButtonEvent &Event, bool Down)
-{
-    for (int i = 0; i < Action_count; i++)
-    {
-        auto &Action = Input.Actions[i];
-        if (Action.ButtonID == Event.button)
-        {
-            if (Down)
-            {
-                Action.Pressed++;
-            }
-            else
-            {
-                Action.Pressed = 0;
-            }
-            break;
-        }
-    }
-}
-
 int main(int argc, char **argv)
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0)
@@ -708,6 +667,10 @@ int main(int argc, char **argv)
                 {
                     Global_DebugUI = !Global_DebugUI;
                 }
+				if (Key == SDLK_ESCAPE)
+				{
+					Game.Running = false;
+				}
                 break;
             }
 
@@ -781,35 +744,39 @@ int main(int argc, char **argv)
                 }
                 break;
             }
-
-            case SDL_JOYDEVICEADDED: {
-                OpenGameController(Input);
-                break;
-            }
-
-            case SDL_JOYDEVICEREMOVED: {
-                SDL_JoystickClose(Input.Controller.Joystick);
-                Input.Controller.Joystick = NULL;
-                printf("Controller removed\n");
-                break;
-            }
-
-            case SDL_JOYAXISMOTION: {
-                ProcessAxisEvent(Input, Event.jaxis);
-                break;
-            }
-
-            case SDL_JOYBUTTONDOWN: {
-                ProcessButtonEvent(Input, Event.jbutton, true);
-                break;
-            }
-
-            case SDL_JOYBUTTONUP: {
-                ProcessButtonEvent(Input, Event.jbutton, false);
-                break;
-            }
             }
         }
+
+		SDL_JoystickUpdate();
+		for (int i = 0; i < Action_count; i++)
+		{
+			auto &Action = Input.Actions[i];
+			if (Action.AxisID != Axis_Invalid)
+			{
+				int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
+				if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
+				{
+					float fv = (Value + 32768) / float(65535);
+					Value = short(fv * 32767);
+				}
+				if (std::abs(Value) < GameControllerAxisDeadzone)
+				{
+					Value = 0;
+				}
+				Action.AxisValue = Value / float(32767);
+			}
+			if (Action.ButtonID != Button_Invalid)
+			{
+				if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
+				{
+					Action.Pressed++;
+				}
+				else
+				{
+					Action.Pressed = 0;
+				}
+			}
+		}
 
         ImGui_ImplSdlGL3_NewFrame(Window);
         UpdateAndRenderLevel(Game, DeltaTime);
@@ -835,7 +802,7 @@ int main(int argc, char **argv)
 
         if (Elapsed*1000.0f < DeltaTimeMS)
         {
-            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
+            //SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
         PreviousTime = CurrentTime;

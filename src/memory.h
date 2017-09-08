@@ -3,7 +3,7 @@
 
 struct memory_block
 {
-    memory_block *Prev;
+    memory_block *Prev = NULL;
     void *Base;
     size_t Used;
     size_t Size;

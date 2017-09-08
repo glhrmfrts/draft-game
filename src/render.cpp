@@ -99,8 +99,13 @@ PushVertex(vertex_buffer &Buffer, const mesh_vertex &Vertex)
 
 void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
 {
+	void *Data = NULL;
+	if (Buffer.VertexCount > 0)
+	{
+		Data = &Buffer.Vertices[0];
+	}
     glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
-    glBufferData(GL_ARRAY_BUFFER, Buffer.VertexCount * Buffer.VertexSize * sizeof(float), &Buffer.Vertices[0], Usage);
+    glBufferData(GL_ARRAY_BUFFER, Buffer.VertexCount * Buffer.VertexSize * sizeof(float), Data, Usage);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 

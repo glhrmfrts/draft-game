@@ -1,37 +1,15 @@
-﻿Build started 30/08/2017 14:56:17.
+﻿Build started 08/09/2017 00:27:20.
      1>Project "C:\c-cpp\draft-game\Draft\Draft\Draft.vcxproj" on node 2 (Build target(s)).
-     1>ClCompile:
-         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\c-cpp\libs\include" /I"C:\c-cpp\draft-game\deps" /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt /std:c++14 ..\..\src\draft.cpp
-     1>cl : Command line warning D9002: ignoring unknown option '/std:c++14'
-         draft.cpp
-     1>c:\c-cpp\draft-game\src\draft.h(108): error C2512: 'gui' : no appropriate default constructor available
-     1>c:\c-cpp\draft-game\src\collision.cpp(89): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>c:\c-cpp\draft-game\src\collision.cpp(94): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>c:\c-cpp\draft-game\src\collision.cpp(99): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>c:\c-cpp\draft-game\src\draft.cpp(30): error C2679: binary '=' : no operator found which takes a right-hand operand of type 'initializer-list' (or there is no acceptable conversion)
-                 c:\c-cpp\draft-game\src\draft.h(33): could be 'action_state &action_state::operator =(const action_state &)'
-                 while trying to match the argument list '(action_state, initializer-list)'
-     1>c:\c-cpp\draft-game\src\draft.cpp(31): error C2679: binary '=' : no operator found which takes a right-hand operand of type 'initializer-list' (or there is no acceptable conversion)
-                 c:\c-cpp\draft-game\src\draft.h(33): could be 'action_state &action_state::operator =(const action_state &)'
-                 while trying to match the argument list '(action_state, initializer-list)'
-     1>c:\c-cpp\draft-game\src\draft.cpp(32): error C2679: binary '=' : no operator found which takes a right-hand operand of type 'initializer-list' (or there is no acceptable conversion)
-                 c:\c-cpp\draft-game\src\draft.h(33): could be 'action_state &action_state::operator =(const action_state &)'
-                 while trying to match the argument list '(action_state, initializer-list)'
-     1>c:\c-cpp\draft-game\src\draft.cpp(33): error C2679: binary '=' : no operator found which takes a right-hand operand of type 'initializer-list' (or there is no acceptable conversion)
-                 c:\c-cpp\draft-game\src\draft.h(33): could be 'action_state &action_state::operator =(const action_state &)'
-                 while trying to match the argument list '(action_state, initializer-list)'
-     1>c:\c-cpp\draft-game\src\draft.cpp(34): error C2679: binary '=' : no operator found which takes a right-hand operand of type 'initializer-list' (or there is no acceptable conversion)
-                 c:\c-cpp\draft-game\src\draft.h(33): could be 'action_state &action_state::operator =(const action_state &)'
-                 while trying to match the argument list '(action_state, initializer-list)'
-     1>c:\c-cpp\draft-game\src\draft.cpp(294): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>c:\c-cpp\draft-game\src\draft.cpp(305): warning C4005: 'CameraOffsetY' : macro redefinition
-                 c:\c-cpp\draft-game\src\draft.cpp(37) : see previous definition of 'CameraOffsetY'
-     1>c:\c-cpp\draft-game\src\draft.cpp(306): warning C4005: 'CameraOffsetZ' : macro redefinition
-                 c:\c-cpp\draft-game\src\draft.cpp(38) : see previous definition of 'CameraOffsetZ'
-     1>c:\c-cpp\draft-game\src\draft.cpp(489): warning C4244: 'argument' : conversion from 'int' to 'float', possible loss of data
-     1>c:\c-cpp\draft-game\src\draft.cpp(629): warning C4244: 'argument' : conversion from 'float' to 'Uint32', possible loss of data
+     1>Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\c-cpp\draft-game\Draft\Debug\Draft.exe" /INCREMENTAL /NOLOGO /LIBPATH:"C:\c-cpp\libs\lib\x86" /LIBPATH:"C:\c-cpp\libs\lib\x64" OpenAL32.lib glew32s.lib SDL2.lib opengl32.dll winmm.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\c-cpp\draft-game\Draft\Debug\Draft.pdb" /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\c-cpp\draft-game\Draft\Debug\Draft.lib" /MACHINE:X86 Debug\imgui.obj
+         Debug\imgui_demo.obj
+         Debug\imgui_draw.obj
+         Debug\imgui_impl_sdl_gl3.obj
+         Debug\lodepng.obj
+         Debug\draft.obj
+     1>LINK : fatal error LNK1104: cannot open file 'opengl32.dll'
      1>Done Building Project "C:\c-cpp\draft-game\Draft\Draft\Draft.vcxproj" (Build target(s)) -- FAILED.
 
 Build FAILED.
 
-Time Elapsed 00:00:01.76
+Time Elapsed 00:00:00.52

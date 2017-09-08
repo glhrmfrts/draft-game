@@ -117,8 +117,8 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     InitMeshBuffer(Result->Mesh.Buffer);
     Result->Model.Mesh = &Result->Mesh;
 
-    const int LineCount = TrailCount*2;
-    const int PlaneCount = TrailCount*6;
+    const size_t LineCount = TrailCount*2;
+    const size_t PlaneCount = TrailCount*6;
     const float emission = 0.3f;
 
     // Plane parts

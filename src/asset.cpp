@@ -22,7 +22,22 @@ LoadTextureFile(asset_cache &AssetCache, const string &Filename, bool Mipmap = f
         uint32 Error = lodepng::decode(Data, Result->Width, Result->Height, Filename);
         if (Error) {
             std::cout << "texture: " << Filename << " " << lodepng_error_text(Error) << std::endl;
-            exit(EXIT_FAILURE);
+
+			// generate magenta texture if it's missing
+			Result->Width = 512;
+			Result->Height = 512;
+			Data.resize(Result->Width * Result->Height * 4);
+			for (uint32 y = 0; y < Result->Height; y++)
+			{
+				for (uint32 x = 0; x < Result->Width; x++)
+				{
+					uint32 i = (y * Result->Width + x) * 4;
+					Data[i] = 255;
+					Data[i+1] = 0;
+					Data[i+2] = 255;
+					Data[i+3] = 255;
+				}
+			}
         }
 
         Bind(*Result, 0);

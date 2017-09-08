@@ -29,12 +29,21 @@ enum game_controller_button_id
 {
     Button_Invalid = -1,
 
+#ifdef _WIN32
+	XboxButton_A = 10,
+	XboxButton_B = 11,
+	XboxButton_X = 12,
+	XboxButton_Y = 13,
+	XboxButton_Left = 8,
+	XboxButton_Right = 9,
+#else
     XboxButton_A = 0,
     XboxButton_B = 1,
     XboxButton_X = 2,
     XboxButton_Y = 3,
     XboxButton_Left = 4,
     XboxButton_Right = 5,
+#endif
 };
 struct game_controller
 {
@@ -59,6 +68,13 @@ struct action_state
     float AxisValue = 0;
     game_controller_axis_id AxisID = Axis_Invalid;
     game_controller_button_id ButtonID = Button_Invalid;
+
+	action_state() {}
+	action_state(int p, int n, int pr, float av,
+				 game_controller_axis_id ai = Axis_Invalid,
+				 game_controller_button_id bi = Button_Invalid)
+		: Positive(p), Negative(n), Pressed(pr), AxisValue(av),
+		  AxisID(ai), ButtonID(bi) {}
 };
 
 #define MouseButton_left 0x1
@@ -78,6 +94,8 @@ struct game_input
     mouse_state MouseState;
     action_state Actions[Action_count];
     game_controller Controller;
+
+	game_input() {}
 };
 
 enum game_mode
