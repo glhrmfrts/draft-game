@@ -279,12 +279,6 @@ int main(int argc, char **argv)
             }
             }
         }
-/*
-        if (IsJustPressed(Game, Action_debugUI))
-        {
-            Global_DebugUI = !Global_DebugUI;
-        }
-*/
         Lib.GameRender(&Game, Elapsed);
 
         memcpy(&Game.PrevInput, &Game.Input, sizeof(game_input));

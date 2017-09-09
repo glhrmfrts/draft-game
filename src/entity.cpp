@@ -133,7 +133,7 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 
     const size_t LineCount = TrailCount*2;
     const size_t PlaneCount = TrailCount*6;
-    const float emission = 1.0f;
+    const float emission = 2.0f;
 
     // Plane parts
     AddPart(Result->Mesh, {{Color, 0, 0, NULL}, 0, 6, GL_TRIANGLES});
@@ -184,8 +184,8 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
 
 #define MinExplosionRot 1.0f
 #define MaxExplosionRot 90.0f
-#define MinExplosionVel 2.0f
-#define MaxExplosionVel 10.0f
+#define MinExplosionVel 0.1f
+#define MaxExplosionVel 4.0f
 #define RandomRotation(Series)  RandomBetween(Series, MinExplosionRot, MaxExplosionRot)
 #define RandomVel(Series, Sign) (Sign * RandomBetween(Series, MinExplosionVel, MaxExplosionVel))
 inline static float
@@ -207,10 +207,11 @@ RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color Color, color OutlineColor, vec3 Sign)
+entity *CreateExplosionEntity(game_state &Game, vec3 Position, vec3 Velocity, color Color, color OutlineColor, vec3 Sign)
 {
     auto *Explosion = PushStruct<explosion>(Game.Arena);
 	Explosion->LifeTime = Global_Game_ExplosionLifeTime;
+	Explosion->Color = Color;
     InitMeshBuffer(Explosion->Mesh.Buffer);
 	AddCube(Explosion->Mesh.Buffer, Color_white, true);
 	for (int i = 0; i < ExplosionPieceCount; i++)
@@ -222,7 +223,7 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
 
 	AddPart(Explosion->Mesh,
 			mesh_part{
-				material{ Color_white, 5.0f, 0, NULL, 0 },
+				material{ Color_white, 0.0f, 0, NULL, 0 },
 				0,
 				36,
 				GL_TRIANGLES });
@@ -234,7 +235,7 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
 				GL_TRIANGLES});
     AddPart(Explosion->Mesh,
 			mesh_part{
-				material{OutlineColor, 0.1f, 0, NULL, Material_ForceTransparent | Material_PolygonLines},
+				material{OutlineColor, 2.0f, 0, NULL, Material_ForceTransparent | Material_PolygonLines},
 				36,
 				3 * ExplosionPieceCount,
 				GL_TRIANGLES});
@@ -243,13 +244,13 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
     {
         auto &Piece = Explosion->Pieces[i];
         auto &Series = Game.ExplosionEntropy;
-        Piece.Position = BaseTransform.Position;
+        Piece.Position = Position;
         Piece.Scale = vec3(0.25f);
         for (int i = 0; i < 3; i++)
         {
             Piece.Velocity[i] = RandomExplosionVel(Series, Sign, i);
         }
-        Piece.Velocity += BaseTransform.Velocity;
+        Piece.Velocity += Velocity;
         Piece.Rotation = vec3{
             RandomRotation(Series),
             RandomRotation(Series),
@@ -258,7 +259,7 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
     }
 
     auto *Result = PushStruct<entity>(Game.Arena);
-	Result->Transform.Position = BaseTransform.Position;
+	Result->Transform.Position = Position;
     Result->Explosion = Explosion;
     return Result;
 }
@@ -267,6 +268,7 @@ entity *CreateCrystalEntity(game_state &Game, vec3 Position)
 {
 	auto *Result = PushStruct<entity>(Game.Arena);
 	Result->Transform.Position = Position;
+	Result->Transform.Scale = vec3{0.5f, 0.5f, 0.75f};
 	Result->Type = EntityType_Crystal;
 	Result->Model = CreateModel(Game.Arena, &Game.CrystalMesh);
 	Result->Bounds = PushStruct<collision_bounds>(Game.Arena);

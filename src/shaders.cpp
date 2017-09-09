@@ -3,13 +3,6 @@
 static string ModelVertexShader = R"FOO(
 #version 330
 
-// In this game we use only one forward directional light
-// so these simple defines will do the job
-#define AmbientLight vec4(0.5f)
-#define LightColor vec4(1.0f)
-#define LightIntensity 1.0f
-#define M_PI 3.1415926535897932384626433832795
-
     layout (location = 0) in vec3  a_Position;
     layout (location = 1) in vec2  a_Uv;
     layout (location = 2) in vec4  a_Color;
@@ -19,54 +12,65 @@ static string ModelVertexShader = R"FOO(
     uniform mat4 u_Transform;
     uniform mat4 u_NormalTransform;
 
-    smooth out vec2  v_Uv;
-    smooth out vec4  v_Color;
+    smooth out vec2 v_Uv;
+    smooth out vec4 v_Color;
+    smooth out vec3 v_Normal;
 
     void main() {
       vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
       gl_Position = u_ProjectionView * WorldPos;
 
-      vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
-
-      vec4 Lighting = AmbientLight;
-      Lighting += LightColor * clamp(dot(-vec3(0, 0, -1), Normal), 0, 1) * LightIntensity;
-      Lighting.a = 1.0f;
-
-	  //vec4 Lighting = vec4(1.0);
+      v_Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
       v_Uv = a_Uv;
-      v_Color = a_Color * Lighting;
+      v_Color = a_Color;
     }
 )FOO";
 
 static string ModelFragmentShader = R"FOO(
 #version 330
 
-#define Material_Glow 0x4
+// In this game we use only one forward directional light
+// so these simple defines will do the job
+#define AmbientLight 0.5f
+#define LightColor vec4(1, 1, 1, 1)
+#define LightIntensity 1.0f
+#define M_PI 3.1415926535897932384626433832795
 
     uniform sampler2D u_Sampler;
     uniform vec4 u_DiffuseColor;
     uniform float u_Emission;
     uniform float u_TexWeight;
     uniform int u_MaterialFlags;
+	uniform vec2 u_UvScale;
+	uniform vec4 u_ExplosionLightColor;
+	uniform float u_ExplosionLightTimer;
 
     smooth in vec2  v_Uv;
     smooth in vec4  v_Color;
+	smooth in vec3  v_Normal;
 
     layout (location = 0) out vec4 BlendUnitColor[2];
 
     void main() {
-      vec4 TexColor = texture(u_Sampler, v_Uv);
+      vec4 TexColor = texture(u_Sampler, v_Uv * u_UvScale);
       vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
       Color *= v_Color;
       Color *= u_DiffuseColor;
+		
+	  vec4 Lighting = LightColor * AmbientLight;
+      Lighting += LightColor * clamp(dot(-vec3(0, 0, -1), v_Normal), 0, 1) * LightIntensity;
+      Lighting.a = 1.0f;
+	  Color *= Lighting;
+	  
+	  float Amount = u_ExplosionLightTimer / 1.0f;
+	  Color += u_ExplosionLightColor * Amount;
 
       //float fog = abs(v_worldPos.z - u_camPos.z);
       //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
       //fog = clamp(fog, 0.0, 1.0);
 
       vec4 Emit = (Color * u_Emission);
-
-      BlendUnitColor[0] = Emit + Color;//mix(color, u_fogColor, 1.0 - fog);
+      BlendUnitColor[0] = Color;//mix(color, u_fogColor, 1.0 - fog);
       BlendUnitColor[1] = Emit;
     }
 )FOO";

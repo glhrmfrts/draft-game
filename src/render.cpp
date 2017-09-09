@@ -244,7 +244,13 @@ void ApplyTextureParameters(texture &Texture, int TextureUnit)
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_S, Texture.Wrap.WrapS);
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_T, Texture.Wrap.WrapT);
 
-    if (Texture.Mipmap)
+	if (Texture.Flags & Texture_Anisotropic)
+	{
+		GLfloat fLargest;
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &fLargest);
+		glTexParameterf(Texture.Target, GL_TEXTURE_MAX_ANISOTROPY_EXT, fLargest);
+	}
+    if (Texture.Flags & Texture_Mipmap)
     {
         glGenerateMipmap(Texture.Target);
     }
@@ -517,7 +523,10 @@ CompileModelProgram(model_program &Program)
     Program.DiffuseColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_DiffuseColor");
     Program.TexWeight = glGetUniformLocation(Program.ShaderProgram.ID, "u_TexWeight");
     Program.Emission = glGetUniformLocation(Program.ShaderProgram.ID, "u_Emission");
+	Program.UvScale = glGetUniformLocation(Program.ShaderProgram.ID, "u_UvScale");
     Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
+	Program.ExplosionLightColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightColor");
+	Program.ExplosionLightTimer = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightTimer");
 
     Bind(Program.ShaderProgram);
     SetUniform(Program.Sampler, 0);
@@ -636,8 +645,17 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 #endif
 }
 
-void RenderBegin(render_state &RenderState)
+void RenderBegin(render_state &RenderState, float DeltaTime)
 {
+	if (RenderState.ExplosionLightTimer > 0)
+	{
+		RenderState.ExplosionLightTimer -= DeltaTime;
+	}
+	else
+	{
+		RenderState.ExplosionLightTimer = 0;
+	}
+
     RenderState.LastVAO = -1;
     RenderState.RenderableCount = 0;
     RenderState.FrameSolidRenderables.clear();
@@ -667,7 +685,6 @@ mat4 GetTransformMatrix(transform &t)
     return TransformMatrix;
 }
 
-
 static void
 RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 {
@@ -695,6 +712,9 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
     SetUniform(Program.DiffuseColor, r.Material->DiffuseColor);
     SetUniform(Program.TexWeight, r.Material->TexWeight);
     SetUniform(Program.Emission, r.Material->Emission);
+	SetUniform(Program.UvScale, r.Material->UvScale);
+	SetUniform(Program.ExplosionLightColor, RenderState.ExplosionLightColor);
+	SetUniform(Program.ExplosionLightTimer, RenderState.ExplosionLightTimer);
     glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
     if (r.Material->Flags & Material_PolygonLines)
     {

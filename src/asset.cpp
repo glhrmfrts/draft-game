@@ -1,11 +1,11 @@
 // Copyright
 #include "lodepng.h"
 
-#define DefaultTextureFilter GL_LINEAR
+#define DefaultTextureFilter GL_NEAREST
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
 
 static texture *
-LoadTextureFile(asset_cache &AssetCache, const string &Filename, bool Mipmap = false)
+LoadTextureFile(asset_cache &AssetCache, const string &Filename, uint32 Flags = 0)
 {
     texture *Result;
     if (AssetCache.Textures.find(Filename) == AssetCache.Textures.end())
@@ -15,7 +15,11 @@ LoadTextureFile(asset_cache &AssetCache, const string &Filename, bool Mipmap = f
         Result->Target = GL_TEXTURE_2D;
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Result->Wrap = {DefaultTextureWrap, DefaultTextureWrap};
-        Result->Mipmap = Mipmap;
+		Result->Flags = Flags;
+		if (Flags & Texture_WrapRepeat)
+		{
+			Result->Wrap = {GL_REPEAT, GL_REPEAT};
+		}
         ApplyTextureParameters(*Result, 0);
 
         vector<uint8> Data;
@@ -43,6 +47,13 @@ LoadTextureFile(asset_cache &AssetCache, const string &Filename, bool Mipmap = f
         Bind(*Result, 0);
         UploadTexture(*Result, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, &Data[0]);
         Unbind(*Result, 0);
+
+		if (Flags & Texture_Mipmap)
+		{
+			Result->Filters.Min = GL_LINEAR_MIPMAP_LINEAR;
+			Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
+			ApplyTextureParameters(*Result, 0);
+		}
 
         AssetCache.Textures[Filename] = Result;
     }

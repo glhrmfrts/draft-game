@@ -23,11 +23,12 @@ struct ship
 
 struct trail;
 
-#define ExplosionPieceCount 16
+#define ExplosionPieceCount 24
 struct explosion
 {
+	mesh Mesh;
+	color Color;
 	float LifeTime;
-    mesh Mesh;
     transform Pieces[ExplosionPieceCount];
 };
 

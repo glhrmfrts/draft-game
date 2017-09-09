@@ -61,6 +61,8 @@ AddEntity(game_state &Game, entity *Entity)
     }
     if (Entity->Explosion)
     {
+		Game.RenderState.ExplosionLightColor = Entity->Explosion->Color;
+		Game.RenderState.ExplosionLightTimer = Global_Game_ExplosionLightTime;
         AddEntityToList(Game.ExplosionEntities, Entity);
     }
     if (Entity->Ship && !(Entity->Flags & Entity_IsPlayer))
@@ -115,12 +117,12 @@ RemoveEntity(game_state &Game, entity *Entity)
     }
 }
 
-#define TrackSegmentLength  20
-#define TrackSegmentWidth   5
-#define TrackLaneWidth      2.5f
-#define TrackSegmentCount   20
-#define TrackSegmentPadding 0.5f
+#define TrackSegmentLength  32
+#define TrackSegmentWidth   32
+#define TrackSegmentCount   8
+#define TrackSegmentPadding 0
 #define SkyboxScale         vec3(500.0f)
+#define CrystalColor        IntColor(FirstPalette.Colors[1])
 static void
 StartLevel(game_state &Game)
 {
@@ -130,23 +132,18 @@ StartLevel(game_state &Game)
         auto &FloorMesh = Game.FloorMesh;
         InitMeshBuffer(FloorMesh.Buffer);
 
-        material FloorMaterial = {IntColor(FirstPalette.Colors[0], 1), 0, 1, LoadTextureFile(Game.AssetCache, "data/textures/checker.png")};
+		material FloorMaterial = {
+			IntColor(FirstPalette.Colors[3], 0.5f),
+			0.1f,
+			1,
+			LoadTextureFile(Game.AssetCache, "data/textures/checker.png", Texture_Mipmap | Texture_Anisotropic), 0 };
         material LaneMaterial = {Color_white, 0.1f, 0, NULL};
 
-        float w = TrackSegmentWidth * TrackLaneWidth;
+		float w = TrackSegmentWidth;
         float l = -w/2;
         float r = w/2;
         AddQuad(FloorMesh.Buffer, vec3(l, 0, 0), vec3(r, 0, 0), vec3(r, 1, 0), vec3(l, 1, 0), Color_white, vec3(1, 1, 1));
         AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES});
-
-        size_t LineVertexCount = 0;
-        for (int i = 1; i < TrackSegmentWidth; i++)
-        {
-            AddLine(FloorMesh.Buffer, vec3(l+i*TrackLaneWidth, 0, 0), vec3(l+i*TrackLaneWidth, 1, 0), Color_white, vec3(1.0f));
-            LineVertexCount += 2;
-        }
-        //AddPart(FloorMesh, {LaneMaterial, 6, LineVertexCount, GL_LINES});
-
         EndMesh(FloorMesh, GL_STATIC_DRAW);
     }
 
@@ -207,7 +204,7 @@ StartLevel(game_state &Game)
 		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
 		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
 
-		AddPart(CrystalMesh, mesh_part{ material{ IntColor(FirstPalette.Colors[1]), 2.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
+		AddPart(CrystalMesh, mesh_part{ material{ CrystalColor, 1.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
 		EndMesh(CrystalMesh, GL_STATIC_DRAW);
 	}
 
@@ -239,7 +236,7 @@ StartLevel(game_state &Game)
 
 	for (int i = 0; i < 5; i++)
 	{
-		auto *Entity = CreateCrystalEntity(Game, vec3{i, 5, 1});
+		auto *Entity = CreateCrystalEntity(Game, vec3{i*2, 5, 0.5f});
 		AddEntity(Game, Entity);
 	}
 }
@@ -266,27 +263,51 @@ CameraDir(camera &Camera)
 static bool
 HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime)
 {
-	ship *Ship = NULL;
+	entity *ShipEntity = NULL;
 	if (First->Ship)
 	{
-		Ship = First->Ship;
+		ShipEntity = First;
 	}
 	else if (Second->Ship)
 	{
-		Ship = Second->Ship;
+		ShipEntity = Second;
 	}
 
     if (First->Type == EntityType_TrailPiece || Second->Type == EntityType_TrailPiece)
     {
-        if (Ship && Ship->NumTrailCollisions == 0)
-        {
-            Ship->CurrentDraftTime += DeltaTime;
-            Ship->NumTrailCollisions++;
-        }
+		if (ShipEntity)
+		{
+			auto *Ship = ShipEntity->Ship;
+			if (Ship && Ship->NumTrailCollisions == 0)
+			{
+				Ship->CurrentDraftTime += DeltaTime;
+				Ship->NumTrailCollisions++;
+			}
+		}
         return false;
     }
 	if (First->Type == EntityType_Crystal || Second->Type == EntityType_Crystal)
 	{
+		entity *CrystalEntity;
+		if (First->Type == EntityType_Crystal)
+		{
+			CrystalEntity = First;
+		}
+		else
+		{
+			CrystalEntity = Second;
+		}
+
+		auto *Explosion = CreateExplosionEntity(
+			Game,
+			CrystalEntity->Transform.Position,
+			CrystalEntity->Transform.Velocity,
+			CrystalColor,
+			CrystalColor,
+			vec3{ 0, 1, 1 }
+		);
+		AddEntity(Game, Explosion);
+		RemoveEntity(Game, CrystalEntity);
 		return false;
 	}
     if (First->Type == EntityType_Ship && Second->Type == EntityType_Ship)
@@ -295,17 +316,21 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
         if (std::abs(rv.y) > 20.0f)
         {
             entity *EntityToExplode = NULL;
+			entity *OtherEntity = NULL;
             if (rv.y < 0.0f)
             {
                 EntityToExplode = First;
+				OtherEntity = Second;
             }
-            if (rv.y > 0.0f)
+			else
             {
                 EntityToExplode = Second;
+				OtherEntity = First;
             }
 
             auto *Explosion = CreateExplosionEntity(Game,
-                                                    EntityToExplode->Transform,
+                                                    EntityToExplode->Transform.Position,
+													OtherEntity->Transform.Velocity,
                                                     EntityToExplode->Ship->Color,
                                                     EntityToExplode->Ship->OutlineColor,
                                                     vec3{0,1,1});
@@ -378,6 +403,23 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 			Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
 			i++;
 		}
+
+		for (int i = 0; i < 5; i++)
+		{
+			auto *Entity = CreateCrystalEntity(Game, vec3{ i * 2, 5, 0.5f });
+			AddEntity(Game, Entity);
+		}
+	}
+
+	if (Game.Input.Keys[SDL_SCANCODE_E])
+	{
+		auto *Explosion = CreateExplosionEntity(Game,
+												Game.PlayerEntity->Transform.Position,
+												Game.PlayerEntity->Transform.Velocity,
+												Game.PlayerEntity->Ship->Color,
+												Game.PlayerEntity->Ship->OutlineColor,
+												vec3{ 0, 1, 1 });
+		AddEntity(Game, Explosion);
 	}
 #endif
 
@@ -435,7 +477,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
 
     UpdateProjectionView(Game.Camera);
-    RenderBegin(Game.RenderState);
+    RenderBegin(Game.RenderState, DeltaTime);
 
     static float EnemyMoveH = 0.0f;
 	//EnemyMoveH += DeltaTime;
@@ -494,8 +536,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             }
 
             const float r = 0.5f;
-            const float min2 =  0.4f * ((TrailCount - i) / (float)TrailCount);
-            const float min1 =  0.4f * ((TrailCount - i+1) / (float)TrailCount);
+            float min2 =  0.4f * ((TrailCount - i) / (float)TrailCount);
+            float min1 =  0.4f * ((TrailCount - i+1) / (float)TrailCount);
             vec3 p1 = c2 - vec3(r - min2, 0, 0);
             vec3 p2 = c2 + vec3(r - min2, 0, 0);
             vec3 p3 = c1 - vec3(r - min1, 0, 0);
@@ -542,9 +584,10 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 		float Alpha = Explosion->LifeTime / Global_Game_ExplosionLifeTime;
         ResetBuffer(Explosion->Mesh.Buffer, 36);
         for (int i = 0; i < ExplosionPieceCount; i++)
-        {
+        { 
             auto &Piece = Explosion->Pieces[i];
             Piece.Position += Piece.Velocity * DeltaTime;
+			Piece.Rotation += Piece.Velocity;
             mat4 Transform = GetTransformMatrix(Piece);
             vec3 p1 = vec3(Transform * vec4(-1.0f, 0.0f, -1.0f, 1.0f));
             vec3 p2 = vec3(Transform * vec4(1.0f, 0.0f, -1.0f, 1.0f));
@@ -557,7 +600,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 		Entity->Transform.Scale = vec3(4.0f) * Scale;
 		if (Scale < 1.0f)
 		{
-			PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[0], Entity->Transform);
+			//PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[0], Entity->Transform);
 		}
 		PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
 		PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[2], transform{});

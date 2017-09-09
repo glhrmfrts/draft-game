@@ -1,11 +1,13 @@
 Current TODOs:
 
 - (Game) Add crystals to the game (crystals should be pink)
-- (Audio) Implement audio system and ship engine sounds
 - (Game) Add obstacles to the game (think of a color to them)
-- (Game) Improve ship explosions visuals
 - (Game) Assign different roles for ships with different colors (blue is normal, red kills you, green does something)
 - (Game) Work on the camera movement to be more dynamic
+- (Audio) Implement audio system and ship engine sounds
 - (Renderer) Fix bloom artifacts
 - (Renderer) Fix order of rendering (sort by distance)
 - (Renderer) Frustum culling
+- (Audio) Add some soundtrack! (trance/dnb sounds awesome)
+
+- OK (Game) Make the ambient light affected by an explosion

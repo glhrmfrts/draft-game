@@ -13,6 +13,7 @@ static float Global_Game_BoostVelocity = 75.0f;
 static float Global_Game_TrailRecordTimer = 0.075f;
 static float Global_Game_DraftChargeTime = 1.0f;
 static float Global_Game_ExplosionLifeTime = 2.0f;
+static float Global_Game_ExplosionLightTime = 1.0f;
 
 static bool  Global_Renderer_DoPostFX = true;
 static bool  Global_Renderer_BloomEnabled = true;

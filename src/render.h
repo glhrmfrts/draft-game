@@ -59,6 +59,9 @@ struct texture_wrap
     GLint WrapS, WrapT;
 };
 
+#define Texture_Mipmap 0x1
+#define Texture_Anisotropic 0x2
+#define Texture_WrapRepeat 0x4
 struct texture
 {
     string Filename;
@@ -68,7 +71,7 @@ struct texture
     uint32 Height;
     texture_filters Filters;
     texture_wrap Wrap;
-    bool Mipmap = false;
+	uint32 Flags = 0;
 };
 
 struct texture_rect
@@ -147,10 +150,11 @@ struct material
     float TexWeight = 0;
     texture *Texture = NULL;
     uint32 Flags = 0;
+	vec2 UvScale = vec2{ 1, 1 };
 
     material() {}
-    material(color c, float e, float tw, texture *t, uint32 f = 0)
-        : DiffuseColor(c), Emission(e), TexWeight(tw), Texture(t), Flags(f) {}
+	material(color c, float e, float tw, texture *t, uint32 f = 0, vec2 us = vec2{ 1, 1 })
+        : DiffuseColor(c), Emission(e), TexWeight(tw), Texture(t), Flags(f), UvScale(us) {}
 };
 
 struct mesh_part
@@ -182,8 +186,11 @@ struct model_program
     int DiffuseColor;
     int TexWeight;
     int Emission;
+	int UvScale;
     int Sampler;
     int MaterialFlags;
+	int ExplosionLightColor;
+	int ExplosionLightTimer;
 };
 
 struct blur_program
@@ -267,6 +274,9 @@ struct render_state
 
     GLint MaxMultiSampleCount;
     GLint LastVAO;
+
+	color ExplosionLightColor;
+	float ExplosionLightTimer;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;
