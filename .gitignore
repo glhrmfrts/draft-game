@@ -3,6 +3,6 @@ build/draft
 *.exe
 Debug
 x64
-*.sdf
-*.opensdf
+**/*.sdf
+**/*.opensdf
 imgui.ini
