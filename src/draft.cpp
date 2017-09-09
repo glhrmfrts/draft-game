@@ -207,7 +207,7 @@ StartLevel(game_state &Game)
 		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
 		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
 
-		AddPart(CrystalMesh, mesh_part{ material{ IntColor(FirstPalette.Colors[1]), 1.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
+		AddPart(CrystalMesh, mesh_part{ material{ IntColor(FirstPalette.Colors[1]), 2.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
 		EndMesh(CrystalMesh, GL_STATIC_DRAW);
 	}
 

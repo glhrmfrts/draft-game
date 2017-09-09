@@ -105,6 +105,8 @@ static string BlurHorizontalFragmentShader = R"FOO(
 uniform sampler2D u_sampler;
 uniform float u_pixelSize;
 
+smooth in vec2 v_uv;
+
 out vec4 BlendUnitColor;
 
 void main()
@@ -129,6 +131,8 @@ static string BlurVerticalFragmentShader = R"FOO(
 
 uniform sampler2D u_sampler;
 uniform float u_pixelSize;
+
+smooth in vec2 v_uv;
 
 out vec4 BlendUnitColor;
 

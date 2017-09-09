@@ -189,8 +189,7 @@ struct model_program
 struct blur_program
 {
     shader_program ShaderProgram;
-    int Orientation;
-    int Offset;
+	int PixelSize;
 };
 
 struct resolve_multisample_program
@@ -243,7 +242,8 @@ struct renderable
 struct render_state
 {
     model_program ModelProgram;
-    blur_program BlurProgram;
+    blur_program BlurHorizontalProgram;
+	blur_program BlurVerticalProgram;
     shader_program BlendProgram;
     shader_program BlitProgram;
     resolve_multisample_program ResolveMultisampleProgram;

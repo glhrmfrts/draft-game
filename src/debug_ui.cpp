@@ -34,6 +34,7 @@ void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
 
         if (ImGui::TreeNode("Bloom"))
         {
+			ImGui::Checkbox("Enabled", &Global_Renderer_BloomEnabled);
             ImGui::SliderFloat("Blur Offset", &Global_Renderer_BloomBlurOffset, 0.0f, 10.0f, "%.2f");
             ImGui::TreePop();
         }

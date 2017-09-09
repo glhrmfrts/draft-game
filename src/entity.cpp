@@ -133,7 +133,7 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 
     const size_t LineCount = TrailCount*2;
     const size_t PlaneCount = TrailCount*6;
-    const float emission = 0.3f;
+    const float emission = 1.0f;
 
     // Plane parts
     AddPart(Result->Mesh, {{Color, 0, 0, NULL}, 0, 6, GL_TRIANGLES});
@@ -163,8 +163,8 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     auto *Entity = PushStruct<entity>(Game.Arena);
     Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 0.5f), 0, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 0.1f, 0, NULL, Material_PolygonLines));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, Material_PolygonLines));
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
     Entity->Bounds = PushStruct<collision_bounds>(Game.Arena);
@@ -222,7 +222,7 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
 
 	AddPart(Explosion->Mesh,
 			mesh_part{
-				material{ Color_white, 0.0f, 0, NULL, 0 },
+				material{ Color_white, 5.0f, 0, NULL, 0 },
 				0,
 				36,
 				GL_TRIANGLES });

@@ -525,18 +525,13 @@ CompileModelProgram(model_program &Program)
 }
 
 static void
-CompileBlurProgram(blur_program &Program)
+CompileBlurProgram(blur_program &Program, string &FragmentShader)
 {
-    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), BlurFragmentShader.c_str());
-    Program.Orientation = glGetUniformLocation(Program.ShaderProgram.ID, "u_orientation");
-    Program.Offset = glGetUniformLocation(Program.ShaderProgram.ID, "u_offset");
+    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), FragmentShader.c_str());
+    Program.PixelSize = glGetUniformLocation(Program.ShaderProgram.ID, "u_pixelSize");
 
     Bind(Program.ShaderProgram);
-
-    vec3 Kernel = {5, 6, 5};
-    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_coefficients"), glm::normalize(Kernel));
     SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_sampler"), 0);
-
     UnbindShaderProgram();
 }
 
@@ -606,7 +601,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     RenderState.Height = Height;
 
     CompileModelProgram(RenderState.ModelProgram);
-    CompileBlurProgram(RenderState.BlurProgram);
+    CompileBlurProgram(RenderState.BlurHorizontalProgram, BlurHorizontalFragmentShader);
+	CompileBlurProgram(RenderState.BlurVerticalProgram, BlurVerticalFragmentShader);
     CompileBlendProgram(RenderState.BlendProgram);
     CompileBlitProgram(RenderState.BlitProgram);
     CompileResolveMultisampleProgram(RenderState.ResolveMultisampleProgram);
@@ -624,15 +620,15 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
 
     InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, Framebuffer_HasDepth | Framebuffer_Multisampled, ColorTexture_Count);
-    InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
+	InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
         // @TODO: maybe it is not necessary to scale down
         size_t BlurWidth = Width >> i;
         size_t BlurHeight = Height >> i;
 
-        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
-        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
+		InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
+		InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
     }
 
 #ifdef DRAFT_DEBUG
@@ -716,20 +712,28 @@ enum blur_orientation
     Blur_Vertical,
 };
 static framebuffer *
-RenderBlur(render_state &RenderState, blur_program &Program, blur_orientation Orientation)
+RenderBlur(render_state &RenderState, blur_program *Program)
 {
+	Bind(Program->ShaderProgram);
     framebuffer *Sources = RenderState.BlurHorizontalFramebuffers;
     framebuffer *Dests = RenderState.BlurVerticalFramebuffers;
-    if (Orientation == Blur_Vertical)
+    if (Program == &RenderState.BlurVerticalProgram)
     {
         auto Tmp = Sources;
         Sources = Dests;
         Dests = Tmp;
     }
-    SetUniform(Program.Orientation, int(Orientation));
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
-        SetUniform(Program.Offset, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
+		if (Program == &RenderState.BlurVerticalProgram)
+		{
+			SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Height));
+		}
+		else
+		{
+			SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
+		}
+        
         BindFramebuffer(Dests[i]);
 
         glClear(GL_COLOR_BUFFER_BIT);
@@ -739,6 +743,7 @@ RenderBlur(render_state &RenderState, blur_program &Program, blur_orientation Or
 
         UnbindFramebuffer(RenderState);
     }
+	UnbindShaderProgram();
     return Dests;
 }
 
@@ -791,41 +796,48 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         glBindVertexArray(RenderState.ScreenBuffer.VAO);
 
         // resolve multisample
-        BindFramebuffer(RenderState.SceneFramebuffer);
-        Bind(RenderState.ResolveMultisampleProgram.ShaderProgram);
-        SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
-        for (size_t i = 0; i < ColorTexture_Count; i++)
-        {
-            Bind(RenderState.MultisampledSceneFramebuffer.ColorTextures[i], i);
-        }
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        UnbindFramebuffer(RenderState);
+		if (Global_Renderer_BloomEnabled)
+		{
+			BindFramebuffer(RenderState.SceneFramebuffer);
+		}
 
-        // downsample scene for blur
-        Bind(RenderState.BlitProgram);
-        Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit], 0);
-        for (int i = 0; i < BloomBlurPassCount; i++)
-        {
-            BindFramebuffer(RenderState.BlurHorizontalFramebuffers[i]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
-        UnbindFramebuffer(RenderState);
-        UnbindShaderProgram();
+		Bind(RenderState.ResolveMultisampleProgram.ShaderProgram);
+		SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
+		for (size_t i = 0; i < ColorTexture_Count; i++)
+		{
+			Bind(RenderState.MultisampledSceneFramebuffer.ColorTextures[i], i);
+		}
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // perform blur
-        Bind(RenderState.BlurProgram.ShaderProgram);
-        RenderBlur(RenderState, RenderState.BlurProgram, Blur_Horizontal);
-        framebuffer *BlurOutput = RenderBlur(RenderState, RenderState.BlurProgram, Blur_Vertical);
+		if (Global_Renderer_BloomEnabled)
+		{
+			UnbindFramebuffer(RenderState);
 
-        // blend scene with blur results
-        Bind(RenderState.BlendProgram);
-        for (int i = 0; i < BloomBlurPassCount; i++)
-        {
-            Bind(BlurOutput[i].ColorTextures[0], i);
-        }
-        Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        UnbindShaderProgram();
+			// downsample scene for blur
+			Bind(RenderState.BlitProgram);
+			Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit], 0);
+			for (int i = 0; i < BloomBlurPassCount; i++)
+			{
+				BindFramebuffer(RenderState.BlurHorizontalFramebuffers[i]);
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+			}
+			UnbindFramebuffer(RenderState);
+			UnbindShaderProgram();
+
+			// perform blur
+			RenderBlur(RenderState, &RenderState.BlurHorizontalProgram);
+			framebuffer *BlurOutput = RenderBlur(RenderState, &RenderState.BlurVerticalProgram);
+
+			// blend scene with blur results
+			Bind(RenderState.BlendProgram);
+			for (int i = 0; i < BloomBlurPassCount; i++)
+			{
+				Bind(BlurOutput[i].ColorTextures[0], i);
+			}
+			Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			UnbindShaderProgram();
+		}
     }
     // @TODO: cleanup textures
 }
