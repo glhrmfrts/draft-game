@@ -12,11 +12,6 @@ struct collision_bounds
     bounding_box Box;
 };
 
-struct track_segment
-{
-    int NothingForNow;
-};
-
 struct ship
 {
     color Color;
@@ -42,6 +37,8 @@ enum entity_type
 {
     EntityType_Ship,
     EntityType_TrailPiece,
+	EntityType_Crystal,
+	EntityType_TrackSegment,
 };
 struct entity
 {
@@ -53,7 +50,6 @@ struct entity
     explosion *Explosion = NULL;
     ship *Ship = NULL;
     trail *Trail = NULL;
-    track_segment *TrackSegment = NULL;
     collision_bounds *Bounds = NULL;
     model *Model = NULL;
 };

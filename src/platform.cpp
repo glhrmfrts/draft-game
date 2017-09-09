@@ -110,12 +110,16 @@ int main(int argc, char **argv)
     SDL_GL_SetSwapInterval(0);
 
     ALCdevice *AudioDevice = alcOpenDevice(NULL);
-    if (!AudioDevice)
-        std::cerr << "Error opening audio device" << std::endl;
+	if (!AudioDevice)
+	{
+		std::cerr << "Error opening audio device" << std::endl;
+	}
 
     ALCcontext *AudioContext = alcCreateContext(AudioDevice, NULL);
-    if (!alcMakeContextCurrent(AudioContext))
-        std::cerr << "Error setting audio context" << std::endl;
+	if (!alcMakeContextCurrent(AudioContext))
+	{
+		std::cerr << "Error setting audio context" << std::endl;
+	}
 
 	glewExperimental = GL_TRUE;
 	if (glewInit() != GLEW_OK)
@@ -131,7 +135,6 @@ int main(int argc, char **argv)
     Game.Window = Window;
     Game.Width = Width;
     Game.Height = Height;
-    Game.ExplosionEntropy = RandomSeed(1234);
 
     auto &Input = Game.Input;
     if (SDL_NumJoysticks() > 0)
@@ -199,7 +202,7 @@ int main(int argc, char **argv)
                     Action.Pressed = 0;
                 }
             }
-            const uint8 *Keys = SDL_GetKeyboardState(NULL);
+            const uint8 *Keys = SDL_GetKeyboardState(&Input.KeyCount);
             uint8 Positive = Keys[Action.Positive];
             uint8 Negative = Keys[Action.Negative];
             Action.Pressed += Positive + Negative;
@@ -211,6 +214,8 @@ int main(int argc, char **argv)
             {
                 Action.AxisValue = -1;
             }
+
+			Input.Keys = Keys;
         }
 
         SDL_Event Event;

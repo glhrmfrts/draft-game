@@ -47,7 +47,7 @@ AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ShapedEntities, Entity);
     }
-    if (Entity->TrackSegment)
+    if (Entity->Type == EntityType_TrackSegment)
     {
         AddEntityToList(Game.TrackEntities, Entity);
     }
@@ -93,7 +93,7 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.ShapedEntities, Entity);
     }
-    if (Entity->TrackSegment)
+    if (Entity->Type == EntityType_TrackSegment)
     {
         RemoveEntityFromList(Game.TrackEntities, Entity);
     }
@@ -136,7 +136,7 @@ StartLevel(game_state &Game)
         float w = TrackSegmentWidth * TrackLaneWidth;
         float l = -w/2;
         float r = w/2;
-        AddQuad(FloorMesh.Buffer, vec3(l, 0, 0), vec3(r, 0, 0), vec3(r, 1, 0), vec3(l, 1, 0), Color_white, vec3(0, 0, 1));
+        AddQuad(FloorMesh.Buffer, vec3(l, 0, 0), vec3(r, 0, 0), vec3(r, 1, 0), vec3(l, 1, 0), Color_white, vec3(1, 1, 1));
         AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES});
 
         size_t LineVertexCount = 0;
@@ -193,6 +193,24 @@ StartLevel(game_state &Game)
         Game.SkyboxEntity = Entity;
     }
 
+	{
+		auto &CrystalMesh = Game.CrystalMesh;
+		InitMeshBuffer(CrystalMesh.Buffer);
+
+		AddTriangle(CrystalMesh.Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ 1, -1, 0 }, vec3{ 1, 1, 0 }, vec3{ 0, 0, 1 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ 1, 1, 0 }, vec3{ -1, 1, 0 }, vec3{ 0, 0, 1 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ -1, 1, 0 }, vec3{ -1, -1, 0 }, vec3{ 0, 0, 1 });
+
+		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ 1, -1, 0 }, vec3{ -1, -1, 0 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ 1, 1, 0 }, vec3{ 1, -1, 0 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
+		AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
+
+		AddPart(CrystalMesh, mesh_part{ material{ IntColor(FirstPalette.Colors[1]), 1.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
+		EndMesh(CrystalMesh, GL_STATIC_DRAW);
+	}
+
     MakeCameraPerspective(Game.Camera, (float)Game.Width, (float)Game.Height, 70.0f, 0.1f, 1000.0f);
     Game.Camera.Position = vec3(2, 0, 0);
     Game.Camera.LookAt = vec3(0, 0, 0);
@@ -212,12 +230,18 @@ StartLevel(game_state &Game)
     for (int i = 0; i < TrackSegmentCount; i++)
     {
         auto *Entity = PushStruct<entity>(Game.Arena);
-        Entity->TrackSegment = PushStruct<track_segment>(Game.Arena);
+		Entity->Type = EntityType_TrackSegment;
         Entity->Transform.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
         Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
         Entity->Model = CreateModel(Game.Arena, &Game.FloorMesh);
         AddEntity(Game, Entity);
     }
+
+	for (int i = 0; i < 5; i++)
+	{
+		auto *Entity = CreateCrystalEntity(Game, vec3{i, 5, 1});
+		AddEntity(Game, Entity);
+	}
 }
 
 inline static float
@@ -242,18 +266,18 @@ CameraDir(camera &Camera)
 static bool
 HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime)
 {
+	ship *Ship = NULL;
+	if (First->Ship)
+	{
+		Ship = First->Ship;
+	}
+	else if (Second->Ship)
+	{
+		Ship = Second->Ship;
+	}
+
     if (First->Type == EntityType_TrailPiece || Second->Type == EntityType_TrailPiece)
     {
-        ship *Ship = NULL;
-        if (First->Ship)
-        {
-            Ship = First->Ship;
-        }
-        else if (Second->Ship)
-        {
-            Ship = Second->Ship;
-        }
-
         if (Ship && Ship->NumTrailCollisions == 0)
         {
             Ship->CurrentDraftTime += DeltaTime;
@@ -261,6 +285,10 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
         }
         return false;
     }
+	if (First->Type == EntityType_Crystal || Second->Type == EntityType_Crystal)
+	{
+		return false;
+	}
     if (First->Type == EntityType_Ship && Second->Type == EntityType_Ship)
     {
         vec3 rv = First->Transform.Velocity - Second->Transform.Velocity;
@@ -327,6 +355,29 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 	if (IsJustPressed(Game, Action_debugUI))
 	{
 		Global_DebugUI = !Global_DebugUI;
+	}
+
+	if (Game.Input.Keys[SDL_SCANCODE_R])
+	{
+		Game.PlayerEntity->Transform.Position = vec3{ 0.0f };
+		Game.PlayerEntity->Transform.Velocity = vec3{ 0.0f };
+		int i = 0;
+		for (auto *Entity : Game.ShipEntities)
+		{
+			if (!Entity) continue;
+
+			Entity->Transform.Position = vec3{i+1, 0, 0};
+			Entity->Transform.Velocity = vec3{ 0.0f };
+			i++;
+		}
+
+		i = 0;
+		for (auto *Entity : Game.TrackEntities)
+		{
+			Entity->Transform.Position = vec3(0, i*TrackSegmentLength + TrackSegmentPadding*i, -0.25f);
+			Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
+			i++;
+		}
 	}
 #endif
 
@@ -574,6 +625,8 @@ extern "C"
 		int Height = Game->Height;
 		ImGui_ImplSdlGL3_Init(Game->Window);
 
+		Game->ExplosionEntropy = RandomSeed(1234);
+
 		RegisterInputActions(Game->Input);
 		InitGUI(Game->GUI, Game->Input);
 		MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
@@ -581,6 +634,7 @@ extern "C"
 		StartLevel(*Game);
 	}
 
+	// @TODO: this exists only for imgui, remove for release version
 	__declspec(dllexport) GAME_PROCESS_EVENT(GameProcessEvent)
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(Event);

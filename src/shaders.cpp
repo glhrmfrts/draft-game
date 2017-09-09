@@ -7,7 +7,7 @@ static string ModelVertexShader = R"FOO(
 // so these simple defines will do the job
 #define AmbientLight vec4(0.5f)
 #define LightColor vec4(1.0f)
-#define LightIntensity 1
+#define LightIntensity 1.0f
 #define M_PI 3.1415926535897932384626433832795
 
     layout (location = 0) in vec3  a_Position;
@@ -29,11 +29,12 @@ static string ModelVertexShader = R"FOO(
       vec3 Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
 
       vec4 Lighting = AmbientLight;
-      Lighting += LightColor * dot(-vec3(0, 0, -1), Normal) * LightIntensity;
+      Lighting += LightColor * clamp(dot(-vec3(0, 0, -1), Normal), 0, 1) * LightIntensity;
       Lighting.a = 1.0f;
 
+	  //vec4 Lighting = vec4(1.0);
       v_Uv = a_Uv;
-      v_Color = a_Color * clamp(Lighting, 0, 1);
+      v_Color = a_Color * Lighting;
     }
 )FOO";
 
@@ -95,6 +96,56 @@ out vec4 BlendUnitColor;
 
 void main() {
     BlendUnitColor = texture2D(u_Sampler, v_uv);
+}
+)FOO";
+
+static string BlurHorizontalFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2D u_sampler;
+uniform float u_pixelSize;
+
+out vec4 BlendUnitColor;
+
+void main()
+{
+	vec4 sum = texture2D(u_sampler,v_uv+u_pixelSize*vec2(-5,0))*0.01222447;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(-4,0))*0.02783468;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(-3,0))*0.06559061;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(-2,0))*0.12097757;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(-1,0))*0.17466632;
+	sum += texture2D(u_sampler,v_uv)*0.19741265;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(1,0))*0.17466632;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(2,0))*0.12097757;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(3,0))*0.06559061;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(4,0))*0.02783468;
+	sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(5,0))*0.01222447;
+	BlendUnitColor = sum;
+}
+)FOO";
+
+static string BlurVerticalFragmentShader = R"FOO(
+#version 330
+
+uniform sampler2D u_sampler;
+uniform float u_pixelSize;
+
+out vec4 BlendUnitColor;
+
+void main()
+{
+  vec4 sum = texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,-5))*0.01222447;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,-4))*0.02783468;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,-3))*0.06559061;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,-2))*0.12097757;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,-1))*0.17466632;
+  sum += texture2D(u_sampler,v_uv)*0.19741265;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,1))*0.17466632;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,2))*0.12097757;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,3))*0.06559061;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,4))*0.02783468;
+  sum += texture2D(u_sampler,v_uv+u_pixelSize*vec2(0,5))*0.01222447;
+  BlendUnitColor = sum;
 }
 )FOO";
 

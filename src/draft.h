@@ -13,7 +13,7 @@
 #include "gui.h"
 #include "entity.h"
 #include "random.h"
-
+ 
 #define GAME_INIT(name) void name(game_state *Game)
 #define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
 #define GAME_DESTROY(name) void name(game_state *Game)
@@ -110,6 +110,9 @@ struct game_input
     action_state Actions[Action_count];
     game_controller Controller;
 
+	const uint8 *Keys;
+	int KeyCount;
+
 	game_input() {}
 };
 
@@ -132,6 +135,7 @@ struct game_state
     mesh FloorMesh;
     mesh ShipMesh;
     mesh SkyboxMesh;
+	mesh CrystalMesh;
     vec3 Gravity;
 
     std::list<entity *> ModelEntities;

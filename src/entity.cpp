@@ -263,6 +263,16 @@ entity *CreateExplosionEntity(game_state &Game, transform &BaseTransform, color 
     return Result;
 }
 
+entity *CreateCrystalEntity(game_state &Game, vec3 Position)
+{
+	auto *Result = PushStruct<entity>(Game.Arena);
+	Result->Transform.Position = Position;
+	Result->Type = EntityType_Crystal;
+	Result->Model = CreateModel(Game.Arena, &Game.CrystalMesh);
+	Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
+	return Result;
+}
+
 static float
 Interp(float c, float t, float a, float dt)
 {

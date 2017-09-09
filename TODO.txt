@@ -1,7 +1,7 @@
 Current TODOs:
 
-- (Audio) Implement audio system and ship engine sounds
 - (Game) Add crystals to the game (crystals should be pink)
+- (Audio) Implement audio system and ship engine sounds
 - (Game) Add obstacles to the game (think of a color to them)
 - (Game) Improve ship explosions visuals
 - (Game) Assign different roles for ships with different colors (blue is normal, red kills you, green does something)
