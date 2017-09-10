@@ -38,7 +38,7 @@ ApplyCorrection(entity *Entity, vec3 Correction)
 }
 
 #define ClimbHeight 0.26f
-void DetectCollisions(const std::list<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions)
+void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions)
 {
     // The entities' bounding boxes only get updated in the integration
     // phase, which happens after the collision detection so we need
@@ -120,10 +120,10 @@ void DetectCollisions(const std::list<entity *> Entities, vector<collision> &Col
             Col.Second = EntityB;
             Collisions[NumCollisions++] = Col;
         }
-    }
+    } 
 }
 
-void Integrate(const std::list<entity *> Entities, vec3 Gravity, float DeltaTime)
+void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
 {
     size_t EntityCount = Entities.size();
     for (auto *Entity : Entities)

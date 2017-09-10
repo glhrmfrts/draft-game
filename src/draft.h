@@ -13,6 +13,7 @@
 #include "gui.h"
 #include "entity.h"
 #include "random.h"
+#include "level.h"
  
 #define GAME_INIT(name) void name(game_state *Game)
 #define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
@@ -62,7 +63,7 @@ enum game_controller_button_id
 };
 struct game_controller
 {
-    SDL_Joystick *Joystick;
+    SDL_Joystick *Joystick = NULL;
 };
 
 enum action_type
@@ -138,16 +139,16 @@ struct game_state
 	mesh CrystalMesh;
     vec3 Gravity;
 
-    std::list<entity *> ModelEntities;
-    std::list<entity *> ShapedEntities;
-    std::list<entity *> TrackEntities;
-    std::list<entity *> TrailEntities;
-    std::list<entity *> ExplosionEntities;
-    std::list<entity *> ShipEntities;
-    std::vector<collision> CollisionCache;
+    vector<entity *> ModelEntities;
+	vector<entity *> ShapedEntities;
+	vector<entity *> TrackEntities;
+	vector<entity *> TrailEntities;
+	vector<entity *> ExplosionEntities;
+	vector<entity *> ShipEntities;
+    vector<collision> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;
-    int CurrentLevel = 0;
+    level *CurrentLevel = 0;
 
     random_series ExplosionEntropy;
 

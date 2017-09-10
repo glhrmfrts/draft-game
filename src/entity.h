@@ -21,23 +21,25 @@ struct ship
     int NumTrailCollisions = 0;
 };
 
-struct trail;
-
-#define ExplosionPieceCount 24
 struct explosion
 {
 	mesh Mesh;
 	color Color;
 	float LifeTime;
-    transform Pieces[ExplosionPieceCount];
+	vector<vec3> Triangles;
+	vector<vec3> Normals;
+	vector<transform> Pieces;
 };
+
+struct trail;
+struct trail_piece;
 
 #define Entity_Kinematic 0x1
 #define Entity_IsPlayer  0x2
 enum entity_type
 {
     EntityType_Ship,
-    EntityType_TrailPiece,
+	EntityType_TrailPiece,
 	EntityType_Crystal,
 	EntityType_TrackSegment,
 };
@@ -51,11 +53,12 @@ struct entity
     explosion *Explosion = NULL;
     ship *Ship = NULL;
     trail *Trail = NULL;
+	trail_piece *TrailPiece = NULL;
     collision_bounds *Bounds = NULL;
     model *Model = NULL;
 };
 
-#define TrailCount 6
+#define TrailCount 10
 struct trail
 {
     entity Entities[TrailCount];
@@ -64,7 +67,11 @@ struct trail
     float Timer = 0;
     int PositionStackIndex = 0;
     bool FirstFrame = true;
-    entity *Owner;
+};
+
+struct trail_piece
+{
+	entity *Owner;
 };
 
 /*

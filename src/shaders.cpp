@@ -15,6 +15,7 @@ static string ModelVertexShader = R"FOO(
     smooth out vec2 v_Uv;
     smooth out vec4 v_Color;
     smooth out vec3 v_Normal;
+	smooth out vec4 v_WorldPos;
 
     void main() {
       vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
@@ -23,6 +24,7 @@ static string ModelVertexShader = R"FOO(
       v_Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
       v_Uv = a_Uv;
       v_Color = a_Color;
+	  v_WorldPos = WorldPos;
     }
 )FOO";
 
@@ -44,10 +46,15 @@ static string ModelFragmentShader = R"FOO(
 	uniform vec2 u_UvScale;
 	uniform vec4 u_ExplosionLightColor;
 	uniform float u_ExplosionLightTimer;
+	uniform vec3 u_CamPos;
+	uniform vec4 u_FogColor;
+	uniform float u_FogStart;
+	uniform float u_FogEnd;
 
     smooth in vec2  v_Uv;
     smooth in vec4  v_Color;
 	smooth in vec3  v_Normal;
+	smooth in vec4  v_WorldPos;
 
     layout (location = 0) out vec4 BlendUnitColor[2];
 
@@ -63,14 +70,15 @@ static string ModelFragmentShader = R"FOO(
 	  Color *= Lighting;
 	  
 	  float Amount = u_ExplosionLightTimer / 1.0f;
-	  Color += u_ExplosionLightColor * Amount;
+	  Color += u_ExplosionLightColor * Amount * 0.5f;
 
-      //float fog = abs(v_worldPos.z - u_camPos.z);
-      //fog = (u_fogEnd - fog) / (u_fogEnd - u_fogStart);
-      //fog = clamp(fog, 0.0, 1.0);
+      float fog = abs(v_WorldPos.y - u_CamPos.y);
+      fog = (u_FogEnd - fog) / (u_FogEnd - u_FogStart);
+      fog = clamp(fog, 0.0, 1.0);
 
+	  Color = mix(Color, u_FogColor, 1.0 - fog);
       vec4 Emit = (Color * u_Emission);
-      BlendUnitColor[0] = Color;//mix(color, u_fogColor, 1.0 - fog);
+      BlendUnitColor[0] = Color;
       BlendUnitColor[1] = Emit;
     }
 )FOO";

@@ -26,6 +26,14 @@ IntColor(int c, float alpha = 1.0f)
     return color(r/255.0f, g/255.0f, b/255.0f, alpha);
 }
 
+struct mesh_vertex
+{
+	vec3 Position;
+	vec2 Uv;
+	color Color;
+	vec3 Normal;
+};
+
 struct vertex_buffer
 {
     vector<float> Vertices;
@@ -191,6 +199,10 @@ struct model_program
     int MaterialFlags;
 	int ExplosionLightColor;
 	int ExplosionLightTimer;
+	int CamPos;
+	int FogColor;
+	int FogStart;
+	int FogEnd;
 };
 
 struct blur_program
@@ -275,6 +287,7 @@ struct render_state
     GLint MaxMultiSampleCount;
     GLint LastVAO;
 
+	color FogColor;
 	color ExplosionLightColor;
 	float ExplosionLightTimer;
 

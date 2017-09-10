@@ -95,6 +95,8 @@ int main(int argc, char **argv)
 
     int Width = 1280;
     int Height = 720;
+	int vWidth = Width / 2;
+	int vHeight = Height / 2;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           Width, Height, SDL_WINDOW_OPENGL);
 
@@ -131,10 +133,13 @@ int main(int argc, char **argv)
 	printf("%s\n", glGetString(GL_VENDOR));
 	printf("%s\n", glGetString(GL_RENDERER));
 
+	glEnable(GL_MULTISAMPLE);
+	glViewport(0, 0, Width, Height);
+
     game_state Game;
     Game.Window = Window;
-    Game.Width = Width;
-    Game.Height = Height;
+    Game.Width = vWidth;
+    Game.Height = vHeight;
 
     auto &Input = Game.Input;
     if (SDL_NumJoysticks() > 0)
@@ -171,37 +176,46 @@ int main(int argc, char **argv)
 #endif
       
         SDL_PumpEvents();
-        SDL_JoystickUpdate();
+
+		bool HasJoystick = Input.Controller.Joystick != NULL;
+		if (HasJoystick)
+		{
+			SDL_JoystickUpdate();
+		}
         for (int i = 0; i < Action_count; i++)
         {
             auto &Action = Input.Actions[i];
             Action.Pressed = 0;
             Action.AxisValue = 0;
-            if (Action.AxisID != Axis_Invalid)
-            {
-                int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
-                if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
-                {
-                    float fv = (Value + 32768) / float(65535);
-                    Value = short(fv * 32767);
-                }
-                if (std::abs(Value) < GameControllerAxisDeadzone)
-                {
-                    Value = 0;
-                }
-                Action.AxisValue = Value / float(32767);
-            }
-            if (Action.ButtonID != Button_Invalid)
-            {
-                if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
-                {
-                    Action.Pressed++;
-                }
-                else
-                {
-                    Action.Pressed = 0;
-                }
-            }
+			if (HasJoystick)
+			{
+				if (Action.AxisID != Axis_Invalid)
+				{
+					int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
+					if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
+					{
+						float fv = (Value + 32768) / float(65535);
+						Value = short(fv * 32767);
+					}
+					if (std::abs(Value) < GameControllerAxisDeadzone)
+					{
+						Value = 0;
+					}
+					Action.AxisValue = Value / float(32767);
+				}
+				if (Action.ButtonID != Button_Invalid)
+				{
+					if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
+					{
+						Action.Pressed++;
+					}
+					else
+					{
+						Action.Pressed = 0;
+					}
+				}
+			}
+
             const uint8 *Keys = SDL_GetKeyboardState(&Input.KeyCount);
             uint8 Positive = Keys[Action.Positive];
             uint8 Negative = Keys[Action.Negative];

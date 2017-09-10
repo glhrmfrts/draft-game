@@ -80,13 +80,6 @@ PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
     Buffer.VertexCount++;
 }
 
-struct mesh_vertex
-{
-    vec3 Position;
-    vec2 Uv;
-    color Color;
-    vec3 Normal;
-};
 inline static void
 PushVertex(vertex_buffer &Buffer, const mesh_vertex &Vertex)
 {
@@ -466,17 +459,16 @@ BindFramebuffer(framebuffer &Framebuffer)
 static void
 UnbindFramebuffer(render_state &RenderState)
 {
+	// @TODO: un-hardcode this
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, RenderState.Width, RenderState.Height);
+    glViewport(0, 0, 1280, 720);
 }
-
-#define MeshVertexSize 12
 
 // InitMeshBuffer initializes a vertex_buffer with the common attributes
 // used by all meshes in the game
 void InitMeshBuffer(vertex_buffer &Buffer)
 {
-    size_t Stride = MeshVertexSize*sizeof(float);
+	size_t Stride = sizeof(mesh_vertex);
     InitBuffer(Buffer, 12, 4,
                vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
                vertex_attribute{1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
@@ -496,7 +488,7 @@ void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
     vec3 Max(0.0f);
     for (size_t i = 0; i < b.VertexCount; i++)
     {
-        size_t VertexIndex = i * MeshVertexSize;
+        size_t VertexIndex = i * (sizeof(mesh_vertex)/sizeof(float));
         vec3 Pos = {b.Vertices[VertexIndex], b.Vertices[VertexIndex+1], b.Vertices[VertexIndex+2]};
 
         Min.x = std::min(Min.x, Pos.x);
@@ -527,6 +519,10 @@ CompileModelProgram(model_program &Program)
     Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
 	Program.ExplosionLightColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightColor");
 	Program.ExplosionLightTimer = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightTimer");
+	Program.CamPos = glGetUniformLocation(Program.ShaderProgram.ID, "u_CamPos");
+	Program.FogColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogColor");
+	Program.FogStart = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogStart");
+	Program.FogEnd = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogEnd");
 
     Bind(Program.ShaderProgram);
     SetUniform(Program.Sampler, 0);
@@ -688,13 +684,22 @@ mat4 GetTransformMatrix(transform &t)
 static void
 RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 {
+	if (r.Transform.Position.y - Camera.Position.y > Global_Renderer_FogEnd)
+	{
+		return;
+	}
+
     if (RenderState.LastVAO != r.VAO)
     {
         glBindVertexArray(RenderState.LastVAO = r.VAO);
     }
 
     auto &Program = RenderState.ModelProgram;
+	SetUniform(Program.FogStart, Global_Renderer_FogStart);
+	SetUniform(Program.FogEnd, Global_Renderer_FogEnd);
+	SetUniform(Program.FogColor, RenderState.FogColor);
     SetUniform(Program.ProjectionView, Camera.ProjectionView);
+	SetUniform(Program.CamPos, Camera.Position);
     SetUniform(Program.Transform, GetTransformMatrix(r.Transform));
 
     // @TODO: check why this breaks the floor model

@@ -1,7 +1,9 @@
 Current TODOs:
 
+- (Input) Check if there is a joystick before polling it lol
+- (Game) Use entity's mesh triangles for explosion
 - (Game) Add crystals to the game (crystals should be pink)
-- (Game) Add obstacles to the game (think of a color to them)
+- (Game) Add obstacles to the game, that rises as the time comes (think of a color to them)
 - (Game) Assign different roles for ships with different colors (blue is normal, red kills you, green does something)
 - (Game) Work on the camera movement to be more dynamic
 - (Audio) Implement audio system and ship engine sounds

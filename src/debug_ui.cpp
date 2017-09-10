@@ -38,6 +38,12 @@ void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
             ImGui::SliderFloat("Blur Offset", &Global_Renderer_BloomBlurOffset, 0.0f, 10.0f, "%.2f");
             ImGui::TreePop();
         }
+		if (ImGui::TreeNode("Fog"))
+		{
+			ImGui::SliderFloat("Start", &Global_Renderer_FogStart, 0.0f, 500.0f, "%.2f");
+			ImGui::SliderFloat("End", &Global_Renderer_FogEnd, 0.0f, 500.0f, "%.2f");
+			ImGui::TreePop();
+		}
         ImGui::Spacing();
     }
 }
