@@ -58,7 +58,7 @@ struct entity
     model *Model = NULL;
 };
 
-#define TrailCount 10
+#define TrailCount 16
 struct trail
 {
     entity Entities[TrailCount];

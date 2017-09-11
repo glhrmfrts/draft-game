@@ -3,32 +3,46 @@
 
 struct crystal_event
 {
-	float Position[3];
+	float x, y, z;
+};
+
+enum enemy_type
+{
+	EnemyType_Default,
+	EnemyType_Explosive,
+};
+struct ship_event
+{
+	enemy_type EnemyType;
+	float x, y, z;
+	float vy;
 };
 
 enum level_event_type
 {
-	LevelEventType_Crystal,
+    LevelEventType_Crystal,
+	LevelEventType_Ship,
 };
 struct level_event
 {
-	level_event_type Type;
-	union
-	{
-		crystal_event Crystal;
-	};
+    level_event_type Type;
+    union
+    {
+        crystal_event Crystal;
+		ship_event Ship;
+    };
 };
 
 struct level_tick
 {
-	float TriggerDistance = 0;
-	vector<level_event> Events;
+    float TriggerDistance = 0;
+    vector<level_event> Events;
 };
 
 struct level
 {
-	int CurrentTick = 0;
-	vector<level_tick> Ticks;
+    int CurrentTick = 0;
+    vector<level_tick> Ticks;
 };
 
 #endif

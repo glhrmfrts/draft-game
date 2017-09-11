@@ -221,13 +221,6 @@ StartLevel(game_state &Game)
     Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
-    for (int i = 5; i < 10; i++)
-    {
-        auto *EnemyEntity = CreateShipEntity(Game, IntColor(SecondPalette.Colors[3]), IntColor(SecondPalette.Colors[3]));
-        EnemyEntity->Transform.Position.x = i + 1;
-        AddEntity(Game, EnemyEntity);
-    }
-
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
     Game.PlayerEntity->Transform.Rotation.y = 20.0f;
 	Game.PlayerEntity->Transform.Velocity.y = ShipMaxVel;
@@ -313,6 +306,14 @@ FindEntityOfType(entity *First, entity *Second, entity_type Type)
 }
 
 #define CrystalBoost 10.0f
+#define DraftBoost   40.0f
+inline static void
+ApplyBoostToShip(entity *Entity, float Boost, float Max)
+{
+	Entity->Transform.Velocity.y += Boost;
+	Entity->Transform.Velocity.y = std::min(Entity->Transform.Velocity.y, Max);
+}
+
 static bool
 HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime)
 {
@@ -350,11 +351,9 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 		AddEntity(Game, Explosion);
 		RemoveEntity(Game, CrystalEntity);
 
-		if (OtherEntity->Type == EntityType_Ship &&
-			OtherEntity->Transform.Velocity.y < ShipMaxVel)
+		if (OtherEntity->Type == EntityType_Ship)
 		{
-			OtherEntity->Transform.Velocity.y += CrystalBoost;
-			OtherEntity->Transform.Velocity.y = std::min(OtherEntity->Transform.Velocity.y, ShipMaxVel);
+			ApplyBoostToShip(OtherEntity, CrystalBoost, ShipMaxVel);
 		}
 		return false;
 	}
@@ -393,7 +392,6 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
     return true;
 }
 
-#define PlayerMinVel 20.0f
 static void
 UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 {
@@ -460,10 +458,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 	{
 		float MoveX = GetAxisValue(Game.Input, Action_horizontal);
 		float MoveY = 0;
-		if (PlayerEntity->Transform.Velocity.y < PlayerMinVel)
-		{
-			MoveY = 0.1f;
-		}
 		MoveShipEntity(PlayerEntity, MoveX, MoveY, DeltaTime);
 	}
 
@@ -471,8 +465,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         if (IsJustPressed(Game, Action_boost))
         {
-            Game.PlayerEntity->Transform.Velocity.y = Global_Game_BoostVelocity;
-            PlayerShip->DraftCharge = 0.0f;
+			ApplyBoostToShip(Game.PlayerEntity, DraftBoost, ShipMaxVel + DraftBoost*1.5f);
+			PlayerShip->CurrentDraftTime = 0.0f;
         }
     }
 
@@ -518,12 +512,12 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     RenderBegin(Game.RenderState, DeltaTime);
 
     static float EnemyMoveH = 0.0f;
-	EnemyMoveH += DeltaTime;
+	//EnemyMoveH += DeltaTime;
     for (auto *Entity : Game.ShipEntities)
     {
         if (!Entity) continue;
 
-        MoveShipEntity(Entity, sin(EnemyMoveH), 0.4f, DeltaTime);
+        MoveShipEntity(Entity, sin(EnemyMoveH), 0.0f, DeltaTime);
     }
 
     for (auto *Entity : Game.TrailEntities)

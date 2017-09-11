@@ -200,6 +200,28 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     return Entity;
 }
 
+#define DefaultEnemyColor   IntColor(SecondPalette.Colors[3])
+#define ExplosiveEnemyColor Color_red
+entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, enemy_type Type)
+{
+	color Color;
+	switch (Type)
+	{
+	case EnemyType_Default:
+		Color = DefaultEnemyColor;
+		break;
+
+	case EnemyType_Explosive:
+		Color = ExplosiveEnemyColor;
+		break;
+	}
+
+	auto *Result = CreateShipEntity(Game, Color, Color);
+	Result->Transform.Position = Position;
+	Result->Transform.Velocity = Velocity;
+	return Result;
+}
+
 #define MinExplosionRot 1.0f
 #define MaxExplosionRot 90.0f
 #define MinExplosionVel 0.1f
@@ -314,15 +336,21 @@ Interp(float c, float t, float a, float dt)
     return (dir == std::copysign(1, t - c)) ? c : t;
 }
 
-#define ShipMaxVel  100.0f
-#define PlayerMaxVel 120.0f
-#define ShipAcceleration 20.0f
-#define ShipBreakAcceleration 30.0f
-#define ShipSteerSpeed 20.0f
-#define ShipSteerAcceleration 80.0f
-#define ShipFriction 2.0f
+#define ShipMinVel				20.0f
+#define ShipMaxVel				100.0f
+#define PlayerMaxVel			120.0f
+#define ShipAcceleration		20.0f
+#define ShipBreakAcceleration	30.0f
+#define ShipSteerSpeed			20.0f
+#define ShipSteerAcceleration	80.0f
+#define ShipFriction			2.0f
 void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
+	if (Entity->Transform.Velocity.y < ShipMinVel)
+	{
+		MoveV = 0.1f;
+	}
+
     float MaxVel = ShipMaxVel;
     if (Entity->Flags & Entity_IsPlayer)
     {
