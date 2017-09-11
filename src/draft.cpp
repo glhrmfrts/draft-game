@@ -73,6 +73,7 @@ void AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ShipEntities, Entity);
     }
+	Game.NumEntities++;
 }
 
 inline static void
@@ -119,6 +120,7 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.ShipEntities, Entity);
     }
+	Game.NumEntities--;
 }
 
 #define TrackSegmentLength  512
@@ -256,6 +258,12 @@ DebugReset(game_state &Game)
 	Game.PlayerEntity->Transform.Velocity = vec3{ 0.0f };
 	Game.CurrentLevel->CurrentTick = 0;
 	Game.PlayerEntity->Transform.Velocity.y = ShipMaxVel;
+	Game.CurrentLevel->DelayedEvents.clear();
+
+	for (auto *Entity : Game.CurrentLevel->EntitiesToRemove)
+	{
+		RemoveEntity(Game, Entity);
+	}
 
 	for (int i = 0; i < TrackSegmentCount * 2; i++)
 	{
@@ -375,6 +383,11 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 				OtherEntity = First;
             }
 
+			if (EntityToExplode->Ship->EnemyType == EnemyType_Explosive)
+			{
+				EntityToExplode = OtherEntity;
+			}
+
             auto *Explosion = CreateExplosionEntity(Game,
 													*EntityToExplode->Model->Mesh,
 													EntityToExplode->Model->Mesh->Parts[0],
@@ -401,7 +414,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto *PlayerShip = PlayerEntity->Ship;
     vec3 CamDir = CameraDir(Camera);
 
-	UpdateLevel(Game);
+	UpdateLevel(Game, DeltaTime);
 
 #ifdef DRAFT_DEBUG
     if (Global_Camera_FreeCam)
@@ -710,7 +723,7 @@ extern "C"
 	{
 		ImGui_ImplSdlGL3_NewFrame(Game->Window);
 		UpdateAndRenderLevel(*Game, DeltaTime);
-		DrawDebugUI(Game->PlayerEntity, DeltaTime);
+		DrawDebugUI(*Game, DeltaTime);
 		ImGui::Render();
 	}
 

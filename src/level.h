@@ -1,16 +1,13 @@
 #ifndef DRAFT_LEVEL_H
 #define DRAFT_LEVEL_H
 
+#include <list>
+
 struct crystal_event
 {
 	float x, y, z;
 };
 
-enum enemy_type
-{
-	EnemyType_Default,
-	EnemyType_Explosive,
-};
 struct ship_event
 {
 	enemy_type EnemyType;
@@ -26,6 +23,9 @@ enum level_event_type
 struct level_event
 {
     level_event_type Type;
+	float Delay = 0;
+	float Timer = 0;
+
     union
     {
         crystal_event Crystal;
@@ -35,14 +35,16 @@ struct level_event
 
 struct level_tick
 {
+	vector<level_event> Events;
     float TriggerDistance = 0;
-    vector<level_event> Events;
 };
 
 struct level
 {
+	vector<entity *> EntitiesToRemove;
+	vector<level_tick> Ticks;
+	std::list<level_event> DelayedEvents;
     int CurrentTick = 0;
-    vector<level_tick> Ticks;
 };
 
 #endif

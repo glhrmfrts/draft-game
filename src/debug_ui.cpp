@@ -1,11 +1,11 @@
 #include "config.h"
 
-void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
+void DrawDebugUI(game_state &Game, float DeltaTime)
 {
     if (!Global_DebugUI) return;
 
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
-    ImGui::Text("Player Velocity: %s", ToString(PlayerEntity->Transform.Velocity).c_str());
+    ImGui::Text("Player Velocity: %s", ToString(Game.PlayerEntity->Transform.Velocity).c_str());
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);
@@ -20,6 +20,8 @@ void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Game"))
     {
+		ImGui::Text("Entities: %d", Game.NumEntities);
+		ImGui::Spacing();
         if (ImGui::TreeNode("Trail"))
         {
             ImGui::SliderFloat("Record Timer", &Global_Game_TrailRecordTimer, 0.0f, 4.0f, "%.3f");
@@ -30,6 +32,8 @@ void DrawDebugUI(entity *PlayerEntity, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Renderer"))
     {
+		ImGui::Text("Renderables: %d", Game.RenderState.FrameSolidRenderables.size() + Game.RenderState.FrameTransparentRenderables.size());
+		ImGui::Spacing();
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);
 
         if (ImGui::TreeNode("Bloom"))

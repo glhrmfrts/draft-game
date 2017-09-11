@@ -149,6 +149,7 @@ struct game_state
     entity *SkyboxEntity;
     entity *PlayerEntity;
     level *CurrentLevel = 0;
+	int NumEntities = 0;
 
     random_series ExplosionEntropy;
 

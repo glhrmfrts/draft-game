@@ -219,6 +219,7 @@ entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, en
 	auto *Result = CreateShipEntity(Game, Color, Color);
 	Result->Transform.Position = Position;
 	Result->Transform.Velocity = Velocity;
+	Result->Ship->EnemyType = Type;
 	return Result;
 }
 

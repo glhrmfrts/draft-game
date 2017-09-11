@@ -12,6 +12,11 @@ struct collision_bounds
     bounding_box Box;
 };
 
+enum enemy_type
+{
+	EnemyType_Default,
+	EnemyType_Explosive,
+};
 struct ship
 {
     color Color;
@@ -19,6 +24,7 @@ struct ship
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
+	enemy_type EnemyType;
 };
 
 struct explosion
