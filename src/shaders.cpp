@@ -63,12 +63,12 @@ static string ModelFragmentShader = R"FOO(
       vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
       Color *= v_Color;
       Color *= u_DiffuseColor;
-		
+
 	  vec4 Lighting = LightColor * AmbientLight;
       Lighting += LightColor * clamp(dot(-vec3(0, 0, -1), v_Normal), 0, 1) * LightIntensity;
       Lighting.a = 1.0f;
 	  Color *= Lighting;
-	  
+
 	  float Amount = u_ExplosionLightTimer / 1.0f;
 	  Color += u_ExplosionLightColor * Amount * 0.5f;
 

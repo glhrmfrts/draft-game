@@ -1,36 +1,30 @@
-SRC = $(wildcard src/*.cpp)
+PLATFORM_SRC = src/platform.cpp src/lib_linux.cpp
+SRC = $(filter-out $(PLATFORM_SRC), $(wildcard src/*.cpp))
 SRC += $(wildcard deps/*.cpp)
 
 CFILES = deps/imgui.cpp deps/imgui_draw.cpp deps/imgui_demo.cpp deps/imgui_impl_sdl_gl3.cpp deps/lodepng.cpp src/draft.cpp
+PLATFORM_CFILES = src/platform.cpp
+LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW -ldl
 
-ifdef SystemRoot
-	LIBS = -lglew32s -lfreetype-6 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lgdi32 -lopenAL32 -lsndfile-1
-else
-	LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW
-endif
-
-INCLUDE_PATHS = -Ideps -IC:/c-cpp/libs/include -IC:/c-cpp/pl/lua/src -IC:/c-cpp/LuaBridge/Source
+INCLUDE_PATHS = -Ideps
 
 CC = clang++
-CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DGLEW_STATIC -DDRAFT_DEBUG
-LDFLAGS = -LC:/c-cpp/libs/lib/x64 $(LIBS)
+CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DDRAFT_DEBUG
+LDFLAGS = $(LIBS)
 
-OUT = build/draft
-ifdef SystemRoot
-  CC = g++
-	OUT = build/draft.exe
-endif
+OUT = build/draft.so
+PLATFORM_OUT = build/platform
 
 $(OUT): $(SRC)
-	$(CC) $(CFLAGS) $(CFILES) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -fPIC -shared $(CFILES) -o $@ $(LDFLAGS)
 
-win64: src/platform.cpp
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o Draft\x64\Debug\platform.exe
+platform: $(PLATFORM_SRC)
+	$(CC) $(CFLAGS) $(PLATFORM_CFILES) -o $(PLATFORM_OUT) $(LDFLAGS)
 
-run: $(OUT)
-	@cd build && ./../$(OUT)
+run: platform
+	@cd build && ./../$(PLATFORM_OUT)
 
 clean:
-	@rm $(OUT)
+	@rm $(OUT) $(PLATFORM_OUT)
 
 .PHONY: run clean

@@ -319,7 +319,7 @@ inline static void
 ApplyBoostToShip(entity *Entity, float Boost, float Max)
 {
 	Entity->Transform.Velocity.y += Boost;
-	Entity->Transform.Velocity.y = std::min(Entity->Transform.Velocity.y, Max);
+	//Entity->Transform.Velocity.y = std::min(Entity->Transform.Velocity.y, Max);
 }
 
 static bool
@@ -547,7 +547,12 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             }
         }
 
-		PushPosition(Trail, Entity->Transform.Position);
+        Trail->Timer -= DeltaTime;
+        if (Trail->Timer <= 0)
+        {
+            Trail->Timer = Global_Game_TrailRecordTimer;
+            PushPosition(Trail, Entity->Transform.Position);
+        }
 
         mesh &Mesh = Trail->Mesh;
         ResetBuffer(Mesh.Buffer);
@@ -625,7 +630,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 		float Alpha = Explosion->LifeTime / Global_Game_ExplosionLifeTime;
         ResetBuffer(Explosion->Mesh.Buffer);
         for (int i = 0; i < Explosion->Pieces.size(); i++)
-        { 
+        {
             auto &Piece = Explosion->Pieces[i];
             Piece.Position += Piece.Velocity * DeltaTime;
             mat4 Transform = GetTransformMatrix(Piece);
@@ -696,9 +701,15 @@ RegisterInputActions(game_input &Input)
     Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
+#ifdef _WIN32
+#define export_func __declspec(dllexport)
+#else
+#define export_func
+#endif
+
 extern "C"
 {
-	__declspec(dllexport) GAME_INIT(GameInit)
+	export_func GAME_INIT(GameInit)
 	{
 		int Width = Game->Width;
 		int Height = Game->Height;
@@ -714,20 +725,20 @@ extern "C"
 	}
 
 	// @TODO: this exists only for imgui, remove in the future
-	__declspec(dllexport) GAME_PROCESS_EVENT(GameProcessEvent)
+	export_func GAME_PROCESS_EVENT(GameProcessEvent)
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(Event);
 	}
 
-	__declspec(dllexport) GAME_RENDER(GameRender)
+	export_func GAME_RENDER(GameRender)
 	{
 		ImGui_ImplSdlGL3_NewFrame(Game->Window);
-		UpdateAndRenderLevel(*Game, DeltaTime);
+		UpdateAndRenderLevel(*Game, 0.007f);
 		DrawDebugUI(*Game, DeltaTime);
 		ImGui::Render();
 	}
 
-	__declspec(dllexport) GAME_DESTROY(GameDestroy)
+	export_func GAME_DESTROY(GameDestroy)
 	{
 		ImGui_ImplSdlGL3_Shutdown();
 		FreeArena(Game->Arena);

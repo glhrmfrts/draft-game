@@ -289,7 +289,7 @@ struct render_state
 
 	color FogColor;
 	color ExplosionLightColor;
-	float ExplosionLightTimer;
+	float ExplosionLightTimer = 0;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;

@@ -258,7 +258,7 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
 	Explosion->LifeTime = Global_Game_ExplosionLifeTime;
 	Explosion->Color = Color;
     InitMeshBuffer(Explosion->Mesh.Buffer);
-	
+
 	size_t PieceCount = Part.Count / 3;
 	static vector<vec3> Normals;
 	if (Normals.size() < PieceCount)
@@ -344,10 +344,15 @@ Interp(float c, float t, float a, float dt)
 #define ShipBreakAcceleration	30.0f
 #define ShipSteerSpeed			20.0f
 #define ShipSteerAcceleration	80.0f
-#define ShipFriction			2.0f
+#define ShipFriction			5.0f
 void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
-	if (Entity->Transform.Velocity.y < ShipMinVel)
+    float MinVel = ShipMinVel;
+    if (Entity->Flags & Entity_IsPlayer)
+    {
+        MinVel += 5.0f;
+    }
+	if (Entity->Transform.Velocity.y < MinVel)
 	{
 		MoveV = 0.1f;
 	}
