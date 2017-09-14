@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <AL/alc.h>
+#include "thread_pool.h"
 #include "config.h"
 #include "common.h"
 #include "collision.h"
@@ -14,7 +15,7 @@
 #include "entity.h"
 #include "random.h"
 #include "level.h"
- 
+
 #define GAME_INIT(name) void name(game_state *Game)
 #define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
 #define GAME_DESTROY(name) void name(game_state *Game)
@@ -74,6 +75,7 @@ enum action_type
     Action_vertical,
     Action_boost,
 	Action_debugUI,
+    Action_debugPause,
     Action_count,
 };
 struct action_state

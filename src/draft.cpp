@@ -10,6 +10,7 @@
 #include "imgui_impl_sdl_gl3.h"
 #include "draft.h"
 #include "memory.cpp"
+#include "thread_pool.cpp"
 #include "collision.cpp"
 #include "render.cpp"
 #include "asset.cpp"
@@ -414,6 +415,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto *PlayerShip = PlayerEntity->Ship;
     vec3 CamDir = CameraDir(Camera);
 
+    static bool Paused = false;
+    if (IsJustPressed(Game, Action_debugPause))
+    {
+        Paused = !Paused;
+    }
+    if (Paused) return;
+
 	UpdateLevel(Game, DeltaTime);
 
 #ifdef DRAFT_DEBUG
@@ -699,6 +707,7 @@ RegisterInputActions(game_input &Input)
     Input.Actions[Action_vertical] = action_state{ SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
     Input.Actions[Action_boost] = action_state{ SDL_SCANCODE_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
     Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
+    Input.Actions[Action_debugPause] = action_state{ SDL_SCANCODE_P, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
 #ifdef _WIN32
@@ -733,7 +742,7 @@ extern "C"
 	export_func GAME_RENDER(GameRender)
 	{
 		ImGui_ImplSdlGL3_NewFrame(Game->Window);
-		UpdateAndRenderLevel(*Game, 0.007f);
+		UpdateAndRenderLevel(*Game, DeltaTime);
 		DrawDebugUI(*Game, DeltaTime);
 		ImGui::Render();
 	}

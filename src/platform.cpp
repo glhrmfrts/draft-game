@@ -99,13 +99,13 @@ int main(int argc, char **argv)
     Lib.GameInit(&Game);
 
 	float ReloadTimer = GameLibraryReloadTime;
-    clock_t PreviousTime = clock();
     float DeltaTime = 0.016f;
     float DeltaTimeMS = DeltaTime * 1000.0f;
+    uint32 PreviousTime = SDL_GetTicks();
     while (Game.Running)
     {
-        clock_t CurrentTime = clock();
-        float Elapsed = ((CurrentTime - PreviousTime) / (float)CLOCKS_PER_SEC);
+        uint32 CurrentTime = SDL_GetTicks();
+        float Elapsed = ((CurrentTime - PreviousTime) / 1000.0f);
 
 #ifdef DRAFT_DEBUG
 		ReloadTimer -= Elapsed;
@@ -248,7 +248,7 @@ int main(int argc, char **argv)
 
         if (Elapsed*1000.0f < DeltaTimeMS)
         {
-            //SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
+            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
         }
 
         PreviousTime = CurrentTime;
