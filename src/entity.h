@@ -27,6 +27,11 @@ struct ship
 	enemy_type EnemyType;
 };
 
+struct player_state
+{
+    int Score = 0;
+};
+
 struct explosion
 {
 	mesh Mesh;
@@ -56,6 +61,7 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
+    player_state *PlayerState = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
     trail *Trail = NULL;

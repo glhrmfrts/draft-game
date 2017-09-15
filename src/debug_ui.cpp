@@ -4,8 +4,10 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
 {
     if (!Global_DebugUI) return;
 
+    ImGui::Text("ms: %.2f", DeltaTime * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
     ImGui::Text("Player Velocity: %s", ToString(Game.PlayerEntity->Transform.Velocity).c_str());
+    ImGui::Text("Player Score: %d", Game.PlayerEntity->PlayerState->Score);
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);

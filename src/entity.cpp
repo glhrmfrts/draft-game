@@ -195,6 +195,7 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
 	Entity->Trail = CreateTrail(Game.Arena, Entity, OutlineColor);
 	if (IsPlayer)
     {
+        Entity->PlayerState = PushStruct<player_state>(Game.Arena);
         AddFlags(Entity, Entity_IsPlayer);
     }
     return Entity;
@@ -325,6 +326,17 @@ entity *CreateCrystalEntity(game_state &Game, vec3 Position)
 	return Result;
 }
 
+entity *CreateWallEntity(game_state &Game, vec3 Position, float Width)
+{
+    auto *Result = PushStruct<entity>(Game.Arena);
+    Result->Transform.Position = Position;
+    Result->Transform.Scale = vec3{Width, 1.0f, 1.0f};
+    Result->Type = EntityType_Wall;
+    Result->Model = CreateModel(Game.Arena, &Game.WallMesh);
+    Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
+    return Result;
+}
+
 static float
 Interp(float c, float t, float a, float dt)
 {
@@ -339,6 +351,7 @@ Interp(float c, float t, float a, float dt)
 
 #define ShipMinVel				20.0f
 #define ShipMaxVel				100.0f
+#define PlayerMinVel            25.0f
 #define PlayerMaxVel			120.0f
 #define ShipAcceleration		20.0f
 #define ShipBreakAcceleration	30.0f
@@ -350,7 +363,7 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     float MinVel = ShipMinVel;
     if (Entity->Flags & Entity_IsPlayer)
     {
-        MinVel += 5.0f;
+        MinVel = PlayerMinVel;
     }
 	if (Entity->Transform.Velocity.y < MinVel)
 	{

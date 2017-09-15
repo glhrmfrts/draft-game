@@ -41,8 +41,8 @@ int main(int argc, char **argv)
 
     int Width = 1280;
     int Height = 720;
-	int vWidth = Width / 2;
-	int vHeight = Height / 2;
+	int vWidth = Width/2;
+	int vHeight = Height/2;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           Width, Height, SDL_WINDOW_OPENGL);
 

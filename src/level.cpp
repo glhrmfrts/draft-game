@@ -10,21 +10,25 @@ AddLevelEntity(game_state &Game, level *Level, entity *Entity)
 }
 
 inline static void
-AddEvent(level_tick &Tick, crystal_event Event, float Delay = 0)
+AddEvent(level_tick &Tick, crystal_event Event, float Delay = 0, float ResetTimer = 0, int MinScore = 0)
 {
 	level_event LevelEvent;
 	LevelEvent.Type = LevelEventType_Crystal;
 	LevelEvent.Delay = Delay;
+    LevelEvent.ResetTimer = ResetTimer;
+    LevelEvent.MinScore = MinScore;
 	LevelEvent.Crystal = Event;
 	Tick.Events.push_back(LevelEvent);
 }
 
 inline static void
-AddEvent(level_tick &Tick, ship_event Event, float Delay = 0)
+AddEvent(level_tick &Tick, ship_event Event, float Delay = 0, float ResetTimer = 0, int MinScore = 0)
 {
 	level_event LevelEvent;
 	LevelEvent.Type = LevelEventType_Ship;
 	LevelEvent.Delay = Delay;
+    LevelEvent.ResetTimer = ResetTimer;
+    LevelEvent.MinScore = MinScore;
 	LevelEvent.Ship = Event;
 	Tick.Events.push_back(LevelEvent);
 }
@@ -38,28 +42,25 @@ level *GenerateTestLevel(memory_arena &Arena)
         AddEvent(Tick, crystal_event{ 0, 400, 0 });
         AddEvent(Tick, crystal_event{ 0, 500, 0 });
         AddEvent(Tick, crystal_event{ 0, 600, 0 });
-        AddEvent(Tick, ship_event{ EnemyType_Default, 4, 10, 0, 0 });
-        AddEvent(Tick, ship_event{ EnemyType_Default, -4, 10, 0, 0 });
-        AddEvent(Tick, ship_event{ EnemyType_Default, 2, 10, 0, 0 });
-
-        for (int i = 0; i < 10; i++)
-        {
-            float x = sin((float)i/10.0f);
-            AddEvent(Tick, crystal_event{ x * 5.0f, 600 + ((float)i * 100), 0 });
-        }
 
         Result->Ticks.push_back(Tick);
     }
 
 	{
 		level_tick Tick;
-		Tick.TriggerDistance = 500;
-		AddEvent(Tick, ship_event{ EnemyType_Default, 4, -10, 0, 12 });
-		AddEvent(Tick, ship_event{ EnemyType_Default, -8, -10, 0, 12 }, 3.0f);
-		AddEvent(Tick, ship_event{ EnemyType_Explosive, -8, -10, 0, 12 }, 6.0f);
+		Tick.TriggerDistance = 610;
+		AddEvent(Tick, ship_event{ EnemyType_Default, 4, -10, 0, 10 });
+		AddEvent(Tick, ship_event{ EnemyType_Default, -8, -10, 0, 10 }, 3.0f, 0.0f, 100);
+		AddEvent(Tick, ship_event{ EnemyType_Explosive, -8, -10, 0, 10 }, 6.0f, 3.0f, 200);
 
 		Result->Ticks.push_back(Tick);
 	}
+
+    {
+        level_tick Tick;
+        Tick.TriggerDistance = 1000;
+        AddEvent(Tick, random_spikes_event{ 10, 200  }, 0, 0, 300);
+    }
     return Result;
 }
 
@@ -88,6 +89,13 @@ static void ProcessEvent(game_state &Game, level *Level, entity *PlayerEntity, c
 		AddLevelEntity(Game, Level, CreateEnemyShipEntity(Game, PlayerPosition + Pos, vec3{ 0, PlayerVel.y + Event.Ship.vy, 0 }, Event.Ship.EnemyType));
 		break;
 	}
+
+    case LevelEventType_Wall:
+    {
+        vec3 Pos = EventPosition(Event.Wall);
+        AddLevelEntity(Game, Level, CreateWallEntity(Game, PlayerPosition + Pos), Event.Wall.Width);
+        break;
+    }
 	}
 }
 
@@ -95,6 +103,7 @@ void UpdateLevel(game_state &Game, float DeltaTime)
 {
     auto *Level = Game.CurrentLevel;
     auto *PlayerEntity = Game.PlayerEntity;
+    auto *PlayerState = PlayerEntity->PlayerState;
     auto &PlayerPosition = PlayerEntity->Transform.Position;
     int NumTicks = (int)Level->Ticks.size();
     for (int i = Level->CurrentTick; i < NumTicks; i++)
@@ -123,8 +132,15 @@ void UpdateLevel(game_state &Game, float DeltaTime)
 		auto &Event = *it;
 		if (Event.Timer >= Event.Delay)
 		{
-			ProcessEvent(Game, Level, PlayerEntity, Event);
-			it = Level->DelayedEvents.erase(it);
+            if (PlayerState->Score >= Event.MinScore)
+            {
+                ProcessEvent(Game, Level, PlayerEntity, Event);
+                it = Level->DelayedEvents.erase(it);
+            }
+			else
+            {
+                Event.Timer = Event.ResetTimer;
+            }
 		}
 		else
 		{

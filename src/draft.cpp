@@ -219,6 +219,14 @@ StartLevel(game_state &Game)
 		EndMesh(CrystalMesh, GL_STATIC_DRAW);
 	}
 
+    {
+        auto &WallMesh = Game.WallMesh;
+        InitMeshBuffer(WallMesh.Buffer);
+        AddCube(WallMesh.Buffer);
+        AddPart(WallMesh, mesh_part{ material{ Color_white, 0.0f, 0.0f, NULL }, 0, WallMesh.Buffer.VertexCount, GL_TRIANGLES });
+        EndMesh(WallMesh, GL_STATIC_DRAW);
+    }
+
     MakeCameraPerspective(Game.Camera, (float)Game.Width, (float)Game.Height, 70.0f, 0.1f, 1000.0f);
     Game.Camera.Position = vec3(2, 0, 0);
     Game.Camera.LookAt = vec3(0, 0, 0);
@@ -257,8 +265,9 @@ DebugReset(game_state &Game)
 {
 	Game.PlayerEntity->Transform.Position = vec3{ 0.0f };
 	Game.PlayerEntity->Transform.Velocity = vec3{ 0.0f };
-	Game.CurrentLevel->CurrentTick = 0;
 	Game.PlayerEntity->Transform.Velocity.y = ShipMaxVel;
+    Game.PlayerEntity->PlayerState->Score = 0;
+    Game.CurrentLevel->CurrentTick = 0;
 	Game.CurrentLevel->DelayedEvents.clear();
 
 	for (auto *Entity : Game.CurrentLevel->EntitiesToRemove)
@@ -314,8 +323,10 @@ FindEntityOfType(entity *First, entity *Second, entity_type Type)
 	return Result;
 }
 
-#define CrystalBoost 10.0f
-#define DraftBoost   40.0f
+#define CrystalBoost      10.0f
+#define DraftBoost        40.0f
+#define CrystalBoostScore 10
+#define DraftBoostScore   100
 inline static void
 ApplyBoostToShip(entity *Entity, float Boost, float Max)
 {
@@ -363,6 +374,10 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 		if (OtherEntity->Type == EntityType_Ship)
 		{
 			ApplyBoostToShip(OtherEntity, CrystalBoost, ShipMaxVel);
+            if (OtherEntity->PlayerState)
+            {
+                OtherEntity->PlayerState->Score += CrystalBoostScore;
+            }
 		}
 		return false;
 	}
@@ -384,7 +399,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 				OtherEntity = First;
             }
 
-			if (EntityToExplode->Ship->EnemyType == EnemyType_Explosive)
+			if (true)
 			{
 				EntityToExplode = OtherEntity;
 			}
@@ -488,6 +503,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         {
 			ApplyBoostToShip(Game.PlayerEntity, DraftBoost, ShipMaxVel + DraftBoost*1.5f);
 			PlayerShip->CurrentDraftTime = 0.0f;
+            Game.PlayerEntity->PlayerState->Score += DraftBoostScore;
         }
     }
 
