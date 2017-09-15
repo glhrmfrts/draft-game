@@ -33,6 +33,18 @@ AddEvent(level_tick &Tick, ship_event Event, float Delay = 0, float ResetTimer =
 	Tick.Events.push_back(LevelEvent);
 }
 
+inline static void
+AddEvent(level_tick &Tick, wall_event Event, float Delay = 0, float ResetTimer = 0, int MinScore = 0)
+{
+    level_event LevelEvent;
+	LevelEvent.Type = LevelEventType_Wall;
+	LevelEvent.Delay = Delay;
+    LevelEvent.ResetTimer = ResetTimer;
+    LevelEvent.MinScore = MinScore;
+	LevelEvent.Wall = Event;
+	Tick.Events.push_back(LevelEvent);
+}
+
 level *GenerateTestLevel(memory_arena &Arena)
 {
     level *Result = PushStruct<level>(Arena);
@@ -50,8 +62,8 @@ level *GenerateTestLevel(memory_arena &Arena)
 		level_tick Tick;
 		Tick.TriggerDistance = 610;
 		AddEvent(Tick, ship_event{ EnemyType_Default, 4, -10, 0, 10 });
-		AddEvent(Tick, ship_event{ EnemyType_Default, -8, -10, 0, 10 }, 3.0f, 0.0f, 100);
-		AddEvent(Tick, ship_event{ EnemyType_Explosive, -8, -10, 0, 10 }, 6.0f, 3.0f, 200);
+		AddEvent(Tick, ship_event{ EnemyType_Default, -4, -10, 0, 10 }, 1.0f, 0.0f, 100);
+		AddEvent(Tick, ship_event{ EnemyType_Explosive, 2, -10, 0, 10 }, 1.0f, 0.0f, 200);
 
 		Result->Ticks.push_back(Tick);
 	}
@@ -59,7 +71,12 @@ level *GenerateTestLevel(memory_arena &Arena)
     {
         level_tick Tick;
         Tick.TriggerDistance = 1000;
-        AddEvent(Tick, random_spikes_event{ 10, 200  }, 0, 0, 300);
+        AddEvent(Tick, wall_event{ -15, 200, 0, 20 }, 1.0f, 0, 300);
+        AddEvent(Tick, wall_event{ 5, 200, 0, 20 }, 1.5f, 0, 300);
+        AddEvent(Tick, wall_event{ -15, 400, 0, 20 }, 1.0f, 0, 300);
+        AddEvent(Tick, wall_event{ 5, 400, 0, 20 }, 1.5f, 0, 300);
+
+        Result->Ticks.push_back(Tick);
     }
     return Result;
 }
@@ -93,7 +110,7 @@ static void ProcessEvent(game_state &Game, level *Level, entity *PlayerEntity, c
     case LevelEventType_Wall:
     {
         vec3 Pos = EventPosition(Event.Wall);
-        AddLevelEntity(Game, Level, CreateWallEntity(Game, PlayerPosition + Pos), Event.Wall.Width);
+        AddLevelEntity(Game, Level, CreateWallEntity(Game, PlayerPosition + Pos, Event.Wall.Width));
         break;
     }
 	}
@@ -130,22 +147,20 @@ void UpdateLevel(game_state &Game, float DeltaTime)
 	while (it != Level->DelayedEvents.end())
 	{
 		auto &Event = *it;
-		if (Event.Timer >= Event.Delay)
-		{
-            if (PlayerState->Score >= Event.MinScore)
+        if (PlayerState->Score >= Event.MinScore)
+        {
+            if (Event.Timer >= Event.Delay)
             {
                 ProcessEvent(Game, Level, PlayerEntity, Event);
                 it = Level->DelayedEvents.erase(it);
+                continue;
             }
-			else
+            else
             {
-                Event.Timer = Event.ResetTimer;
+                Event.Timer += DeltaTime;
             }
-		}
-		else
-		{
-			Event.Timer += DeltaTime;
-			it++;
-		}
+        }
+
+        it++;
 	}
 }

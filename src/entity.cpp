@@ -328,12 +328,20 @@ entity *CreateCrystalEntity(game_state &Game, vec3 Position)
 
 entity *CreateWallEntity(game_state &Game, vec3 Position, float Width)
 {
+    const float Depth = 2.0f;
+    const float Height = 10.0f;
+    Position.x += Width/2;
+    Position.y += Depth/2;
+
     auto *Result = PushStruct<entity>(Game.Arena);
     Result->Transform.Position = Position;
-    Result->Transform.Scale = vec3{Width, 1.0f, 1.0f};
+    Result->Transform.Scale = vec3{Width, Depth, Height};
     Result->Type = EntityType_Wall;
     Result->Model = CreateModel(Game.Arena, &Game.WallMesh);
     Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
+    Result->WallState = PushStruct<wall_state>(Game.Arena);
+    Result->WallState->BaseZ = Position.z;
+    AddFlags(Result, Entity_Kinematic);
     return Result;
 }
 

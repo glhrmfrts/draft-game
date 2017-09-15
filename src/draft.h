@@ -139,6 +139,7 @@ struct game_state
     mesh ShipMesh;
     mesh SkyboxMesh;
 	mesh CrystalMesh;
+    mesh WallMesh;
     vec3 Gravity;
 
     vector<entity *> ModelEntities;
@@ -147,6 +148,7 @@ struct game_state
 	vector<entity *> TrailEntities;
 	vector<entity *> ExplosionEntities;
 	vector<entity *> ShipEntities;
+    vector<entity *> WallEntities;
     vector<collision> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;

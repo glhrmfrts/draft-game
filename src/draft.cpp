@@ -74,6 +74,10 @@ void AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ShipEntities, Entity);
     }
+    if (Entity->Type == EntityType_Wall)
+    {
+        AddEntityToList(Game.WallEntities, Entity);
+    }
 	Game.NumEntities++;
 }
 
@@ -121,7 +125,11 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.ShipEntities, Entity);
     }
-	Game.NumEntities--;
+    if (Entity->Type == EntityType_Wall)
+    {
+        RemoveEntityFromList(Game.WallEntities, Entity);
+    }
+    Game.NumEntities = std::max(0, Game.NumEntities - 1);
 }
 
 #define TrackSegmentLength  512
@@ -135,6 +143,7 @@ StartLevel(game_state &Game)
 {
     FreeArena(Game.Arena);
 	Game.RenderState.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
+    Game.RenderState.FogColor.a = 1.0f;
 	ApplyExplosionLight(Game.RenderState, IntColor(FirstPalette.Colors[3]));
 
     {
@@ -223,7 +232,7 @@ StartLevel(game_state &Game)
         auto &WallMesh = Game.WallMesh;
         InitMeshBuffer(WallMesh.Buffer);
         AddCube(WallMesh.Buffer);
-        AddPart(WallMesh, mesh_part{ material{ Color_white, 0.0f, 0.0f, NULL }, 0, WallMesh.Buffer.VertexCount, GL_TRIANGLES });
+        AddPart(WallMesh, mesh_part{ material{ IntColor(0xffffff, 0.75f), 0.0f, 0.0f, NULL }, 0, WallMesh.Buffer.VertexCount, GL_TRIANGLES });
         EndMesh(WallMesh, GL_STATIC_DRAW);
     }
 
@@ -399,7 +408,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 				OtherEntity = First;
             }
 
-			if (true)
+			if (EntityToExplode->Ship->EnemyType == EnemyType_Explosive)
 			{
 				EntityToExplode = OtherEntity;
 			}
@@ -417,6 +426,23 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
             RemoveEntity(Game, EntityToExplode);
             return false;
         }
+    }
+    if (First->Type == EntityType_Wall || Second->Type == EntityType_Wall)
+    {
+        auto Result = FindEntityOfType(First, Second, EntityType_Wall);
+        auto *EntityToExplode = Result.Other;
+        auto *Explosion = CreateExplosionEntity(Game,
+                                                *EntityToExplode->Model->Mesh,
+                                                EntityToExplode->Model->Mesh->Parts[0],
+                                                EntityToExplode->Transform.Position,
+                                                vec3{ 0.0f },
+                                                EntityToExplode->Transform.Scale,
+                                                EntityToExplode->Ship->Color,
+                                                EntityToExplode->Ship->OutlineColor,
+                                                vec3{ 0,1,1 });
+        AddEntity(Game, Explosion);
+        RemoveEntity(Game, EntityToExplode);
+        return false;
     }
     return true;
 }
@@ -529,9 +555,9 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     PlayerShip->CurrentDraftTime = std::max(0.0f, std::min(PlayerShip->CurrentDraftTime, Global_Game_DraftChargeTime));
     PlayerShip->DraftCharge = PlayerShip->CurrentDraftTime / Global_Game_DraftChargeTime;
 
+    auto PlayerPosition = Game.PlayerEntity->Transform.Position;
     if (!Global_Camera_FreeCam)
     {
-        auto PlayerPosition = Game.PlayerEntity->Transform.Position;
         Camera.Position = vec3(PlayerPosition.x,
                                PlayerPosition.y + Global_Camera_OffsetY,
                                PlayerPosition.z + Global_Camera_OffsetZ);
@@ -554,7 +580,31 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         if (!Entity) continue;
 
-        MoveShipEntity(Entity, sin(EnemyMoveH), 0.0f, DeltaTime);
+        float MoveY = 0.0f;
+        if (Entity->Transform.Position.y < PlayerPosition.y)
+        {
+            MoveY = 4.0f;
+        }
+        MoveShipEntity(Entity, sin(EnemyMoveH), MoveY, DeltaTime);
+    }
+
+    for (auto *Entity : Game.WallEntities)
+    {
+        if (!Entity) continue;
+
+        auto *WallState = Entity->WallState;
+        if (WallState->Timer >= Global_Game_WallRaiseTime)
+        {
+            WallState->Timer = Global_Game_WallRaiseTime;
+        }
+        else
+        {
+            WallState->Timer += DeltaTime;
+        }
+
+        float Amount = 1.0f - (WallState->Timer / Global_Game_WallRaiseTime);
+        Println(Amount);
+        Entity->Transform.Position.z = WallState->BaseZ + (Global_Game_WallStartOffset * Amount);
     }
 
     for (auto *Entity : Game.TrailEntities)

@@ -32,6 +32,12 @@ struct player_state
     int Score = 0;
 };
 
+struct wall_state
+{
+    float Timer = 0;
+    float BaseZ;
+};
+
 struct explosion
 {
 	mesh Mesh;
@@ -53,6 +59,7 @@ enum entity_type
 	EntityType_TrailPiece,
 	EntityType_Crystal,
 	EntityType_TrackSegment,
+    EntityType_Wall,
 };
 struct entity
 {
@@ -61,6 +68,7 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
+    wall_state *WallState = NULL;
     player_state *PlayerState = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
