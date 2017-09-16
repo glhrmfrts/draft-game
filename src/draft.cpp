@@ -793,6 +793,7 @@ extern "C"
 		Game->ExplosionEntropy = RandomSeed(1234);
 
 		RegisterInputActions(Game->Input);
+        InitFreeType(Game->AssetCache);
 		InitGUI(Game->GUI, Game->Input);
 		MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
 		InitRenderState(Game->RenderState, Width, Height);

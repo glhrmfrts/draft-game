@@ -114,10 +114,9 @@ PushDrawCommand(gui &GUI)
     GUI.DrawCommandList.push_back(Curr);
 }
 
-static uint32
-PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
-         texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
-         bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
+                texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
+                bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     auto &Curr = GUI.CurrentDrawCommand;
     if (Curr.Texture != Texture ||
@@ -185,21 +184,48 @@ uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV, GLuint PrimType, bo
     return PushRect(GUI, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-#if 0
-uint32 PushText(gui &GUI, font &Font, const string &Text, rect R, color C, bool CheckState = true)
+uint32 PushText(gui &GUI, bitmap_font &Font, const string &Text, rect r, color c, bool CheckState = true)
 {
-    vec2 Size(0, 0);
-    RenderText(GUI, Font, Text, R, C, &Size);
+    int CurX = r.x;
+    int CurY = r.y;
+    for (size_t i = 0; i < Text.size(); i++)
+    {
+        if (Text[i] == '\n')
+        {
+            CurX = x;
+            CurY -= Font.NewLine;
+            continue;
+        }
 
-    R.Width = Size.x;
-    R.Height = Size.y;
+        int Index = int(Text[i]);
+        CurX += Font.BearingX[Index];
+        if (Text[i] != ' ')
+        {
+            int Diff = Font.CharHeight[Index] - Font.BearingY[Index];
+            PushRect(GUI,
+                     rect{ CurX, CurY - Diff, Width, Height },
+                     Color_white,
+                     c,
+                     Font.Texture,
+                     Font.TexRect[Index],
+                     1.0f,
+                     false,
+                     GL_TRIANGLES,
+                     false);
+        }
+
+        CurX += Font.AdvX[Index] - Font.BearingX[Index];
+        r.Width = std::max(r.Width, CurX);
+    }
+
+    r.Width = r.Width - r.X;
+    r.Height = (CurY + Font.NewLine) - r.Y;
     if (CheckState)
     {
-        return CheckElementState(*GUI.Input, R);
+        return CheckElementState(*GUI.Input, r);
     }
     return GUIElementState_none;
 }
-#endif
 
 void End(gui &GUI)
 {
