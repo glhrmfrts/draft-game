@@ -267,6 +267,7 @@ StartLevel(game_state &Game)
     }
 
 	Game.CurrentLevel = GenerateTestLevel(Game.Arena);
+    Game.TestFont = LoadBitmapFontFromTTF(Game.AssetCache, "data/fonts/vcr.ttf", 16);
 }
 
 static void
@@ -760,6 +761,9 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
         PushRect(Game.GUI, rect{25,25,190 * PlayerShip->DraftCharge,10},
                  IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
+
+        PushText(Game.GUI, Game.TestFont, "Score gui", rect{50, 20, 0, 0}, Color_white);
+
         End(Game.GUI);
     }
 }

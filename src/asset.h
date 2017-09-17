@@ -11,6 +11,7 @@ struct bitmap_font
 {
     int Size;
     int SquareSize;
+    int NewLine;
     texture *Texture;
 
     int          AdvX[MaxCharSupport];
@@ -22,11 +23,50 @@ struct bitmap_font
     texture_rect TexRect[MaxCharSupport];
 };
 
-struct asset_cache
+enum asset_type
 {
-    FT_Lib FreeTypeLib;
-    std::unordered_map<string, texture *> Textures;
+    AssetType_Texture,
+    AssetType_Font,
+};
+enum asset_completion
+{
+    AssetCompletion_Incomplete,
+    AssetCompletion_ThreadSafe,
+    AssetCompletion_ThreadUnsafe,
+};
+
+struct asset_loader;
+struct asset_entry
+{
+    asset_type Type;
+    asset_completion Completion;
+    string Filename;
+    string ID;
+    asset_loader *Loader;
+    void *Param;
+
+    union
+    {
+        struct {
+            vector<uint8> TextureData;
+            texture *Result;
+        } Texture;
+
+        struct {
+            vector<uint8> TextureData;
+            bitmap_font *Result;
+        } Font;
+    };
+};
+
+struct asset_loader
+{
+    FT_Library FreeTypeLib;
     memory_arena Arena;
+
+    thread_pool Pool;
+    std::mutex ArenaMutex;
+    std::atomic_int NumLoadedEntries;
 };
 
 #endif

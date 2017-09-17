@@ -184,42 +184,44 @@ uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV, GLuint PrimType, bo
     return PushRect(GUI, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-uint32 PushText(gui &GUI, bitmap_font &Font, const string &Text, rect r, color c, bool CheckState = true)
+uint32 PushText(gui &GUI, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
 {
-    int CurX = r.x;
-    int CurY = r.y;
+    int CurX = r.X;
+    int CurY = r.Y;
     for (size_t i = 0; i < Text.size(); i++)
     {
         if (Text[i] == '\n')
         {
-            CurX = x;
-            CurY -= Font.NewLine;
+            CurX = r.X;
+            CurY -= Font->NewLine;
             continue;
         }
 
         int Index = int(Text[i]);
-        CurX += Font.BearingX[Index];
+        CurX += Font->BearingX[Index];
         if (Text[i] != ' ')
         {
-            int Diff = Font.CharHeight[Index] - Font.BearingY[Index];
+            int Diff = Font->CharHeight[Index] - Font->BearingY[Index];
+            int Width = Font->CharWidth[Index];
+            int Height = Font->CharHeight[Index];
             PushRect(GUI,
-                     rect{ CurX, CurY - Diff, Width, Height },
+                     rect{ (float)CurX, (float)CurY - Diff, (float)Width, (float)Height },
                      Color_white,
                      c,
-                     Font.Texture,
-                     Font.TexRect[Index],
+                     Font->Texture,
+                     Font->TexRect[Index],
                      1.0f,
                      false,
                      GL_TRIANGLES,
                      false);
         }
 
-        CurX += Font.AdvX[Index] - Font.BearingX[Index];
-        r.Width = std::max(r.Width, CurX);
+        CurX += Font->AdvX[Index] - Font->BearingX[Index];
+        r.Width = std::max((int)r.Width, CurX);
     }
 
     r.Width = r.Width - r.X;
-    r.Height = (CurY + Font.NewLine) - r.Y;
+    r.Height = (CurY + Font->NewLine) - r.Y;
     if (CheckState)
     {
         return CheckElementState(*GUI.Input, r);

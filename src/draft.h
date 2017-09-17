@@ -156,6 +156,7 @@ struct game_state
 	int NumEntities = 0;
 
     random_series ExplosionEntropy;
+    bitmap_font *TestFont;
 
 	SDL_Window *Window;
     int Width;
