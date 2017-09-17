@@ -226,10 +226,7 @@ void Unbind(texture &Texture, int TextureUnit)
 
 void ApplyTextureParameters(texture &Texture, int TextureUnit)
 {
-    if (!Texture.ID)
-    {
-        glGenTextures(1, &Texture.ID);
-    }
+	assert(Texture.ID);
 
     Bind(Texture, TextureUnit);
     glTexParameteri(Texture.Target, GL_TEXTURE_MIN_FILTER, Texture.Filters.Min);
@@ -395,6 +392,7 @@ CreateFramebufferTexture(render_state &RenderState, texture &Texture, GLuint Tar
     Texture.Height = Height;
     Texture.Filters = {Filter, Filter};
     Texture.Wrap = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE};
+	glGenTextures(1, &Texture.ID);
     ApplyTextureParameters(Texture, 0);
     Bind(Texture, 0);
     UploadTexture(Texture, Format,

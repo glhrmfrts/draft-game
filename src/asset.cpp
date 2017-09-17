@@ -23,7 +23,14 @@ void InitAssetLoader(asset_loader &Loader)
         exit(EXIT_FAILURE);
     }
 
-    CreateThreadPool(Loader.Pool, 1);
+    CreateThreadPool(Loader.Pool, 1, 32);
+	Loader.NumLoadedEntries = 0;
+}
+
+void DestroyAssetLoader(asset_loader &Loader)
+{
+	FT_Done_FreeType(Loader.FreeTypeLib);
+	DestroyThreadPool(Loader.Pool);
 }
 
 void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename, const string &ID, void *Param)
@@ -35,6 +42,22 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
     Entry.Completion = AssetCompletion_Incomplete;
     Entry.Loader = &Loader;
     Entry.Param = Param;
+    switch (Type)
+    {
+    case AssetType_Texture:
+    {
+        Entry.Texture.Result = PushStruct<texture>(Loader.Arena);
+        break;
+    }
+    
+    case AssetType_Font:
+    {
+        auto *Result = PushStruct<bitmap_font>(Loader.Arena);
+        Result->Texture = PushStruct<texture>(Loader.Arena);
+        Entry.Font.Result = Result;
+        break;
+    }
+    }
     Loader.Entries.push_back(Entry);
 }
 
@@ -62,14 +85,6 @@ inline texture *FindTexture(asset_loader &Loader, const string &ID)
     return NULL;
 }
 
-// @TODO: maybe not needed since we have only one worker thread
-template<typename T>
-T *SafeAllocateAsset(asset_loader &Loader)
-{
-    std::unique_lock<std::mutex> Lock(Entry->Loader->ArenaMutex);
-    return PushStruct<T>(Entry->Loader->Arena);
-}
-
 static void LoadAssetThreadSafePart(void *Arg)
 {
     auto *Entry = (asset_entry *)Arg;
@@ -78,8 +93,8 @@ static void LoadAssetThreadSafePart(void *Arg)
     case AssetType_Texture:
     {
         uint32 Flags = (uint32)Entry->Param;
-        auto *Result = SafeAllocateAsset<texture>(*Entry->Loader);
-        Result->Filename = Filename;
+        auto *Result = Entry->Texture.Result;
+        Result->Filename = Entry->Filename;
         Result->Target = GL_TEXTURE_2D;
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Result->Wrap = {DefaultTextureWrap, DefaultTextureWrap};
@@ -94,16 +109,15 @@ static void LoadAssetThreadSafePart(void *Arg)
             Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
         }
 
-        Entry->Texture.Result = Result;
-        uint32 Error = lodepng::decode(Entry->Texture.TextureData, Result->Width, Result->Height, Filename);
+		vector<uint8> Data;
+        uint32 Error = lodepng::decode(Data, Result->Width, Result->Height, Entry->Filename);
         if (Error)
         {
-            std::cout << "texture: " << Filename << " " << lodepng_error_text(Error) << std::endl;
+            std::cout << "texture: " << Entry->Filename << " " << lodepng_error_text(Error) << std::endl;
             // generate magenta texture if it's missing
             Result->Width = 512;
             Result->Height = 512;
 
-            auto &Data = Entry->Texture.TextureData;
             Data.resize(Result->Width * Result->Height * 4);
             for (uint32 y = 0; y < Result->Height; y++)
             {
@@ -117,29 +131,33 @@ static void LoadAssetThreadSafePart(void *Arg)
                 }
             }
         }
+
+		Entry->Texture.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, Data.size(), "texture data");
+		memcpy(Entry->Texture.TextureData, &Data[0], Data.size());
         break;
     }
 
     case AssetType_Font:
     {
         FT_Face Face;
-        int Error = FT_New_Face(Entry->Loader->FreeTypeLib, Filename.c_str(), 0, &Face);
+        int Error = FT_New_Face(Entry->Loader->FreeTypeLib, Entry->Filename.c_str(), 0, &Face);
         if (Error)
         {
             Println("error loading font");
-            exit(EXIT_FAILURE);
+			break;
         }
 
         int Size = (int)(long int)Entry->Param;
         FT_Set_Pixel_Sizes(Face, Size, Size);
 
-        auto *Result = SafeAllocateAsset<bitmap_font>(*Entry->Loader);
+        auto *Result = Entry->Font.Result;
         Result->Size = Size;
         Result->SquareSize = NextP2(Size);
 
         int TextureDataSize = Result->SquareSize * Result->SquareSize * CharsPerTexture;
-        GLubyte TextureData[TextureDataSize];
-        memset(TextureData, 0, TextureDataSize);
+		Entry->Font.TextureDataSize = TextureDataSize;
+		Entry->Font.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, TextureDataSize, "font texture data");
+        memset(Entry->Font.TextureData, 0, TextureDataSize);
 
         for (int i = 0; i < MaxCharSupport; i++)
         {
@@ -161,10 +179,10 @@ static void LoadAssetThreadSafePart(void *Arg)
             for (int Char = 0; Char < Height; Char++)
             {
                 memcpy(
-                    TextureData + Row*Pitch*Result->SquareSize + Col*Result->SquareSize + Char*Pitch,
+                    Entry->Font.TextureData + Row*Pitch*Result->SquareSize + Col*Result->SquareSize + Char*Pitch,
                     Bitmap->buffer + (Height - Char - 1) * Width,
                     Width
-                    );
+                );
             }
 
             Result->AdvX[i] = Face->glyph->advance.x>>6;
@@ -186,8 +204,6 @@ static void LoadAssetThreadSafePart(void *Arg)
         }
 
         FT_Done_Face(Face);
-        Entry->Font.Result = Result;
-        Entry->Font.TextureData = TextureData;
         break;
     }
     }
@@ -203,39 +219,42 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
     case AssetType_Texture:
     {
         auto *Result = Entry->Texture.Result;
-        ApplyTextureParameters(*Result, 0);
+		glGenTextures(1, &Result->ID);
 
         Bind(*Result, 0);
-        UploadTexture(*Result, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, &Entry->Texture.TextureData[0]);
+        UploadTexture(*Result, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, Entry->Texture.TextureData);
         Unbind(*Result, 0);
+
+		ApplyTextureParameters(*Result, 0);
         break;
     }
 
     case AssetType_Font:
     {
         auto *Result = Entry->Font.Result;
-        auto *Texture = PushStruct<texture>(Entry->Loader->Arena);
+        auto *Texture = Result->Texture;
+		glGenTextures(1, &Texture->ID);
+
         Texture->Width = Texture->Height = Result->SquareSize * CharsPerTextureRoot;
         Texture->Target = GL_TEXTURE_2D;
         Texture->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Texture->Wrap = {DefaultTextureWrap, DefaultTextureWrap};
-        ApplyTextureParameters(*Texture, 0);
 
-        GLubyte RGBA[TextureDataSize*4];
-        for (int i = 0; i < TextureDataSize; i++)
+        GLubyte *RGBA = new GLubyte[Entry->Font.TextureDataSize * 4];
+        for (int i = 0; i < Entry->Font.TextureDataSize; i++)
         {
             int Idx = i * 4;
             RGBA[Idx] = 255;
             RGBA[Idx+1] = 255;
             RGBA[Idx+2] = 255;
-            RGBA[Idx+3] = TextureData[i];
+            RGBA[Idx+3] = Entry->Font.TextureData[i];
         }
 
         Bind(*Texture, 0);
         UploadTexture(*Texture, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, RGBA);
         Unbind(*Texture, 0);
 
-        Result->Texture = Texture;
+		ApplyTextureParameters(*Texture, 0);
         break;
     }
     }
@@ -251,7 +270,7 @@ void StartLoading(asset_loader &Loader)
     }
 }
 
-bool IsComplete(asset_loader &Loader)
+bool Update(asset_loader &Loader)
 {
     if (!int(Loader.Pool.NumJobs))
     {

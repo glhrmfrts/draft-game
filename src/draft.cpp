@@ -136,11 +136,11 @@ RemoveEntity(game_state &Game, entity *Entity)
 #define TrackSegmentWidth   1024
 #define TrackSegmentCount   8
 #define TrackSegmentPadding 0
-#define SkyboxScale         vec3(500.0f)
 #define CrystalColor        IntColor(FirstPalette.Colors[1])
 static void
 StartLevel(game_state &Game)
 {
+	Game.Mode = GameMode_Level;
     FreeArena(Game.Arena);
 	Game.RenderState.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
     Game.RenderState.FogColor.a = 1.0f;
@@ -154,7 +154,7 @@ StartLevel(game_state &Game)
 			Game.RenderState.FogColor,
 			1.0f,
 			1,
-			LoadTextureFile(Game.AssetCache, "data/textures/grid.png", Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat),
+			FindTexture(Game.AssetLoader, "grid"),
 			0,
 			vec2{TrackSegmentWidth/16,TrackSegmentWidth/16}
 		};
@@ -183,31 +183,6 @@ StartLevel(game_state &Game)
         AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
 
         EndMesh(ShipMesh, GL_STATIC_DRAW);
-    }
-
-    {
-        auto &SkyboxMesh = Game.SkyboxMesh;
-        InitMeshBuffer(SkyboxMesh.Buffer);
-
-        texture *FrontTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_bk.png");
-        texture *RightTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_rt.png");
-        texture *BackTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_ft.png");
-        texture *LeftTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_lf.png");
-        texture *TopTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_up.png");
-        texture *BottomTexture = LoadTextureFile(Game.AssetCache, "data/skyboxes/kurt/space_dn.png");
-        AddSkyboxFace(SkyboxMesh, vec3(-1, 1, -1), vec3(1, 1, -1), vec3(1, 1, 1), vec3(-1, 1, 1), FrontTexture, 0);
-        AddSkyboxFace(SkyboxMesh, vec3(1, 1, -1), vec3(1, -1, -1), vec3(1, -1, 1), vec3(1, 1, 1), RightTexture, 1);
-        AddSkyboxFace(SkyboxMesh, vec3(1, -1, -1), vec3(-1, -1, -1), vec3(-1, -1, 1), vec3(1, -1, 1), BackTexture, 2);
-        AddSkyboxFace(SkyboxMesh, vec3(-1, -1, -1), vec3(-1, 1, -1), vec3(-1, 1, 1), vec3(-1, -1, 1), LeftTexture, 3);
-        AddSkyboxFace(SkyboxMesh, vec3(-1, 1, 1), vec3(1, 1, 1), vec3(1, -1, 1), vec3(-1, -1, 1), TopTexture, 4);
-        AddSkyboxFace(SkyboxMesh, vec3(-1, -1, -1), vec3(1, -1, -1), vec3(1, 1, -1), vec3(-1, 1, -1), BottomTexture, 5);
-        EndMesh(SkyboxMesh, GL_STATIC_DRAW);
-
-        auto Entity = PushStruct<entity>(Game.Arena);
-        Entity->Model = CreateModel(Game.Arena, &SkyboxMesh);
-        Entity->Transform.Scale = SkyboxScale;
-        AddEntity(Game, Entity);
-        Game.SkyboxEntity = Entity;
     }
 
 	{
@@ -267,7 +242,7 @@ StartLevel(game_state &Game)
     }
 
 	Game.CurrentLevel = GenerateTestLevel(Game.Arena);
-    Game.TestFont = LoadBitmapFontFromTTF(Game.AssetCache, "data/fonts/vcr.ttf", 16);
+    Game.TestFont = FindBitmapFont(Game.AssetLoader, "vcr_16");
 }
 
 static void
@@ -565,13 +540,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         Camera.LookAt = Camera.Position + vec3(0, 10, 0);
     }
 
-    {
-        auto *Entity = Game.PlayerEntity;
-        Game.SkyboxEntity->Transform.Position.y = Entity->Transform.Position.y;
-        float dx = Entity->Transform.Position.x - Game.SkyboxEntity->Transform.Position.x;
-        Game.SkyboxEntity->Transform.Position.x += dx * 0.25f;
-    }
-
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState, DeltaTime);
 
@@ -604,7 +572,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         }
 
         float Amount = 1.0f - (WallState->Timer / Global_Game_WallRaiseTime);
-        Println(Amount);
         Entity->Transform.Position.z = WallState->BaseZ + (Global_Game_WallStartOffset * Amount);
     }
 
@@ -780,6 +747,54 @@ RegisterInputActions(game_input &Input)
     Input.Actions[Action_debugPause] = action_state{ SDL_SCANCODE_P, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
+static void
+StartLoadingScreen(game_state &Game)
+{
+	Game.Mode = GameMode_LoadingScreen;
+	InitAssetLoader(Game.AssetLoader);
+
+	AddAssetEntry(
+		Game.AssetLoader,
+		AssetType_Texture,
+		"data/textures/grid.png",
+		"grid",
+		(void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
+	);
+	AddAssetEntry(
+		Game.AssetLoader,
+		AssetType_Font,
+		"data/fonts/vcr.ttf",
+		"vcr_16",
+		(void *)16
+	);
+	StartLoading(Game.AssetLoader);
+}
+
+static void
+RenderLoadingScreen(game_state &Game, float DeltaTime)
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	auto &g = Game.GUI;
+	float Width = Game.Width * 0.5f;
+	float Height = Game.Height * 0.1f;
+	float x = (float)Game.Width/2 - Width/2;
+	float y = (float)Game.Height/2 - Height/2;
+	float LoadingPercentage = (float)(int)Game.AssetLoader.NumLoadedEntries / (float)Game.AssetLoader.Entries.size();
+	float ProgressBarWidth = Width*LoadingPercentage;
+
+	UpdateProjectionView(Game.GUICamera);
+	Begin(g, Game.GUICamera);
+	PushRect(g, rect{ x, y, Width, Height }, Color_white, GL_LINE_LOOP);
+	PushRect(g, rect{ x + 5, y + 5, ProgressBarWidth - 10, Height - 10 }, Color_white);
+	End(g);
+
+	if (Update(Game.AssetLoader))
+	{
+		StartLevel(Game);
+	}
+}
+
 #ifdef _WIN32
 #define export_func __declspec(dllexport)
 #else
@@ -797,11 +812,10 @@ extern "C"
 		Game->ExplosionEntropy = RandomSeed(1234);
 
 		RegisterInputActions(Game->Input);
-        InitFreeType(Game->AssetCache);
 		InitGUI(Game->GUI, Game->Input);
 		MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
 		InitRenderState(Game->RenderState, Width, Height);
-		StartLevel(*Game);
+		StartLoadingScreen(*Game);
 	}
 
 	// @TODO: this exists only for imgui, remove in the future
@@ -813,7 +827,15 @@ extern "C"
 	export_func GAME_RENDER(GameRender)
 	{
 		ImGui_ImplSdlGL3_NewFrame(Game->Window);
-		UpdateAndRenderLevel(*Game, DeltaTime);
+		switch (Game->Mode)
+		{
+		case GameMode_LoadingScreen:
+			RenderLoadingScreen(*Game, DeltaTime);
+			break;
+		case GameMode_Level:
+			UpdateAndRenderLevel(*Game, DeltaTime);
+			break;
+		}
 		DrawDebugUI(*Game, DeltaTime);
 		ImGui::Render();
 	}
@@ -821,7 +843,8 @@ extern "C"
 	export_func GAME_DESTROY(GameDestroy)
 	{
 		ImGui_ImplSdlGL3_Shutdown();
+		DestroyAssetLoader(Game->AssetLoader);
 		FreeArena(Game->Arena);
-		FreeArena(Game->AssetCache.Arena);
+		FreeArena(Game->AssetLoader.Arena);
 	}
 }

@@ -85,6 +85,7 @@ void InitGUI(gui &GUI, game_input &Input)
 void Begin(gui &GUI, camera &Camera)
 {
     assert(GUI.Program.ID);
+    assert(Camera.Updated);
 
     Bind(GUI.Program);
     SetUniform(GUI.ProjectionView, Camera.ProjectionView);
@@ -174,7 +175,7 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
     return GUIElementState_none;
 }
 
-uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType, bool CheckState = true)
+uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return PushRect(GUI, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }

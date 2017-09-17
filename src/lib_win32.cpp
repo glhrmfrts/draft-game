@@ -33,8 +33,8 @@ GetFileLastWriteTime(char *Filename)
 static void
 LoadGameLibrary(game_library &Lib)
 {
-	CopyFile(GameLibraryPath, TempLibraryPath, FALSE);
-    Lib.Library = LoadLibrary(TempLibraryPath);
+	//CopyFile(GameLibraryPath, TempLibraryPath, FALSE);
+    Lib.Library = LoadLibrary(GameLibraryPath);
     if (Lib.Library)
     {
 		Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);

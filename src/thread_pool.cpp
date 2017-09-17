@@ -26,6 +26,7 @@ static void ThreadPoolLoop(void *Arg)
 
 void CreateThreadPool(thread_pool &Pool, int NumThreads, int JobsPerThread = 1)
 {
+	Pool.NumJobs = 0;
 	Pool.JobsPerThread = JobsPerThread;
 	Pool.Threads.resize(NumThreads);
 	for (int i = 0; i < NumThreads; i++)

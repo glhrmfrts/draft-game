@@ -9,7 +9,7 @@
 #include "draft.h"
 
 #undef main
-
+ 
 #ifdef _WIN32
 #include "lib_win32.cpp"
 #else

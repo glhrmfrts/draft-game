@@ -48,12 +48,13 @@ struct asset_entry
     union
     {
         struct {
-            vector<uint8> TextureData;
+			uint8 *TextureData;
             texture *Result;
         } Texture;
 
         struct {
-            vector<uint8> TextureData;
+            uint8 *TextureData;
+			int TextureDataSize;
             bitmap_font *Result;
         } Font;
     };
@@ -63,9 +64,9 @@ struct asset_loader
 {
     FT_Library FreeTypeLib;
     memory_arena Arena;
+	vector<asset_entry> Entries;
 
     thread_pool Pool;
-    std::mutex ArenaMutex;
     std::atomic_int NumLoadedEntries;
 };
 

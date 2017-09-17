@@ -121,14 +121,16 @@ struct game_input
 
 enum game_mode
 {
-    GameMode_level,
+	GameMode_LoadingScreen,
+    GameMode_Level,
 };
 struct game_state
 {
+	game_mode Mode;
     game_input Input;
     game_input PrevInput;
 
-    asset_cache AssetCache;
+	asset_loader AssetLoader;
     gui GUI;
     camera GUICamera;
     render_state RenderState;
