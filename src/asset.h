@@ -38,9 +38,9 @@ enum asset_completion
 struct asset_loader;
 struct asset_entry
 {
+    uint64 LastLoadTime;
     asset_type Type;
     asset_completion Completion;
-    uint32 LastLoadTime;
     string Filename;
     string ID;
     asset_loader *Loader;

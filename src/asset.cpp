@@ -292,9 +292,9 @@ void CheckAssetsChanged(asset_loader &Loader)
     Update(Loader);
     for (auto &Entry : Loader.Entries)
     {
-        uint32 LastWriteTime = Loader.Platform->GetFileLastWriteTime(Entry.Filename.c_str());
-        uint32 Compare = Loader.Platform->CompareFileTime(LastWriteTime, Entry.LastLoadTime);
-        if (Compare > 0)
+        uint64 LastWriteTime = Loader.Platform->GetFileLastWriteTime(Entry.Filename.c_str());
+        int32 Compare = Loader.Platform->CompareFileTime(LastWriteTime, Entry.LastLoadTime);
+        if (Compare != 0)
         {
             printf("[asset] Asset changed: %s\n", Entry.Filename.c_str());
             AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Entry);

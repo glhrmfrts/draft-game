@@ -9,7 +9,7 @@
 struct game_library
 {
     HMODULE                 Library;
-    uint32                  LoadTime;
+    uint64                  LoadTime;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
@@ -17,7 +17,7 @@ struct game_library
 };
 
 static inline FILETIME
-Uint32ToFileTime(uint32 t)
+Uint64ToFileTime(uint64 t)
 {
     ULARGE_INTEGER LargeInteger = {};
     LargeInteger.QuadPart = t;
@@ -41,14 +41,15 @@ PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
     ULARGE_INTEGER LargeInteger;
     LargeInteger.LowPart = LastWriteTime.dwLowDateTime;
     LargeInteger.HighPart = LastWriteTime.dwHighDateTime;
-    return (uint32)LargeInteger.QuadPart;
+    return (uint64)LargeInteger.QuadPart;
 }
 
 PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
 {
-    FILETIME FileTime1 = Uint32ToFileTime(t1);
-    FILETIME FileTime2 = Uint32ToFileTime(t2);
-    return int32(CompareFileTime(&FileTime1, &FileTime2));
+    FILETIME FileTime1 = Uint64ToFileTime(t1);
+    FILETIME FileTime2 = Uint64ToFileTime(t2);
+    int32 Result = int32(CompareFileTime(&FileTime1, &FileTime2));
+    return Result;
 }
 
 static void
@@ -87,6 +88,7 @@ UnloadGameLibrary(game_library &Lib)
 static bool
 GameLibraryChanged(game_library &Lib)
 {
-    uint32 LastWriteTime = PlatformGetFileLastWriteTime(GameLibraryPath);
-    return (PlatformCompareFileTime(LastWriteTime, Lib.LoadTime) > 0);
+    uint64 LastWriteTime = PlatformGetFileLastWriteTime(GameLibraryPath);
+    bool Result = (PlatformCompareFileTime(LastWriteTime, Lib.LoadTime) > 0);
+    return Result;
 }

@@ -16,8 +16,8 @@
 #include "random.h"
 #include "level.h"
 
-#define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) int name(const char *Filename)
-#define PLATFORM_COMPARE_FILE_TIME(name)        int name(int t1, int t2)
+#define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
+#define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
 
 typedef PLATFORM_GET_FILE_LAST_WRITE_TIME(platform_get_file_last_write_time_func);
 typedef PLATFORM_COMPARE_FILE_TIME(platform_compare_file_time_func);
