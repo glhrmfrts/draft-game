@@ -14,7 +14,7 @@ static inline int NextP2(int n)
     return Result;
 }
 
-void InitAssetLoader(asset_loader &Loader)
+void InitAssetLoader(asset_loader &Loader, platform_api &Platform)
 {
     int Error = FT_Init_FreeType(&Loader.FreeTypeLib);
     if (Error)
@@ -25,6 +25,7 @@ void InitAssetLoader(asset_loader &Loader)
 
     CreateThreadPool(Loader.Pool, 1, 32);
     Loader.NumLoadedEntries = 0;
+    Loader.Platform = &Platform;
 }
 
 void DestroyAssetLoader(asset_loader &Loader)
@@ -46,7 +47,9 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
     {
     case AssetType_Texture:
     {
-        Entry.Texture.Result = PushStruct<texture>(Loader.Arena);
+        auto *Result = PushStruct<texture>(Loader.Arena);
+        glGenTextures(1, &Result->ID);
+        Entry.Texture.Result = Result;
         break;
     }
     
@@ -54,6 +57,7 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
     {
         auto *Result = PushStruct<bitmap_font>(Loader.Arena);
         Result->Texture = PushStruct<texture>(Loader.Arena);
+        glGenTextures(1, &Result->Texture->ID);
         Entry.Font.Result = Result;
         break;
     }
@@ -208,6 +212,7 @@ static void LoadAssetThreadSafePart(void *Arg)
     }
     }
 
+    Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
     Entry->Completion = AssetCompletion_ThreadSafe;
     Entry->Loader->NumLoadedEntries++;
 }
@@ -219,8 +224,6 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
     case AssetType_Texture:
     {
         auto *Result = Entry->Texture.Result;
-        glGenTextures(1, &Result->ID);
-
         Bind(*Result, 0);
         UploadTexture(*Result, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, Entry->Texture.TextureData);
         Unbind(*Result, 0);
@@ -233,8 +236,6 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
     {
         auto *Result = Entry->Font.Result;
         auto *Texture = Result->Texture;
-        glGenTextures(1, &Texture->ID);
-
         Texture->Width = Texture->Height = Result->SquareSize * CharsPerTextureRoot;
         Texture->Target = GL_TEXTURE_2D;
         Texture->Filters = {DefaultTextureFilter, DefaultTextureFilter};
@@ -284,4 +285,19 @@ bool Update(asset_loader &Loader)
         return true;
     }
     return false;
+}
+
+void CheckAssetsChanged(asset_loader &Loader)
+{
+    Update(Loader);
+    for (auto &Entry : Loader.Entries)
+    {
+        uint32 LastWriteTime = Loader.Platform->GetFileLastWriteTime(Entry.Filename.c_str());
+        uint32 Compare = Loader.Platform->CompareFileTime(LastWriteTime, Entry.LastLoadTime);
+        if (Compare > 0)
+        {
+            printf("[asset] Asset changed: %s\n", Entry.Filename.c_str());
+            AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Entry);
+        }
+    }
 }

@@ -86,6 +86,8 @@ int main(int argc, char **argv)
     Game.Window = Window;
     Game.Width = vWidth;
     Game.Height = vHeight;
+    Game.Platform.CompareFileTime = PlatformCompareFileTime;
+    Game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
 
     auto &Input = Game.Input;
     if (SDL_NumJoysticks() > 0)

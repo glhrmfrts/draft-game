@@ -9,7 +9,7 @@
 struct game_library
 {
     HMODULE                 Library;
-    FILETIME                LoadTime;
+    uint32                  LoadTime;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
@@ -17,7 +17,18 @@ struct game_library
 };
 
 static inline FILETIME
-GetFileLastWriteTime(char *Filename)
+Uint32ToFileTime(uint32 t)
+{
+    ULARGE_INTEGER LargeInteger = {};
+    LargeInteger.QuadPart = t;
+    
+    FILETIME Result = {};
+    Result.dwLowDateTime = LargeInteger.LowPart;
+    Result.dwHighDateTime = LargeInteger.HighPart;
+    return Result;
+}
+
+PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
 {
     FILETIME LastWriteTime = {};
 
@@ -27,7 +38,17 @@ GetFileLastWriteTime(char *Filename)
         LastWriteTime = Data.ftLastWriteTime;
     }
 
-    return LastWriteTime;
+    ULARGE_INTEGER LargeInteger;
+    LargeInteger.LowPart = LastWriteTime.dwLowDateTime;
+    LargeInteger.HighPart = LastWriteTime.dwHighDateTime;
+    return (uint32)LargeInteger.QuadPart;
+}
+
+PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
+{
+    FILETIME FileTime1 = Uint32ToFileTime(t1);
+    FILETIME FileTime2 = Uint32ToFileTime(t2);
+    return int32(CompareFileTime(&FileTime1, &FileTime2));
 }
 
 static void
@@ -37,7 +58,7 @@ LoadGameLibrary(game_library &Lib)
     Lib.Library = LoadLibrary(GameLibraryPath);
     if (Lib.Library)
     {
-        Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
+        Lib.LoadTime = PlatformGetFileLastWriteTime(GameLibraryPath);
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
@@ -66,6 +87,6 @@ UnloadGameLibrary(game_library &Lib)
 static bool
 GameLibraryChanged(game_library &Lib)
 {
-    FILETIME LastWriteTime = GetFileLastWriteTime(GameLibraryPath);
-    return (CompareFileTime(&LastWriteTime, &Lib.LoadTime) == 1);
+    uint32 LastWriteTime = PlatformGetFileLastWriteTime(GameLibraryPath);
+    return (PlatformCompareFileTime(LastWriteTime, Lib.LoadTime) > 0);
 }

@@ -16,6 +16,18 @@
 #include "random.h"
 #include "level.h"
 
+#define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) int name(const char *Filename)
+#define PLATFORM_COMPARE_FILE_TIME(name)        int name(int t1, int t2)
+
+typedef PLATFORM_GET_FILE_LAST_WRITE_TIME(platform_get_file_last_write_time_func);
+typedef PLATFORM_COMPARE_FILE_TIME(platform_compare_file_time_func);
+
+struct platform_api
+{
+    platform_get_file_last_write_time_func *GetFileLastWriteTime;
+    platform_compare_file_time_func *CompareFileTime;    
+};
+
 #define GAME_INIT(name) void name(game_state *Game)
 #define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
 #define GAME_DESTROY(name) void name(game_state *Game)
@@ -160,6 +172,7 @@ struct game_state
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
 
+    platform_api Platform;
 	SDL_Window *Window;
     int Width;
     int Height;

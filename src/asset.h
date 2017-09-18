@@ -40,6 +40,7 @@ struct asset_entry
 {
     asset_type Type;
     asset_completion Completion;
+    uint32 LastLoadTime;
     string Filename;
     string ID;
     asset_loader *Loader;
@@ -60,12 +61,14 @@ struct asset_entry
     };
 };
 
+struct platform_api;
 struct asset_loader
 {
     FT_Library FreeTypeLib;
     memory_arena Arena;
     vector<asset_entry> Entries;
 
+    platform_api *Platform;
     thread_pool Pool;
     std::atomic_int NumLoadedEntries;
 };

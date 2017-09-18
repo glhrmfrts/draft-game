@@ -751,7 +751,7 @@ static void
 StartLoadingScreen(game_state &Game)
 {
     Game.Mode = GameMode_LoadingScreen;
-    InitAssetLoader(Game.AssetLoader);
+    InitAssetLoader(Game.AssetLoader, Game.Platform);
 
     AddAssetEntry(
         Game.AssetLoader,
@@ -836,6 +836,19 @@ extern "C"
             UpdateAndRenderLevel(*Game, DeltaTime);
             break;
         }
+
+#ifdef DRAFT_DEBUG
+        {
+            static float ReloadTimer = 0.0f;
+            ReloadTimer += DeltaTime;
+            if (ReloadTimer >= 1.0f)
+            {
+                ReloadTimer = 0.0f;
+                CheckAssetsChanged(Game->AssetLoader);
+            }
+        }
+#endif
+
         DrawDebugUI(*Game, DeltaTime);
         ImGui::Render();
     }
