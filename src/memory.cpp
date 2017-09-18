@@ -81,7 +81,7 @@ void FreeArena(memory_arena &Arena)
         printf("[memory] Freeing memory block '%s' of %u bytes at address %p\n", Block->Name, Block->Size, Block->Base);
 #endif
         Arena.CurrentBlock = Block->Prev;
-		free(Block->Base);
-		free(Block);
+        free(Block->Base);
+        free(Block);
     }
 }

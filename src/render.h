@@ -28,10 +28,10 @@ IntColor(int c, float alpha = 1.0f)
 
 struct mesh_vertex
 {
-	vec3 Position;
-	vec2 Uv;
-	color Color;
-	vec3 Normal;
+    vec3 Position;
+    vec2 Uv;
+    color Color;
+    vec3 Normal;
 };
 
 struct vertex_buffer
@@ -79,7 +79,7 @@ struct texture
     uint32 Height;
     texture_filters Filters;
     texture_wrap Wrap;
-	uint32 Flags = 0;
+    uint32 Flags = 0;
 };
 
 struct texture_rect
@@ -158,10 +158,10 @@ struct material
     float TexWeight = 0;
     texture *Texture = NULL;
     uint32 Flags = 0;
-	vec2 UvScale = vec2{ 1, 1 };
+    vec2 UvScale = vec2{ 1, 1 };
 
     material() {}
-	material(color c, float e, float tw, texture *t, uint32 f = 0, vec2 us = vec2{ 1, 1 })
+    material(color c, float e, float tw, texture *t, uint32 f = 0, vec2 us = vec2{ 1, 1 })
         : DiffuseColor(c), Emission(e), TexWeight(tw), Texture(t), Flags(f), UvScale(us) {}
 };
 
@@ -194,21 +194,21 @@ struct model_program
     int DiffuseColor;
     int TexWeight;
     int Emission;
-	int UvScale;
+    int UvScale;
     int Sampler;
     int MaterialFlags;
-	int ExplosionLightColor;
-	int ExplosionLightTimer;
-	int CamPos;
-	int FogColor;
-	int FogStart;
-	int FogEnd;
+    int ExplosionLightColor;
+    int ExplosionLightTimer;
+    int CamPos;
+    int FogColor;
+    int FogStart;
+    int FogEnd;
 };
 
 struct blur_program
 {
     shader_program ShaderProgram;
-	int PixelSize;
+    int PixelSize;
 };
 
 struct resolve_multisample_program
@@ -262,7 +262,7 @@ struct render_state
 {
     model_program ModelProgram;
     blur_program BlurHorizontalProgram;
-	blur_program BlurVerticalProgram;
+    blur_program BlurVerticalProgram;
     shader_program BlendProgram;
     shader_program BlitProgram;
     resolve_multisample_program ResolveMultisampleProgram;
@@ -287,9 +287,9 @@ struct render_state
     GLint MaxMultiSampleCount;
     GLint LastVAO;
 
-	color FogColor;
-	color ExplosionLightColor;
-	float ExplosionLightTimer = 0;
+    color FogColor;
+    color ExplosionLightColor;
+    float ExplosionLightTimer = 0;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;

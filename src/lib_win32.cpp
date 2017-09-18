@@ -9,7 +9,7 @@
 struct game_library
 {
     HMODULE                 Library;
-	FILETIME                LoadTime;
+    FILETIME                LoadTime;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
@@ -19,31 +19,31 @@ struct game_library
 static inline FILETIME
 GetFileLastWriteTime(char *Filename)
 {
-	FILETIME LastWriteTime = {};
+    FILETIME LastWriteTime = {};
 
-	WIN32_FILE_ATTRIBUTE_DATA Data;
-	if (GetFileAttributesEx(Filename, GetFileExInfoStandard, &Data))
-	{
-		LastWriteTime = Data.ftLastWriteTime;
-	}
+    WIN32_FILE_ATTRIBUTE_DATA Data;
+    if (GetFileAttributesEx(Filename, GetFileExInfoStandard, &Data))
+    {
+        LastWriteTime = Data.ftLastWriteTime;
+    }
 
-	return LastWriteTime;
+    return LastWriteTime;
 }
 
 static void
 LoadGameLibrary(game_library &Lib)
 {
-	//CopyFile(GameLibraryPath, TempLibraryPath, FALSE);
+    //CopyFile(GameLibraryPath, TempLibraryPath, FALSE);
     Lib.Library = LoadLibrary(GameLibraryPath);
     if (Lib.Library)
     {
-		Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
-		printf("Loading game library\n");
+        Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
+        printf("Loading game library\n");
 
-		Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
-		Lib.GameRender = (game_render_func *)GetProcAddress(Lib.Library, "GameRender");
-		Lib.GameDestroy = (game_destroy_func *)GetProcAddress(Lib.Library, "GameDestroy");
-		Lib.GameProcessEvent = (game_process_event_func *)GetProcAddress(Lib.Library, "GameProcessEvent");
+        Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
+        Lib.GameRender = (game_render_func *)GetProcAddress(Lib.Library, "GameRender");
+        Lib.GameDestroy = (game_destroy_func *)GetProcAddress(Lib.Library, "GameDestroy");
+        Lib.GameProcessEvent = (game_process_event_func *)GetProcAddress(Lib.Library, "GameProcessEvent");
     }
     else
     {
@@ -55,12 +55,12 @@ LoadGameLibrary(game_library &Lib)
 static void
 UnloadGameLibrary(game_library &Lib)
 {
-	FreeLibrary(Lib.Library);
-	Lib.Library = 0;
-	Lib.GameInit = NULL;
-	Lib.GameRender = NULL;
-	Lib.GameDestroy = NULL;
-	Lib.GameProcessEvent = NULL;
+    FreeLibrary(Lib.Library);
+    Lib.Library = 0;
+    Lib.GameInit = NULL;
+    Lib.GameRender = NULL;
+    Lib.GameDestroy = NULL;
+    Lib.GameProcessEvent = NULL;
 }
 
 static bool

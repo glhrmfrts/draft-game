@@ -15,7 +15,7 @@
 struct game_library
 {
     void *                  Library;
-	time_t                  LoadTime;
+    time_t                  LoadTime;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
@@ -25,10 +25,10 @@ struct game_library
 static inline time_t
 GetFileLastWriteTime(char *Filename)
 {
-	struct stat Stat;
+    struct stat Stat;
     stat(Filename, &Stat);
 
-	return Stat.st_mtime;
+    return Stat.st_mtime;
 }
 
 static void
@@ -49,13 +49,13 @@ LoadGameLibrary(game_library &Lib)
     Lib.Library = dlopen(TempLibraryPath, RTLD_LAZY);
     if (Lib.Library)
     {
-		Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
-		printf("Loading game library\n");
+        Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
+        printf("Loading game library\n");
 
-		Lib.GameInit = (game_init_func *)dlsym(Lib.Library, "GameInit");
-		Lib.GameRender = (game_render_func *)dlsym(Lib.Library, "GameRender");
-		Lib.GameDestroy = (game_destroy_func *)dlsym(Lib.Library, "GameDestroy");
-		Lib.GameProcessEvent = (game_process_event_func *)dlsym(Lib.Library, "GameProcessEvent");
+        Lib.GameInit = (game_init_func *)dlsym(Lib.Library, "GameInit");
+        Lib.GameRender = (game_render_func *)dlsym(Lib.Library, "GameRender");
+        Lib.GameDestroy = (game_destroy_func *)dlsym(Lib.Library, "GameDestroy");
+        Lib.GameProcessEvent = (game_process_event_func *)dlsym(Lib.Library, "GameProcessEvent");
     }
     else
     {
@@ -67,12 +67,12 @@ LoadGameLibrary(game_library &Lib)
 static void
 UnloadGameLibrary(game_library &Lib)
 {
-	dlclose(Lib.Library);
-	Lib.Library = 0;
-	Lib.GameInit = NULL;
-	Lib.GameRender = NULL;
-	Lib.GameDestroy = NULL;
-	Lib.GameProcessEvent = NULL;
+    dlclose(Lib.Library);
+    Lib.Library = 0;
+    Lib.GameInit = NULL;
+    Lib.GameRender = NULL;
+    Lib.GameDestroy = NULL;
+    Lib.GameProcessEvent = NULL;
 }
 
 static bool

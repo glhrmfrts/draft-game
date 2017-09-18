@@ -41,8 +41,8 @@ int main(int argc, char **argv)
 
     int Width = 1280;
     int Height = 720;
-	int vWidth = Width/2;
-	int vHeight = Height/2;
+    int vWidth = Width/2;
+    int vHeight = Height/2;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           Width, Height, SDL_WINDOW_OPENGL);
 
@@ -58,29 +58,29 @@ int main(int argc, char **argv)
     SDL_GL_SetSwapInterval(0);
 
     ALCdevice *AudioDevice = alcOpenDevice(NULL);
-	if (!AudioDevice)
-	{
-		std::cerr << "Error opening audio device" << std::endl;
-	}
+    if (!AudioDevice)
+    {
+        std::cerr << "Error opening audio device" << std::endl;
+    }
 
     ALCcontext *AudioContext = alcCreateContext(AudioDevice, NULL);
-	if (!alcMakeContextCurrent(AudioContext))
-	{
-		std::cerr << "Error setting audio context" << std::endl;
-	}
+    if (!alcMakeContextCurrent(AudioContext))
+    {
+        std::cerr << "Error setting audio context" << std::endl;
+    }
 
-	glewExperimental = GL_TRUE;
-	if (glewInit() != GLEW_OK)
-	{
-		std::cout << "Error loading GL extensions" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	printf("%s\n", glGetString(GL_VERSION));
-	printf("%s\n", glGetString(GL_VENDOR));
-	printf("%s\n", glGetString(GL_RENDERER));
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK)
+    {
+        std::cout << "Error loading GL extensions" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", glGetString(GL_VERSION));
+    printf("%s\n", glGetString(GL_VENDOR));
+    printf("%s\n", glGetString(GL_RENDERER));
 
-	glEnable(GL_MULTISAMPLE);
-	glViewport(0, 0, Width, Height);
+    glEnable(GL_MULTISAMPLE);
+    glViewport(0, 0, Width, Height);
 
     game_state Game;
     Game.Window = Window;
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
     Lib.GameInit(&Game);
 
-	float ReloadTimer = GameLibraryReloadTime;
+    float ReloadTimer = GameLibraryReloadTime;
     float DeltaTime = 0.016f;
     float DeltaTimeMS = DeltaTime * 1000.0f;
     uint32 PreviousTime = SDL_GetTicks();
@@ -108,58 +108,58 @@ int main(int argc, char **argv)
         float Elapsed = ((CurrentTime - PreviousTime) / 1000.0f);
 
 #ifdef DRAFT_DEBUG
-		ReloadTimer -= Elapsed;
-		if (ReloadTimer <= 0)
-		{
-			ReloadTimer = GameLibraryReloadTime;
+        ReloadTimer -= Elapsed;
+        if (ReloadTimer <= 0)
+        {
+            ReloadTimer = GameLibraryReloadTime;
             if (GameLibraryChanged(Lib))
-			{
-				UnloadGameLibrary(Lib);
-				LoadGameLibrary(Lib);
-			}
-		}
+            {
+                UnloadGameLibrary(Lib);
+                LoadGameLibrary(Lib);
+            }
+        }
 #endif
 
         SDL_PumpEvents();
 
-		bool HasJoystick = Input.Controller.Joystick != NULL;
-		if (HasJoystick)
-		{
-			SDL_JoystickUpdate();
-		}
+        bool HasJoystick = Input.Controller.Joystick != NULL;
+        if (HasJoystick)
+        {
+            SDL_JoystickUpdate();
+        }
         for (int i = 0; i < Action_count; i++)
         {
             auto &Action = Input.Actions[i];
             Action.Pressed = 0;
             Action.AxisValue = 0;
-			if (HasJoystick)
-			{
-				if (Action.AxisID != Axis_Invalid)
-				{
-					int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
-					if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
-					{
-						float fv = (Value + 32768) / float(65535);
-						Value = short(fv * 32767);
-					}
-					if (std::abs(Value) < GameControllerAxisDeadzone)
-					{
-						Value = 0;
-					}
-					Action.AxisValue = Value / float(32767);
-				}
-				if (Action.ButtonID != Button_Invalid)
-				{
-					if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
-					{
-						Action.Pressed++;
-					}
-					else
-					{
-						Action.Pressed = 0;
-					}
-				}
-			}
+            if (HasJoystick)
+            {
+                if (Action.AxisID != Axis_Invalid)
+                {
+                    int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
+                    if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
+                    {
+                        float fv = (Value + 32768) / float(65535);
+                        Value = short(fv * 32767);
+                    }
+                    if (std::abs(Value) < GameControllerAxisDeadzone)
+                    {
+                        Value = 0;
+                    }
+                    Action.AxisValue = Value / float(32767);
+                }
+                if (Action.ButtonID != Button_Invalid)
+                {
+                    if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
+                    {
+                        Action.Pressed++;
+                    }
+                    else
+                    {
+                        Action.Pressed = 0;
+                    }
+                }
+            }
 
             const uint8 *Keys = SDL_GetKeyboardState(&Input.KeyCount);
             uint8 Positive = Keys[Action.Positive];
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
                 Action.AxisValue = -1;
             }
 
-			Input.Keys = Keys;
+            Input.Keys = Keys;
         }
 
         SDL_Event Event;

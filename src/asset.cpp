@@ -24,13 +24,13 @@ void InitAssetLoader(asset_loader &Loader)
     }
 
     CreateThreadPool(Loader.Pool, 1, 32);
-	Loader.NumLoadedEntries = 0;
+    Loader.NumLoadedEntries = 0;
 }
 
 void DestroyAssetLoader(asset_loader &Loader)
 {
-	FT_Done_FreeType(Loader.FreeTypeLib);
-	DestroyThreadPool(Loader.Pool);
+    FT_Done_FreeType(Loader.FreeTypeLib);
+    DestroyThreadPool(Loader.Pool);
 }
 
 void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename, const string &ID, void *Param)
@@ -109,7 +109,7 @@ static void LoadAssetThreadSafePart(void *Arg)
             Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
         }
 
-		vector<uint8> Data;
+        vector<uint8> Data;
         uint32 Error = lodepng::decode(Data, Result->Width, Result->Height, Entry->Filename);
         if (Error)
         {
@@ -132,8 +132,8 @@ static void LoadAssetThreadSafePart(void *Arg)
             }
         }
 
-		Entry->Texture.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, Data.size(), "texture data");
-		memcpy(Entry->Texture.TextureData, &Data[0], Data.size());
+        Entry->Texture.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, Data.size(), "texture data");
+        memcpy(Entry->Texture.TextureData, &Data[0], Data.size());
         break;
     }
 
@@ -144,7 +144,7 @@ static void LoadAssetThreadSafePart(void *Arg)
         if (Error)
         {
             Println("error loading font");
-			break;
+            break;
         }
 
         int Size = (int)(long int)Entry->Param;
@@ -155,8 +155,8 @@ static void LoadAssetThreadSafePart(void *Arg)
         Result->SquareSize = NextP2(Size);
 
         int TextureDataSize = Result->SquareSize * Result->SquareSize * CharsPerTexture;
-		Entry->Font.TextureDataSize = TextureDataSize;
-		Entry->Font.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, TextureDataSize, "font texture data");
+        Entry->Font.TextureDataSize = TextureDataSize;
+        Entry->Font.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, TextureDataSize, "font texture data");
         memset(Entry->Font.TextureData, 0, TextureDataSize);
 
         for (int i = 0; i < MaxCharSupport; i++)
@@ -219,13 +219,13 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
     case AssetType_Texture:
     {
         auto *Result = Entry->Texture.Result;
-		glGenTextures(1, &Result->ID);
+        glGenTextures(1, &Result->ID);
 
         Bind(*Result, 0);
         UploadTexture(*Result, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, Entry->Texture.TextureData);
         Unbind(*Result, 0);
 
-		ApplyTextureParameters(*Result, 0);
+        ApplyTextureParameters(*Result, 0);
         break;
     }
 
@@ -233,7 +233,7 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
     {
         auto *Result = Entry->Font.Result;
         auto *Texture = Result->Texture;
-		glGenTextures(1, &Texture->ID);
+        glGenTextures(1, &Texture->ID);
 
         Texture->Width = Texture->Height = Result->SquareSize * CharsPerTextureRoot;
         Texture->Target = GL_TEXTURE_2D;
@@ -254,7 +254,7 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
         UploadTexture(*Texture, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, RGBA);
         Unbind(*Texture, 0);
 
-		ApplyTextureParameters(*Texture, 0);
+        ApplyTextureParameters(*Texture, 0);
         break;
     }
     }

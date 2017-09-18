@@ -14,8 +14,8 @@ struct collision_bounds
 
 enum enemy_type
 {
-	EnemyType_Default,
-	EnemyType_Explosive,
+    EnemyType_Default,
+    EnemyType_Explosive,
 };
 struct ship
 {
@@ -24,7 +24,7 @@ struct ship
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
-	enemy_type EnemyType;
+    enemy_type EnemyType;
 };
 
 struct player_state
@@ -40,12 +40,12 @@ struct wall_state
 
 struct explosion
 {
-	mesh Mesh;
-	color Color;
-	float LifeTime;
-	vector<vec3> Triangles;
-	vector<vec3> Normals;
-	vector<transform> Pieces;
+    mesh Mesh;
+    color Color;
+    float LifeTime;
+    vector<vec3> Triangles;
+    vector<vec3> Normals;
+    vector<transform> Pieces;
 };
 
 struct trail;
@@ -56,9 +56,9 @@ struct trail_piece;
 enum entity_type
 {
     EntityType_Ship,
-	EntityType_TrailPiece,
-	EntityType_Crystal,
-	EntityType_TrackSegment,
+    EntityType_TrailPiece,
+    EntityType_Crystal,
+    EntityType_TrackSegment,
     EntityType_Wall,
 };
 struct entity
@@ -73,7 +73,7 @@ struct entity
     explosion *Explosion = NULL;
     ship *Ship = NULL;
     trail *Trail = NULL;
-	trail_piece *TrailPiece = NULL;
+    trail_piece *TrailPiece = NULL;
     collision_bounds *Bounds = NULL;
     model *Model = NULL;
 };
@@ -91,7 +91,7 @@ struct trail
 
 struct trail_piece
 {
-	entity *Owner;
+    entity *Owner;
 };
 
 /*

@@ -101,7 +101,7 @@ void Begin(gui &GUI, camera &Camera)
 static gui_draw_command
 NextDrawCommand(gui &GUI, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
-	gui_draw_command Command{DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
+    gui_draw_command Command{DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 
