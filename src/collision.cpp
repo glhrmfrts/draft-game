@@ -120,12 +120,11 @@ void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collis
             Col.Second = EntityB;
             Collisions[NumCollisions++] = Col;
         }
-    } 
+    }
 }
 
 void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
 {
-    size_t EntityCount = Entities.size();
     for (auto *Entity : Entities)
     {
         if (!Entity) continue;

@@ -44,7 +44,7 @@ void AddJob(thread_pool &Pool, job_func *Func, void *Arg)
     {
         std::unique_lock<std::mutex> Lock(Data.Mutex, std::defer_lock);
         Lock.lock();
-        if (Data.Jobs.size() < Pool.JobsPerThread)
+        if ((int)Data.Jobs.size() < Pool.JobsPerThread)
         {
             Data.Jobs.push(job{ Func, Arg });
             Pool.NumJobs++;

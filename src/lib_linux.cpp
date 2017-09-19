@@ -15,20 +15,24 @@
 struct game_library
 {
     void *                  Library;
-    time_t                  LoadTime;
+    uint64                  LoadTime;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
     game_process_event_func *GameProcessEvent;
 };
 
-static inline time_t
-GetFileLastWriteTime(char *Filename)
+PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
 {
     struct stat Stat;
     stat(Filename, &Stat);
 
-    return Stat.st_mtime;
+    return (uint64)Stat.st_mtime;
+}
+
+PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
+{
+    return (int32)std::ceil((int32)difftime((time_t)t1, (time_t)t2));
 }
 
 static void
@@ -49,7 +53,7 @@ LoadGameLibrary(game_library &Lib)
     Lib.Library = dlopen(TempLibraryPath, RTLD_LAZY);
     if (Lib.Library)
     {
-        Lib.LoadTime = GetFileLastWriteTime(GameLibraryPath);
+        Lib.LoadTime = PlatformGetFileLastWriteTime(GameLibraryPath);
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)dlsym(Lib.Library, "GameInit");
@@ -78,6 +82,6 @@ UnloadGameLibrary(game_library &Lib)
 static bool
 GameLibraryChanged(game_library &Lib)
 {
-    time_t LastWriteTime = GetFileLastWriteTime(GameLibraryPath);
-    return (difftime(LastWriteTime, Lib.LoadTime) > 0.0);
+    uint64 LastWriteTime = PlatformGetFileLastWriteTime(GameLibraryPath);
+    return (PlatformCompareFileTime(LastWriteTime, Lib.LoadTime) > 0);
 }

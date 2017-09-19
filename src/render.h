@@ -52,11 +52,6 @@ struct vertex_attribute
     size_t Offset;
 };
 
-struct shader_program
-{
-    GLuint ID;
-};
-
 struct texture_filters
 {
     GLint Min, Mag;
@@ -185,9 +180,32 @@ struct mesh
     vector<mesh_part> Parts;
 };
 
-struct model_program
+struct shader_program;
+struct shader_asset_param;
+
+typedef void shader_asset_callback_func(shader_asset_param *);
+
+struct shader_asset_param
 {
-    shader_program ShaderProgram;
+    GLint Type;
+    string Path;
+    shader_program *ShaderProgram;
+    shader_asset_callback_func *Callback;
+};
+
+struct shader_program
+{
+    shader_asset_param VertexShaderParam;
+    shader_asset_param FragmentShaderParam;
+    GLuint ID = 0;
+    GLuint VertexShader = 0;
+    GLuint FragmentShader = 0;
+};
+
+struct model_program : shader_program
+{
+    shader_asset_param VertexShaderParam;
+    shader_asset_param FragmentShaderParam;
     int ProjectionView;
     int Transform;
     int NormalTransform;
@@ -205,15 +223,13 @@ struct model_program
     int FogEnd;
 };
 
-struct blur_program
+struct blur_program : shader_program
 {
-    shader_program ShaderProgram;
     int PixelSize;
 };
 
-struct resolve_multisample_program
+struct resolve_multisample_program : shader_program
 {
-    shader_program ShaderProgram;
     int SampleCount;
 };
 

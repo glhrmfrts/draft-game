@@ -47,7 +47,7 @@ void *PushSize(memory_arena &Arena, size_t SizeInit, const char *Name)
         Arena.CurrentBlock = Block;
 
 #ifdef DRAFT_DEBUG
-        printf("[memory] Allocating memory block '%s' of %u bytes at address %p\n", Name, AllocSize, Block->Base);
+        printf("[memory] Allocating memory block '%s' of %zu bytes at address %p\n", Name, AllocSize, Block->Base);
 #endif
     }
 
@@ -78,7 +78,7 @@ void FreeArena(memory_arena &Arena)
     {
         auto Block = Arena.CurrentBlock;
 #ifdef DRAFT_DEBUG
-        printf("[memory] Freeing memory block '%s' of %u bytes at address %p\n", Block->Name, Block->Size, Block->Base);
+        printf("[memory] Freeing memory block '%s' of %zu bytes at address %p\n", Block->Name, Block->Size, Block->Base);
 #endif
         Arena.CurrentBlock = Block->Prev;
         free(Block->Base);

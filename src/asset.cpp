@@ -4,7 +4,8 @@
 #define DefaultTextureFilter GL_NEAREST
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
 
-static inline int NextP2(int n)
+static inline int
+NextP2(int n)
 {
     int Result = 1;
     while (Result < n)
@@ -12,6 +13,37 @@ static inline int NextP2(int n)
         Result <<= 1;
     }
     return Result;
+}
+
+static long int
+GetFileSize(FILE *handle)
+{
+    long int result = 0;
+
+    fseek(handle, 0, SEEK_END);
+    result = ftell(handle);
+    rewind(handle);
+
+    return result;
+}
+
+static const char *
+ReadFile(const char *filename)
+{
+    FILE *handle = fopen(filename, "r");
+    long int length = GetFileSize(handle);
+    char *buffer = new char[length + 1];
+    int i = 0;
+    char c = 0;
+    while ((c = fgetc(handle)) != EOF) {
+        buffer[i++] = c;
+        if (i >= length) break;
+    }
+
+    buffer[i] = '\0';
+    fclose(handle);
+
+    return (const char *)buffer;
 }
 
 void InitAssetLoader(asset_loader &Loader, platform_api &Platform)
@@ -52,7 +84,7 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
         Entry.Texture.Result = Result;
         break;
     }
-    
+
     case AssetType_Font:
     {
         auto *Result = PushStruct<bitmap_font>(Loader.Arena);
@@ -61,11 +93,39 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
         Entry.Font.Result = Result;
         break;
     }
+
+    case AssetType_Shader:
+    {
+        auto *ShaderParam = (shader_asset_param *)Param;
+        GLuint Result = glCreateShader(ShaderParam->Type);
+        Entry.Shader.Result = Result;
+        break;
+    }
     }
     Loader.Entries.push_back(Entry);
 }
 
-inline bitmap_font *FindBitmapFont(asset_loader &Loader, const string &ID)
+inline void
+AddShaderProgramEntries(asset_loader &Loader, shader_program &Program)
+{
+    AddAssetEntry(
+        Loader,
+        AssetType_Shader,
+        Program.VertexShaderParam.Path,
+        Program.VertexShaderParam.Path,
+        (void *)&Program.VertexShaderParam
+    );
+    AddAssetEntry(
+        Loader,
+        AssetType_Shader,
+        Program.FragmentShaderParam.Path,
+        Program.FragmentShaderParam.Path,
+        (void *)&Program.FragmentShaderParam
+    );
+}
+
+inline bitmap_font *
+FindBitmapFont(asset_loader &Loader, const string &ID)
 {
     for (auto &Entry : Loader.Entries)
     {
@@ -77,7 +137,8 @@ inline bitmap_font *FindBitmapFont(asset_loader &Loader, const string &ID)
     return NULL;
 }
 
-inline texture *FindTexture(asset_loader &Loader, const string &ID)
+inline texture *
+FindTexture(asset_loader &Loader, const string &ID)
 {
     for (auto &Entry : Loader.Entries)
     {
@@ -89,14 +150,15 @@ inline texture *FindTexture(asset_loader &Loader, const string &ID)
     return NULL;
 }
 
-static void LoadAssetThreadSafePart(void *Arg)
+static void
+LoadAssetThreadSafePart(void *Arg)
 {
     auto *Entry = (asset_entry *)Arg;
     switch (Entry->Type)
     {
     case AssetType_Texture:
     {
-        uint32 Flags = (uint32)Entry->Param;
+        uint32 Flags = (uintptr_t)Entry->Param;
         auto *Result = Entry->Texture.Result;
         Result->Filename = Entry->Filename;
         Result->Target = GL_TEXTURE_2D;
@@ -210,6 +272,12 @@ static void LoadAssetThreadSafePart(void *Arg)
         FT_Done_Face(Face);
         break;
     }
+
+    case AssetType_Shader:
+    {
+        Entry->Shader.Source = ReadFile(Entry->Filename.c_str());
+        break;
+    }
     }
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -217,7 +285,8 @@ static void LoadAssetThreadSafePart(void *Arg)
     Entry->Loader->NumLoadedEntries++;
 }
 
-static void LoadAssetThreadUnsafePart(asset_entry *Entry)
+static void
+LoadAssetThreadUnsafePart(asset_entry *Entry)
 {
     switch (Entry->Type)
     {
@@ -256,6 +325,23 @@ static void LoadAssetThreadUnsafePart(asset_entry *Entry)
         Unbind(*Texture, 0);
 
         ApplyTextureParameters(*Texture, 0);
+        break;
+    }
+
+    case AssetType_Shader:
+    {
+        auto *Param = (shader_asset_param *)Entry->Param;
+        GLuint Result = Entry->Shader.Result;
+        CompileShader(Result, Entry->Shader.Source);
+        if (Param->Type == GL_VERTEX_SHADER)
+        {
+            Param->ShaderProgram->VertexShader = Result;
+        }
+        else if (Param->Type == GL_FRAGMENT_SHADER)
+        {
+            Param->ShaderProgram->FragmentShader = Result;
+        }
+        Param->Callback(Param);
         break;
     }
     }

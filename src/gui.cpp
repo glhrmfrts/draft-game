@@ -1,5 +1,7 @@
 // Copyright
 
+// gui shaders are embedded because we need them to draw the loading
+// screen :)
 static string GUIVertexShader = R"FOO(
 #version 330
 
@@ -57,77 +59,83 @@ CheckElementState(game_input &Input, rect Rect)
     return Result;
 }
 
-static void CompileGUIShader(gui &GUI)
+static void
+CompileGUIShader(gui &g)
 {
-    CompileShaderProgram(GUI.Program, GUIVertexShader.c_str(), GUIFragmentShader.c_str());
-    GUI.ProjectionView = glGetUniformLocation(GUI.Program.ID, "u_ProjectionView");
-    GUI.TexWeight = glGetUniformLocation(GUI.Program.ID, "u_TexWeight");
-    GUI.Sampler = glGetUniformLocation(GUI.Program.ID, "u_Sampler");
-    GUI.DiffuseColor = glGetUniformLocation(GUI.Program.ID, "u_DiffuseColor");
+    g.Program.VertexShader = glCreateShader(GL_VERTEX_SHADER);
+    g.Program.FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    CompileShader(g.Program.VertexShader, GUIVertexShader.c_str());
+    CompileShader(g.Program.FragmentShader, GUIFragmentShader.c_str());
+    LinkShaderProgram(g.Program);
 
-    Bind(GUI.Program);
-    SetUniform(GUI.Sampler, 0);
+    g.ProjectionView = glGetUniformLocation(g.Program.ID, "u_ProjectionView");
+    g.TexWeight = glGetUniformLocation(g.Program.ID, "u_TexWeight");
+    g.Sampler = glGetUniformLocation(g.Program.ID, "u_Sampler");
+    g.DiffuseColor = glGetUniformLocation(g.Program.ID, "u_DiffuseColor");
+
+    Bind(g.Program);
+    SetUniform(g.Sampler, 0);
     UnbindShaderProgram();
 }
 
 #define GUIVertexSize 8
 
-void InitGUI(gui &GUI, game_input &Input)
+void InitGUI(gui &g, game_input &Input)
 {
-    GUI.Input = &Input;
-    CompileGUIShader(GUI);
-    InitBuffer(GUI.Buffer, GUIVertexSize, 3,
+    g.Input = &Input;
+    CompileGUIShader(g);
+    InitBuffer(g.Buffer, GUIVertexSize, 3,
                vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
                vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
 }
 
-void Begin(gui &GUI, camera &Camera)
+void Begin(gui &g, camera &Camera)
 {
-    assert(GUI.Program.ID);
+    assert(g.Program.ID);
     assert(Camera.Updated);
 
-    Bind(GUI.Program);
-    SetUniform(GUI.ProjectionView, Camera.ProjectionView);
+    Bind(g.Program);
+    SetUniform(g.ProjectionView, Camera.ProjectionView);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    GUI.CurrentDrawCommand.Texture = NULL;
-    GUI.DrawCommandList.clear();
+    g.CurrentDrawCommand.Texture = NULL;
+    g.DrawCommandList.clear();
 
-    ResetBuffer(GUI.Buffer);
+    ResetBuffer(g.Buffer);
 }
 
 static gui_draw_command
-NextDrawCommand(gui &GUI, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
+NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
-    gui_draw_command Command{DiffuseColor, PrimType, GUI.Buffer.VertexCount, 0, TexWeight, Texture};
+    gui_draw_command Command{DiffuseColor, PrimType, g.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 
 static void
-PushDrawCommand(gui &GUI)
+PushDrawCommand(gui &g)
 {
-    if (!GUI.Buffer.VertexCount) return;
+    if (!g.Buffer.VertexCount) return;
 
-    auto &Curr = GUI.CurrentDrawCommand;
-    Curr.Count = GUI.Buffer.VertexCount - Curr.Offset;
-    GUI.DrawCommandList.push_back(Curr);
+    auto &Curr = g.CurrentDrawCommand;
+    Curr.Count = g.Buffer.VertexCount - Curr.Offset;
+    g.DrawCommandList.push_back(Curr);
 }
 
-uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
+uint32 PushRect(gui &g, rect Rect, color vColor, color DiffuseColor,
                 texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
                 bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
-    auto &Curr = GUI.CurrentDrawCommand;
+    auto &Curr = g.CurrentDrawCommand;
     if (Curr.Texture != Texture ||
         Curr.TexWeight != TexWeight ||
         Curr.PrimitiveType != PrimType ||
         Curr.DiffuseColor != DiffuseColor ||
-        GUI.Buffer.VertexCount == 0)
+        g.Buffer.VertexCount == 0)
     {
-        PushDrawCommand(GUI);
-        GUI.CurrentDrawCommand = NextDrawCommand(GUI, PrimType, TexWeight, DiffuseColor, Texture);
+        PushDrawCommand(g);
+        g.CurrentDrawCommand = NextDrawCommand(g, PrimType, TexWeight, DiffuseColor, Texture);
     }
 
     float x = Rect.X;
@@ -148,19 +156,19 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
     switch (PrimType)
     {
     case GL_LINE_LOOP:
-        PushVertex(GUI.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
         break;
 
     case GL_TRIANGLES:
-        PushVertex(GUI.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
-        PushVertex(GUI.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
         break;
 
     default:
@@ -170,22 +178,22 @@ uint32 PushRect(gui &GUI, rect Rect, color vColor, color DiffuseColor,
 
     if (CheckState)
     {
-        return CheckElementState(*GUI.Input, Rect);
+        return CheckElementState(*g.Input, Rect);
     }
     return GUIElementState_none;
 }
 
-uint32 PushRect(gui &GUI, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+uint32 PushRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
-    return PushRect(GUI, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
+    return PushRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-uint32 PushTexture(gui &GUI, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
+uint32 PushTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
 {
-    return PushRect(GUI, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
+    return PushRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-uint32 PushText(gui &GUI, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
+uint32 PushText(gui &g, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
@@ -205,7 +213,7 @@ uint32 PushText(gui &GUI, bitmap_font *Font, const string &Text, rect r, color c
             int Diff = Font->CharHeight[Index] - Font->BearingY[Index];
             int Width = Font->CharWidth[Index];
             int Height = Font->CharHeight[Index];
-            PushRect(GUI,
+            PushRect(g,
                      rect{ (float)CurX, (float)CurY - Diff, (float)Width, (float)Height },
                      Color_white,
                      c,
@@ -225,26 +233,26 @@ uint32 PushText(gui &GUI, bitmap_font *Font, const string &Text, rect r, color c
     r.Height = (CurY + Font->NewLine) - r.Y;
     if (CheckState)
     {
-        return CheckElementState(*GUI.Input, r);
+        return CheckElementState(*g.Input, r);
     }
     return GUIElementState_none;
 }
 
-void End(gui &GUI)
+void End(gui &g)
 {
-    PushDrawCommand(GUI);
-    UploadVertices(GUI.Buffer, GL_DYNAMIC_DRAW);
+    PushDrawCommand(g);
+    UploadVertices(g.Buffer, GL_DYNAMIC_DRAW);
 
-    glBindVertexArray(GUI.Buffer.VAO);
+    glBindVertexArray(g.Buffer.VAO);
 
-    for (const auto &Cmd : GUI.DrawCommandList)
+    for (const auto &Cmd : g.DrawCommandList)
     {
         if (Cmd.Texture)
         {
             Bind(*Cmd.Texture, 0);
         }
-        SetUniform(GUI.TexWeight, Cmd.TexWeight);
-        SetUniform(GUI.DiffuseColor, Cmd.DiffuseColor);
+        SetUniform(g.TexWeight, Cmd.TexWeight);
+        SetUniform(g.DiffuseColor, Cmd.DiffuseColor);
         glDrawArrays(Cmd.PrimitiveType, Cmd.Offset, Cmd.Count);
         if (Cmd.Texture)
         {

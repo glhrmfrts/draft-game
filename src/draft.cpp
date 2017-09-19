@@ -671,7 +671,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
         float Alpha = Explosion->LifeTime / Global_Game_ExplosionLifeTime;
         ResetBuffer(Explosion->Mesh.Buffer);
-        for (int i = 0; i < Explosion->Pieces.size(); i++)
+        for (size_t i = 0; i < Explosion->Pieces.size(); i++)
         {
             auto &Piece = Explosion->Pieces[i];
             Piece.Position += Piece.Velocity * DeltaTime;
@@ -767,6 +767,13 @@ StartLoadingScreen(game_state &Game)
         "vcr_16",
         (void *)16
     );
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.ModelProgram);
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlurHorizontalProgram);
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlurVerticalProgram);
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlendProgram);
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlitProgram);
+    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.ResolveMultisampleProgram);
+
     StartLoading(Game.AssetLoader);
 }
 

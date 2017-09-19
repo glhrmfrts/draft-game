@@ -27,6 +27,7 @@ enum asset_type
 {
     AssetType_Texture,
     AssetType_Font,
+    AssetType_Shader,
 };
 enum asset_completion
 {
@@ -58,6 +59,11 @@ struct asset_entry
             int TextureDataSize;
             bitmap_font *Result;
         } Font;
+
+        struct {
+            const char *Source;
+            GLuint Result;
+        } Shader;
     };
 };
 

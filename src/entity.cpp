@@ -303,7 +303,6 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
     for (size_t i = 0; i < PieceCount; i++)
     {
         auto &Piece = Explosion->Pieces[i];
-        auto &Series = Game.ExplosionEntropy;
         Piece.Position = Position;
         Piece.Scale = Scale;
         Piece.Velocity = Velocity * 1.1f + Normals[i];

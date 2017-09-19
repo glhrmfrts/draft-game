@@ -34,7 +34,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Renderer"))
     {
-		ImGui::Text("Renderables: %d", Game.RenderState.FrameSolidRenderables.size() + Game.RenderState.FrameTransparentRenderables.size());
+		ImGui::Text("Renderables: %lu", Game.RenderState.FrameSolidRenderables.size() + Game.RenderState.FrameTransparentRenderables.size());
 		ImGui::Spacing();
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);
 

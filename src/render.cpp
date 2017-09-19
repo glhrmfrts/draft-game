@@ -1,7 +1,5 @@
 // Copyright
 
-#include "shaders.cpp"
-
 static void
 EnableVertexAttribute(vertex_attribute Attr)
 {
@@ -111,9 +109,9 @@ void UploadVertices(vertex_buffer &Buffer, size_t Index, size_t Count)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-static GLuint CompileShader(const char *Source, GLint Type)
+static void
+CompileShader(GLuint Shader, const char *Source)
 {
-    GLuint Shader = glCreateShader(Type);
     glShaderSource(Shader, 1, &Source, NULL);
     glCompileShader(Shader);
 
@@ -131,36 +129,36 @@ static GLuint CompileShader(const char *Source, GLint Type)
         printf("failed to compile %s\n%s\n", Source, infoLog);
         exit(EXIT_FAILURE);
     }
-    return Shader;
 }
 
-void CompileShaderProgram(shader_program &Prog, const char *VertexSource, const char *FragmentSource)
+static void
+LinkShaderProgram(shader_program &Prog)
 {
-    GLuint VertexShader = CompileShader(VertexSource, GL_VERTEX_SHADER);
-    GLuint FragmentShader = CompileShader(FragmentSource, GL_FRAGMENT_SHADER);
-
-    Prog.ID = glCreateProgram();
-    glAttachShader(Prog.ID, VertexShader);
-    glAttachShader(Prog.ID, FragmentShader);
+    if (!Prog.ID)
+    {
+        Prog.ID = glCreateProgram();
+    }
+    glAttachShader(Prog.ID, Prog.VertexShader);
+    glAttachShader(Prog.ID, Prog.FragmentShader);
     glLinkProgram(Prog.ID);
 
     int Status;
     glGetProgramiv(Prog.ID, GL_LINK_STATUS, &Status);
     if (Status == GL_FALSE)
     {
-      int LogLength = 0;
-      glGetProgramiv(Prog.ID, GL_INFO_LOG_LENGTH, &LogLength);
+        int LogLength = 0;
+        glGetProgramiv(Prog.ID, GL_INFO_LOG_LENGTH, &LogLength);
 
-      char *InfoLog = new char[LogLength + 1];
-      glGetProgramInfoLog(Prog.ID, LogLength, NULL, InfoLog);
-      InfoLog[LogLength] = '\0';
+        char *InfoLog = new char[LogLength + 1];
+        glGetProgramInfoLog(Prog.ID, LogLength, NULL, InfoLog);
+        InfoLog[LogLength] = '\0';
 
-      printf("failed to link program: %s\n", InfoLog);
-      exit(EXIT_FAILURE);
+        printf("failed to link program: %s\n", InfoLog);
+        exit(EXIT_FAILURE);
     }
 
-    glDeleteShader(VertexShader);
-    glDeleteShader(FragmentShader);
+    glDeleteShader(Prog.VertexShader);
+    glDeleteShader(Prog.FragmentShader);
 }
 
 inline void
@@ -502,78 +500,6 @@ void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
     Mesh.Max = Max;
 }
 
-static void
-CompileModelProgram(model_program &Program)
-{
-    CompileShaderProgram(Program.ShaderProgram, ModelVertexShader.c_str(), ModelFragmentShader.c_str());
-    Program.MaterialFlags = glGetUniformLocation(Program.ShaderProgram.ID, "u_MaterialFlags");
-    Program.ProjectionView = glGetUniformLocation(Program.ShaderProgram.ID, "u_ProjectionView");
-    Program.Transform = glGetUniformLocation(Program.ShaderProgram.ID, "u_Transform");
-    Program.NormalTransform = glGetUniformLocation(Program.ShaderProgram.ID, "u_NormalTransform");
-    Program.DiffuseColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_DiffuseColor");
-    Program.TexWeight = glGetUniformLocation(Program.ShaderProgram.ID, "u_TexWeight");
-    Program.Emission = glGetUniformLocation(Program.ShaderProgram.ID, "u_Emission");
-    Program.UvScale = glGetUniformLocation(Program.ShaderProgram.ID, "u_UvScale");
-    Program.Sampler = glGetUniformLocation(Program.ShaderProgram.ID, "u_Sampler");
-    Program.ExplosionLightColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightColor");
-    Program.ExplosionLightTimer = glGetUniformLocation(Program.ShaderProgram.ID, "u_ExplosionLightTimer");
-    Program.CamPos = glGetUniformLocation(Program.ShaderProgram.ID, "u_CamPos");
-    Program.FogColor = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogColor");
-    Program.FogStart = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogStart");
-    Program.FogEnd = glGetUniformLocation(Program.ShaderProgram.ID, "u_FogEnd");
-
-    Bind(Program.ShaderProgram);
-    SetUniform(Program.Sampler, 0);
-    UnbindShaderProgram();
-}
-
-static void
-CompileBlurProgram(blur_program &Program, string &FragmentShader)
-{
-    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), FragmentShader.c_str());
-    Program.PixelSize = glGetUniformLocation(Program.ShaderProgram.ID, "u_pixelSize");
-
-    Bind(Program.ShaderProgram);
-    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_sampler"), 0);
-    UnbindShaderProgram();
-}
-
-static void
-CompileBlendProgram(shader_program &Program)
-{
-    CompileShaderProgram(Program, BlitVertexShader.c_str(), BlendFragmentShader.c_str());
-    Bind(Program);
-    for (int i = 0; i < BloomBlurPassCount; i++)
-    {
-        char Name[] = "u_Pass#";
-        Name[7] = (char)('0' + i);
-        SetUniform(glGetUniformLocation(Program.ID, Name), 0);
-    }
-    SetUniform(glGetUniformLocation(Program.ID, "u_Scene"), BloomBlurPassCount);
-    UnbindShaderProgram();
-}
-
-static void
-CompileBlitProgram(shader_program &Program)
-{
-    CompileShaderProgram(Program, BlitVertexShader.c_str(), BlitFragmentShader.c_str());
-    Bind(Program);
-    SetUniform(glGetUniformLocation(Program.ID, "u_Sampler"), 0);
-    UnbindShaderProgram();
-}
-
-static void
-CompileResolveMultisampleProgram(resolve_multisample_program &Program)
-{
-    CompileShaderProgram(Program.ShaderProgram, BlitVertexShader.c_str(), ResolveMultisampleFragmentShader.c_str());
-    Program.SampleCount = glGetUniformLocation(Program.ShaderProgram.ID, "u_SampleCount");
-
-    Bind(Program.ShaderProgram);
-    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_SurfaceReflectSampler"), 0);
-    SetUniform(glGetUniformLocation(Program.ShaderProgram.ID, "u_EmitSampler"), 1);
-    UnbindShaderProgram();
-}
-
 // returns the index of the next available renderable
 static size_t
 NextRenderable(render_state &RenderState)
@@ -591,6 +517,118 @@ NextRenderable(render_state &RenderState)
     return RenderState.RenderableCount++;
 }
 
+#define IsLinkable(Program) (Program->VertexShader && Program->FragmentShader)
+
+static void
+ModelProgramCallback(shader_asset_param *Param)
+{
+    auto *Program = (model_program *)Param->ShaderProgram;
+    if (IsLinkable(Program))
+    {
+        LinkShaderProgram(*Program);
+        Program->MaterialFlags = glGetUniformLocation(Program->ID, "u_MaterialFlags");
+        Program->ProjectionView = glGetUniformLocation(Program->ID, "u_ProjectionView");
+        Program->Transform = glGetUniformLocation(Program->ID, "u_Transform");
+        Program->NormalTransform = glGetUniformLocation(Program->ID, "u_NormalTransform");
+        Program->DiffuseColor = glGetUniformLocation(Program->ID, "u_DiffuseColor");
+        Program->TexWeight = glGetUniformLocation(Program->ID, "u_TexWeight");
+        Program->Emission = glGetUniformLocation(Program->ID, "u_Emission");
+        Program->UvScale = glGetUniformLocation(Program->ID, "u_UvScale");
+        Program->Sampler = glGetUniformLocation(Program->ID, "u_Sampler");
+        Program->ExplosionLightColor = glGetUniformLocation(Program->ID, "u_ExplosionLightColor");
+        Program->ExplosionLightTimer = glGetUniformLocation(Program->ID, "u_ExplosionLightTimer");
+        Program->CamPos = glGetUniformLocation(Program->ID, "u_CamPos");
+        Program->FogColor = glGetUniformLocation(Program->ID, "u_FogColor");
+        Program->FogStart = glGetUniformLocation(Program->ID, "u_FogStart");
+        Program->FogEnd = glGetUniformLocation(Program->ID, "u_FogEnd");
+
+        Bind(*Program);
+        SetUniform(Program->Sampler, 0);
+        UnbindShaderProgram();
+    }
+}
+
+static void
+BlurProgramCallback(shader_asset_param *Param)
+{
+    auto *Program = (blur_program *)Param->ShaderProgram;
+    if (IsLinkable(Program))
+    {
+        LinkShaderProgram(*Program);
+        Program->PixelSize = glGetUniformLocation(Program->ID, "u_pixelSize");
+
+        Bind(*Program);
+        SetUniform(glGetUniformLocation(Program->ID, "u_sampler"), 0);
+        UnbindShaderProgram();
+    }
+}
+
+static void
+BlendProgramCallback(shader_asset_param *Param)
+{
+    auto *Program = Param->ShaderProgram;
+    if (IsLinkable(Program))
+    {
+        LinkShaderProgram(*Program);
+        Bind(*Program);
+        for (int i = 0; i < BloomBlurPassCount; i++)
+        {
+            char Name[] = "u_Pass#";
+            Name[7] = (char)('0' + i);
+            SetUniform(glGetUniformLocation(Program->ID, Name), 0);
+        }
+        SetUniform(glGetUniformLocation(Program->ID, "u_Scene"), BloomBlurPassCount);
+        UnbindShaderProgram();
+    }
+}
+
+static void
+BlitProgramCallback(shader_asset_param *Param)
+{
+    auto *Program = Param->ShaderProgram;
+    if (IsLinkable(Program))
+    {
+        LinkShaderProgram(*Program);
+        Bind(*Program);
+        SetUniform(glGetUniformLocation(Program->ID, "u_Sampler"), 0);
+        UnbindShaderProgram();
+    }
+}
+
+static void
+ResolveMultisampleProgramCallback(shader_asset_param *Param)
+{
+    auto *Program = (resolve_multisample_program *)Param->ShaderProgram;
+    if (IsLinkable(Program))
+    {
+        LinkShaderProgram(*Program);
+        Program->SampleCount = glGetUniformLocation(Program->ID, "u_SampleCount");
+
+        Bind(*Program);
+        SetUniform(glGetUniformLocation(Program->ID, "u_SurfaceReflectSampler"), 0);
+        SetUniform(glGetUniformLocation(Program->ID, "u_EmitSampler"), 1);
+        UnbindShaderProgram();
+    }
+}
+
+static void
+InitShaderProgram(shader_program &Program, const string &vsPath, const string &fsPath,
+                  shader_asset_callback_func *Callback)
+{
+    Program.VertexShaderParam = {
+        GL_VERTEX_SHADER,
+        vsPath,
+        &Program,
+        Callback,
+    };
+    Program.FragmentShaderParam = {
+        GL_FRAGMENT_SHADER,
+        fsPath,
+        &Program,
+        Callback,
+    };
+}
+
 void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 {
     glLineWidth(2);
@@ -599,16 +637,45 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     {
         RenderState.MaxMultiSampleCount = 8;
     }
-
     RenderState.Width = Width;
     RenderState.Height = Height;
 
-    CompileModelProgram(RenderState.ModelProgram);
-    CompileBlurProgram(RenderState.BlurHorizontalProgram, BlurHorizontalFragmentShader);
-    CompileBlurProgram(RenderState.BlurVerticalProgram, BlurVerticalFragmentShader);
-    CompileBlendProgram(RenderState.BlendProgram);
-    CompileBlitProgram(RenderState.BlitProgram);
-    CompileResolveMultisampleProgram(RenderState.ResolveMultisampleProgram);
+    InitShaderProgram(
+        RenderState.ModelProgram,
+        "data/shaders/model.vert.glsl",
+        "data/shaders/model.frag.glsl",
+        ModelProgramCallback
+    );
+    InitShaderProgram(
+        RenderState.BlurHorizontalProgram,
+        "data/shaders/blit.vert.glsl",
+        "data/shaders/blurh.frag.glsl",
+        BlurProgramCallback
+    );
+    InitShaderProgram(
+        RenderState.BlurVerticalProgram,
+        "data/shaders/blit.vert.glsl",
+        "data/shaders/blurv.frag.glsl",
+        BlurProgramCallback
+    );
+    InitShaderProgram(
+        RenderState.BlendProgram,
+        "data/shaders/blit.vert.glsl",
+        "data/shaders/blend.frag.glsl",
+        BlendProgramCallback
+    );
+    InitShaderProgram(
+        RenderState.BlitProgram,
+        "data/shaders/blit.vert.glsl",
+        "data/shaders/blit.frag.glsl",
+        BlitProgramCallback
+    );
+    InitShaderProgram(
+        RenderState.ResolveMultisampleProgram,
+        "data/shaders/blit.vert.glsl",
+        "data/shaders/multisample.frag.glsl",
+        ResolveMultisampleProgramCallback
+    );
 
     InitMeshBuffer(RenderState.SpriteBuffer);
     InitBuffer(RenderState.ScreenBuffer, 4, 2,
@@ -737,7 +804,7 @@ enum blur_orientation
 static framebuffer *
 RenderBlur(render_state &RenderState, blur_program *Program)
 {
-    Bind(Program->ShaderProgram);
+    Bind(*Program);
     framebuffer *Sources = RenderState.BlurHorizontalFramebuffers;
     framebuffer *Dests = RenderState.BlurVerticalFramebuffers;
     if (Program == &RenderState.BlurVerticalProgram)
@@ -756,7 +823,7 @@ RenderBlur(render_state &RenderState, blur_program *Program)
         {
             SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
         }
-        
+
         BindFramebuffer(Dests[i]);
 
         glClear(GL_COLOR_BUFFER_BIT);
@@ -796,7 +863,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         BindFramebuffer(RenderState.MultisampledSceneFramebuffer);
     }
 
-    Bind(RenderState.ModelProgram.ShaderProgram);
+    Bind(RenderState.ModelProgram);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -824,7 +891,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
             BindFramebuffer(RenderState.SceneFramebuffer);
         }
 
-        Bind(RenderState.ResolveMultisampleProgram.ShaderProgram);
+        Bind(RenderState.ResolveMultisampleProgram);
         SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
         for (size_t i = 0; i < ColorTexture_Count; i++)
         {
