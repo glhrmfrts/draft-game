@@ -845,13 +845,14 @@ extern "C"
         }
 
 #ifdef DRAFT_DEBUG
+        if (Game->Mode != GameMode_LoadingScreen)
         {
             static float ReloadTimer = 0.0f;
             ReloadTimer += DeltaTime;
             if (ReloadTimer >= 1.0f)
             {
                 ReloadTimer = 0.0f;
-                CheckAssetsChanged(Game->AssetLoader);
+                CheckAssetsChange(Game->AssetLoader);
             }
         }
 #endif

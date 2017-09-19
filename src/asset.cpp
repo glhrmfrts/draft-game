@@ -283,6 +283,8 @@ LoadAssetThreadSafePart(void *Arg)
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
     Entry->Completion = AssetCompletion_ThreadSafe;
     Entry->Loader->NumLoadedEntries++;
+
+    SDL_Delay(500);
 }
 
 static void
@@ -373,7 +375,7 @@ bool Update(asset_loader &Loader)
     return false;
 }
 
-void CheckAssetsChanged(asset_loader &Loader)
+void CheckAssetsChange(asset_loader &Loader)
 {
     Update(Loader);
     for (auto &Entry : Loader.Entries)
