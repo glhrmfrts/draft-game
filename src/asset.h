@@ -23,6 +23,14 @@ struct bitmap_font
     texture_rect TexRect[MaxCharSupport];
 };
 
+struct sound
+{
+    int Channels;
+    int SampleRate;
+    int SampleCount;
+    ALuint Buffer;
+};
+
 enum asset_type
 {
     AssetType_Texture,
@@ -49,21 +57,30 @@ struct asset_entry
 
     union
     {
-        struct {
+        struct
+        {
             uint8 *TextureData;
             texture *Result;
         } Texture;
 
-        struct {
+        struct
+        {
             uint8 *TextureData;
             int TextureDataSize;
             bitmap_font *Result;
         } Font;
 
-        struct {
+        struct
+        {
             const char *Source;
             GLuint Result;
         } Shader;
+
+        struct
+        {
+            short *Data;
+            sound *Result;
+        } Sound;
     };
 };
 

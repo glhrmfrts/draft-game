@@ -101,6 +101,14 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
         Entry.Shader.Result = Result;
         break;
     }
+
+    case AssetType_Sound:
+    {
+        auto *Result = PushStruct<sound>(Loader.Arena);
+        alGenBuffers(1, &Result->Buffer);
+        Entry.Sound.Result = Result;
+        break;
+    }
     }
     Loader.Entries.push_back(Entry);
 }
@@ -148,6 +156,32 @@ FindTexture(asset_loader &Loader, const string &ID)
         }
     }
     return NULL;
+}
+
+inline sound *
+FindSound(asset_loader &Loader, const string &ID)
+{
+    for (auto &Entry : Loader.Entries)
+    {
+        if (Entry.Type == AssetType_Sound && Entry.ID == ID)
+        {
+            return Entry.Sound.Result;
+        }
+    }
+}
+
+static inline ALenum
+GetFormatFromChannels(int Count)
+{
+    switch (Count)
+    {
+    case 1:
+        return AL_FORMAT_MONO16;
+    case 2:
+        return AL_FORMAT_STEREO16;
+    default:
+        return 0;
+    }
 }
 
 static void
@@ -278,6 +312,29 @@ LoadAssetThreadSafePart(void *Arg)
         Entry->Shader.Source = ReadFile(Entry->Filename.c_str());
         break;
     }
+
+    case AssetType_Sound:
+    {
+        SNDFILE *SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &Info);
+        if (!SndFile)
+        {
+            Println("error reading sound file " + Entry->Filename);
+            break;
+        }
+        sf_seek(SndFile, 0, SEEK_SET);
+
+        int SampleCount = Info.frames * Info.channels;
+        short *Data = (short *)PushSize(Entry->Loader->Arena, SampleCount * sizeof(short), "sound data");
+        sf_read_short(SndFile, Data, SampleCount);
+        sf_close(SndFile);
+
+        auto *Result = Entry->Sound.Result;
+        Result->Frames = Info.frames;
+        Result->SampleRate = Info.samplerate;
+        Result->SampleCount = SampleCount;
+
+        Entry.Sound.Data = Data;
+    }
     }
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -327,6 +384,8 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         Unbind(*Texture, 0);
 
         ApplyTextureParameters(*Texture, 0);
+
+        delete[] RGBA;
         break;
     }
 
@@ -344,6 +403,19 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
             Param->ShaderProgram->FragmentShader = Result;
         }
         Param->Callback(Param);
+        break;
+    }
+
+    case AssetType_Sound:
+    {
+        auto *Result = Entry->Sound.Result;
+        alBufferData(
+            Result->Buffer,
+            GetFormatFromChannels(Result->NumChannels),
+            Entry->Sound.Data,
+            Result->SampleCount * sizeof(short),
+            Result->SampleRate
+        );
         break;
     }
     }

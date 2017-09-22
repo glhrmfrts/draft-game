@@ -19,6 +19,29 @@
 #include "entity.cpp"
 #include "level.cpp"
 
+struct audio_source
+{
+    ALuint Source;
+};
+static audio_source *
+CreateAudioSource(memory_arena &Arena, ALuint Buffer)
+{
+    auto *Result = PushStruct<audio_source>(Arena);
+    alGenSources(1, &Result->Source);
+    alSourcef(Result->Source, AL_PITCH, 1);
+    alSourcef(Result->Source, AL_GAIN, 1);
+    alSource3f(Result->Source, AL_POSITION, 0,0,0);
+    alSource3f(Result->Source, AL_VELOCITY, 0,0,0);
+    alSourcei(Result->Source, AL_LOOPING, AL_FALSE);
+    alSourcei(Result->Source, AL_BUFFER, Buffer);
+}
+
+static void
+UpdateAudioParams(audio_source *Audio)
+{
+    alSourcef(Audio->Source, AL_GAIN, Audio->Gain);
+}
+
 // Finds the first free slot on the list and insert the entity
 inline static void
 AddEntityToList(vector<entity *> &List, entity *Entity)
@@ -243,6 +266,7 @@ StartLevel(game_state &Game)
 
     Game.CurrentLevel = GenerateTestLevel(Game.Arena);
     Game.TestFont = FindBitmapFont(Game.AssetLoader, "vcr_16");
+    Game.TestSound = CreateAudioSource(Game.Arena, FindSound(Game.AssetLoader, "hit")->Buffer);
 }
 
 static void
