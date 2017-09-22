@@ -6,6 +6,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
 
     ImGui::Text("ms: %.2f", DeltaTime * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
+    ImGui::Text("Player Position: %s", ToString(Game.PlayerEntity->Transform.Position).c_str());
     ImGui::Text("Player Velocity: %s", ToString(Game.PlayerEntity->Transform.Velocity).c_str());
     ImGui::Text("Player Score: %d", Game.PlayerEntity->PlayerState->Score);
     if (ImGui::CollapsingHeader("Camera"))

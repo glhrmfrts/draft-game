@@ -1,6 +1,7 @@
 #ifndef DRAFT_ASSET_H
 #define DRAFT_ASSET_H
 
+#include <sndfile.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
@@ -25,6 +26,7 @@ struct bitmap_font
 
 struct sound
 {
+    int Frames;
     int Channels;
     int SampleRate;
     int SampleCount;
@@ -36,6 +38,7 @@ enum asset_type
     AssetType_Texture,
     AssetType_Font,
     AssetType_Shader,
+    AssetType_Sound,
 };
 enum asset_completion
 {

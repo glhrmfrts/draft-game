@@ -3,6 +3,7 @@
 
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
+#include <AL/al.h>
 #include <AL/alc.h>
 #include "thread_pool.h"
 #include "config.h"
@@ -131,6 +132,8 @@ struct game_input
 	game_input() {}
 };
 
+struct audio_source;
+
 enum game_mode
 {
 	GameMode_LoadingScreen,
@@ -171,6 +174,7 @@ struct game_state
 
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
+    audio_source *DraftBoostAudio;
 
     platform_api Platform;
 	SDL_Window *Window;

@@ -30,7 +30,8 @@ GetFileSize(FILE *handle)
 static const char *
 ReadFile(const char *filename)
 {
-    FILE *handle = fopen(filename, "r");
+    FILE *handle;
+    fopen_s(&handle, filename, "r");
     long int length = GetFileSize(handle);
     char *buffer = new char[length + 1];
     int i = 0;
@@ -315,6 +316,7 @@ LoadAssetThreadSafePart(void *Arg)
 
     case AssetType_Sound:
     {
+        SF_INFO Info;
         SNDFILE *SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &Info);
         if (!SndFile)
         {
@@ -332,16 +334,15 @@ LoadAssetThreadSafePart(void *Arg)
         Result->Frames = Info.frames;
         Result->SampleRate = Info.samplerate;
         Result->SampleCount = SampleCount;
+        Result->Channels = Info.channels;
 
-        Entry.Sound.Data = Data;
+        Entry->Sound.Data = Data;
     }
     }
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
     Entry->Completion = AssetCompletion_ThreadSafe;
     Entry->Loader->NumLoadedEntries++;
-
-    SDL_Delay(500);
 }
 
 static void
@@ -411,7 +412,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         auto *Result = Entry->Sound.Result;
         alBufferData(
             Result->Buffer,
-            GetFormatFromChannels(Result->NumChannels),
+            GetFormatFromChannels(Result->Channels),
             Entry->Sound.Data,
             Result->SampleCount * sizeof(short),
             Result->SampleRate

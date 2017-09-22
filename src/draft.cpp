@@ -22,6 +22,7 @@
 struct audio_source
 {
     ALuint Source;
+    float Gain = 1;
 };
 static audio_source *
 CreateAudioSource(memory_arena &Arena, ALuint Buffer)
@@ -34,6 +35,7 @@ CreateAudioSource(memory_arena &Arena, ALuint Buffer)
     alSource3f(Result->Source, AL_VELOCITY, 0,0,0);
     alSourcei(Result->Source, AL_LOOPING, AL_FALSE);
     alSourcei(Result->Source, AL_BUFFER, Buffer);
+    return Result;
 }
 
 static void
@@ -266,7 +268,7 @@ StartLevel(game_state &Game)
 
     Game.CurrentLevel = GenerateTestLevel(Game.Arena);
     Game.TestFont = FindBitmapFont(Game.AssetLoader, "vcr_16");
-    Game.TestSound = CreateAudioSource(Game.Arena, FindSound(Game.AssetLoader, "hit")->Buffer);
+    Game.DraftBoostAudio = CreateAudioSource(Game.Arena, FindSound(Game.AssetLoader, "boost")->Buffer);
 }
 
 static void
@@ -527,6 +529,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     {
         if (IsJustPressed(Game, Action_boost))
         {
+            alSourcePlay(Game.DraftBoostAudio->Source);
             ApplyBoostToShip(Game.PlayerEntity, DraftBoost, ShipMaxVel + DraftBoost*1.5f);
             PlayerShip->CurrentDraftTime = 0.0f;
             Game.PlayerEntity->PlayerState->Score += DraftBoostScore;
@@ -562,6 +565,22 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
                                PlayerPosition.y + Global_Camera_OffsetY,
                                PlayerPosition.z + Global_Camera_OffsetZ);
         Camera.LookAt = Camera.Position + vec3(0, 10, 0);
+    }
+
+    // update listener
+    {
+        static float *Orient = new float[6];
+        Orient[0] = Camera.View[2][0];
+        Orient[1] = Camera.View[2][1];
+        Orient[2] = Camera.View[2][2];
+        Orient[3] = Camera.View[0][0];
+        Orient[4] = Camera.View[0][1];
+        Orient[5] = Camera.View[0][2];
+        alListenerfv(AL_ORIENTATION, Orient);
+        alListenerfv(AL_POSITION, &Camera.Position[0]);
+        alListener3f(AL_VELOCITY, 0, 0, 0);
+
+        alSourcefv(Game.DraftBoostAudio->Source, AL_POSITION, &PlayerPosition[0]);
     }
 
     UpdateProjectionView(Game.Camera);
@@ -790,6 +809,13 @@ StartLoadingScreen(game_state &Game)
         "data/fonts/vcr.ttf",
         "vcr_16",
         (void *)16
+    );
+    AddAssetEntry(
+        Game.AssetLoader,
+        AssetType_Sound,
+        "data/audio/boost.wav",
+        "boost",
+        NULL
     );
     AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.ModelProgram);
     AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlurHorizontalProgram);
