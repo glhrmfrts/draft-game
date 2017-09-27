@@ -24,6 +24,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     if (ImGui::CollapsingHeader("Game"))
     {
 		ImGui::Text("Entities: %d", Game.NumEntities);
+        ImGui::SliderFloat("Time Speed", &Global_Game_TimeSpeed, -2.0f, 2.0f, "%.2f");
 		ImGui::Spacing();
         if (ImGui::TreeNode("Trail"))
         {

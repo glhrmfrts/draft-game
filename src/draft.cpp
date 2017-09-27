@@ -458,6 +458,8 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto *PlayerShip = PlayerEntity->Ship;
     vec3 CamDir = CameraDir(Camera);
 
+    DeltaTime *= Global_Game_TimeSpeed;
+
     static bool Paused = false;
     if (IsJustPressed(Game, Action_debugPause))
     {

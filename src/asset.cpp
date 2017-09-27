@@ -31,7 +31,12 @@ static const char *
 ReadFile(const char *filename)
 {
     FILE *handle;
+#ifdef _WIN32
     fopen_s(&handle, filename, "r");
+#else
+    handle = fopen(filename, "r");
+#endif
+
     long int length = GetFileSize(handle);
     char *buffer = new char[length + 1];
     int i = 0;
@@ -108,6 +113,13 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
         auto *Result = PushStruct<sound>(Loader.Arena);
         alGenBuffers(1, &Result->Buffer);
         Entry.Sound.Result = Result;
+        break;
+    }
+
+    case AssetType_Script:
+    {
+        auto *Result = PushStruct<simple_lisp_script>(Loader.Arena);
+        Entry.Script.Result = Result;
         break;
     }
     }
@@ -337,6 +349,13 @@ LoadAssetThreadSafePart(void *Arg)
         Result->Channels = Info.channels;
 
         Entry->Sound.Data = Data;
+    }
+
+    case AssetType_Script:
+    {
+        const char *Source = ReadFile(Entry->Filename.c_str());
+        CompileScript(Entry->Script.Result, Source);
+        break;
     }
     }
 
