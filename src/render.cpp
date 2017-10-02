@@ -730,7 +730,6 @@ void RenderBegin(render_state &RenderState, float DeltaTime)
 mat4 GetTransformMatrix(transform &t)
 {
     mat4 TransformMatrix = glm::translate(mat4(1.0f), t.Position);
-    TransformMatrix = glm::scale(TransformMatrix, t.Scale);
     if (t.Rotation.x != 0.0f)
     {
         TransformMatrix = glm::rotate(TransformMatrix, glm::radians(t.Rotation.x), vec3(1,0,0));
@@ -743,6 +742,7 @@ mat4 GetTransformMatrix(transform &t)
     {
         TransformMatrix = glm::rotate(TransformMatrix, glm::radians(t.Rotation.z), vec3(0,0,1));
     }
+    TransformMatrix = glm::scale(TransformMatrix, t.Scale);
     return TransformMatrix;
 }
 

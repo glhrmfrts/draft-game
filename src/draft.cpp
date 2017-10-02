@@ -157,11 +157,8 @@ RemoveEntity(game_state &Game, entity *Entity)
     Game.NumEntities = std::max(0, Game.NumEntities - 1);
 }
 
-#define TrackSegmentLength  512
-#define TrackSegmentWidth   1024
-#define TrackSegmentCount   8
-#define TrackSegmentPadding 0
-#define CrystalColor        IntColor(FirstPalette.Colors[1])
+#define MapPlaneSize  512
+#define CrystalColor  IntColor(FirstPalette.Colors[1])
 static void
 StartLevel(game_state &Game)
 {
@@ -181,13 +178,13 @@ StartLevel(game_state &Game)
             1,
             FindTexture(Game.AssetLoader, "grid"),
             0,
-            vec2{TrackSegmentWidth/16,TrackSegmentWidth/16}
+            vec2{MapPlaneSize/16,MapPlaneSize/16}
         };
 
-        float w = TrackSegmentWidth;
+        float w = 1.0f;
         float l = -w/2;
         float r = w/2;
-        AddQuad(FloorMesh.Buffer, vec3(l, 0, 0), vec3(r, 0, 0), vec3(r, 1, 0), vec3(l, 1, 0), Color_white, vec3(1, 1, 1));
+        AddQuad(FloorMesh.Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
         AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES});
         EndMesh(FloorMesh, GL_STATIC_DRAW);
     }
@@ -237,33 +234,18 @@ StartLevel(game_state &Game)
     }
 
     MakeCameraPerspective(Game.Camera, (float)Game.Width, (float)Game.Height, 70.0f, 0.1f, 1000.0f);
-    Game.Camera.Position = vec3(2, 0, 0);
-    Game.Camera.LookAt = vec3(0, 0, 0);
     Game.Gravity = vec3(0, 0, 0);
 
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
-    Game.PlayerEntity->Transform.Rotation.y = 20.0f;
-    Game.PlayerEntity->Transform.Velocity.y = ShipMaxVel;
     AddEntity(Game, Game.PlayerEntity);
 
-    for (int i = 0; i < TrackSegmentCount * 2; i++)
     {
         auto *Entity = PushStruct<entity>(Game.Arena);
         Entity->Type = EntityType_TrackSegment;
-        Entity->Transform.Scale = vec3(1, TrackSegmentLength, 0);
+        Entity->Transform.Position.z = -0.25f;
+        Entity->Transform.Scale = vec3(MapPlaneSize, MapPlaneSize, 0);
         Entity->Model = CreateModel(Game.Arena, &Game.FloorMesh);
         AddEntity(Game, Entity);
-
-        float z = 0;
-        if (i < TrackSegmentCount)
-        {
-            z = -0.25f;
-        }
-        else
-        {
-            z = 10.0f;
-        }
-        Entity->Transform.Position = vec3(0, (i%TrackSegmentCount)*TrackSegmentLength + TrackSegmentPadding*(i%TrackSegmentCount), z);
     }
 
     Game.CurrentLevel = GenerateTestLevel(Game.Arena);
@@ -274,23 +256,6 @@ StartLevel(game_state &Game)
 static void
 DebugReset(game_state &Game)
 {
-    Game.PlayerEntity->Transform.Position = vec3{ 0.0f };
-    Game.PlayerEntity->Transform.Velocity = vec3{ 0.0f };
-    Game.PlayerEntity->Transform.Velocity.y = ShipMaxVel;
-    Game.PlayerEntity->PlayerState->Score = 0;
-    Game.CurrentLevel->CurrentTick = 0;
-    Game.CurrentLevel->DelayedEvents.clear();
-
-    for (auto *Entity : Game.CurrentLevel->EntitiesToRemove)
-    {
-        RemoveEntity(Game, Entity);
-    }
-
-    for (int i = 0; i < TrackSegmentCount * 2; i++)
-    {
-        auto *Entity = Game.TrackEntities[i];
-        Entity->Transform.Position.y = (i%TrackSegmentCount)*TrackSegmentLength + TrackSegmentPadding*(i%TrackSegmentCount);
-    }
 }
 
 inline static float
@@ -450,14 +415,55 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 }
 
 static void
+UpdateFreeCam(camera &Camera, game_input &Input, float DeltaTime)
+{
+    static float Pitch;
+    static float Yaw;
+    float Speed = 50.0f;
+    float AxisValue = GetAxisValue(Input, Action_camVertical);
+    vec3 CamDir = CameraDir(Camera);
+
+    Camera.Position += CamDir * AxisValue * Speed * DeltaTime;
+
+    if (Input.MouseState.Buttons & MouseButton_middle)
+    {
+        Yaw += Input.MouseState.dX * DeltaTime;
+        Pitch -= Input.MouseState.dY * DeltaTime;
+        Pitch = glm::clamp(Pitch, -1.5f, 1.5f);
+    }
+
+    CamDir.x = sin(Yaw);
+    CamDir.y = cos(Yaw);
+    CamDir.z = Pitch;
+    Camera.LookAt = Camera.Position + CamDir * 50.0f;
+
+    float StrafeYaw = Yaw + (M_PI / 2);
+    float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
+    Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
+}
+
+static void
+UpdateListener(camera &Camera, vec3 PlayerPosition)
+{
+    static float *Orient = new float[6];
+    Orient[0] = Camera.View[2][0];
+    Orient[1] = Camera.View[2][1];
+    Orient[2] = Camera.View[2][2];
+    Orient[3] = Camera.View[0][0];
+    Orient[4] = Camera.View[0][1];
+    Orient[5] = Camera.View[0][2];
+    alListenerfv(AL_ORIENTATION, Orient);
+    alListenerfv(AL_POSITION, &Camera.Position[0]);
+    alListener3f(AL_VELOCITY, 0, 0, 0);
+}
+
+static void
 UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 {
     auto &Input = Game.Input;
     auto &Camera = Game.Camera;
     auto *PlayerEntity = Game.PlayerEntity;
     auto *PlayerShip = PlayerEntity->Ship;
-    vec3 CamDir = CameraDir(Camera);
-
     DeltaTime *= Global_Game_TimeSpeed;
 
     static bool Paused = false;
@@ -467,40 +473,14 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
     if (Paused) return;
 
-    UpdateLevel(Game, DeltaTime);
-
-#ifdef DRAFT_DEBUG
     if (Global_Camera_FreeCam)
     {
-        static float Pitch;
-        static float Yaw;
-        float Speed = 50.0f;
-        float AxisValue = GetAxisValue(Input, Action_camVertical);
-
-        Camera.Position += CameraDir(Game.Camera) * AxisValue * Speed * DeltaTime;
-
-        if (Input.MouseState.Buttons & MouseButton_middle)
-        {
-            Yaw += Input.MouseState.dX * DeltaTime;
-            Pitch -= Input.MouseState.dY * DeltaTime;
-            Pitch = glm::clamp(Pitch, -1.5f, 1.5f);
-        }
-
-        CamDir.x = sin(Yaw);
-        CamDir.y = cos(Yaw);
-        CamDir.z = Pitch;
-        Camera.LookAt = Camera.Position + CamDir * 50.0f;
-
-        float StrafeYaw = Yaw + (M_PI / 2);
-        float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
-        Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
+        UpdateFreeCam(Camera, Input, DeltaTime);
     }
-
     if (IsJustPressed(Game, Action_debugUI))
     {
         Global_DebugUI = !Global_DebugUI;
     }
-
     if (Game.Input.Keys[SDL_SCANCODE_R])
     {
         DebugReset(Game);
@@ -519,23 +499,47 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
                                                 vec3{ 0, 1, 1 });
         AddEntity(Game, Explosion);
     }
-#endif
 
     {
-        float MoveX = GetAxisValue(Game.Input, Action_horizontal);
-        float MoveY = 0;
-        MoveShipEntity(PlayerEntity, MoveX, MoveY, DeltaTime);
-    }
+        const float LOOK_SPEED = 5.0f;
+        const float ACCELERATION = 10.0f;
+        const float DECELERATION = 20.0f;
 
-    if (PlayerShip->DraftCharge == 1.0f)
-    {
-        if (IsJustPressed(Game, Action_boost))
+        static float Yaw;
+        static float MoveYaw;
+        static float Speed;
+        static vec3 MoveDir;
+        static vec3 LookDir;
+        static vec3 LookAt = vec3(0, 1, 0);
+        LookDir = glm::normalize(LookAt - PlayerEntity->Transform.Position);
+
+        float InputLook = GetAxisValue(Game.Input, Action_horizontal);
+        float InputMove = GetAxisValue(Game.Input, Action_vertical);
+        Yaw += InputLook * LOOK_SPEED * DeltaTime;
+
+        if (InputMove > 0 && Speed < 20.0f)
         {
-            alSourcePlay(Game.DraftBoostAudio->Source);
-            ApplyBoostToShip(Game.PlayerEntity, DraftBoost, ShipMaxVel + DraftBoost*1.5f);
-            PlayerShip->CurrentDraftTime = 0.0f;
-            Game.PlayerEntity->PlayerState->Score += DraftBoostScore;
+            Speed += InputMove * ACCELERATION * DeltaTime;
         }
+        else if (InputMove < 0 && Speed > 0.0f)
+        {
+            Speed += InputMove * DECELERATION * DeltaTime;
+        }
+
+        LookDir.x = sin(Yaw);
+        LookDir.y = cos(Yaw);
+        LookAt = PlayerEntity->Transform.Position + LookDir * 20.0f;
+
+        if (InputMove > 0.0f)
+        {
+            MoveDir += (LookDir - MoveDir) * 2.0f * DeltaTime;
+        }
+        //MoveDir.x = sin(Yaw);
+        //MoveDir.y = cos(Yaw);
+        PlayerEntity->Transform.Velocity = MoveDir * Speed;
+        PlayerEntity->Transform.Position += PlayerEntity->Transform.Velocity * DeltaTime;
+
+        PlayerEntity->Transform.Rotation.z = glm::degrees(-Yaw);
     }
 
     size_t FrameCollisionCount = 0;
@@ -563,28 +567,13 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     auto PlayerPosition = Game.PlayerEntity->Transform.Position;
     if (!Global_Camera_FreeCam)
     {
-        Camera.Position = vec3(PlayerPosition.x,
-                               PlayerPosition.y + Global_Camera_OffsetY,
-                               PlayerPosition.z + Global_Camera_OffsetZ);
-        Camera.LookAt = Camera.Position + vec3(0, 10, 0);
+        vec3 d = PlayerPosition - Camera.LookAt;
+        Camera.Position += d * 5.0f * DeltaTime;
+        Camera.LookAt = Camera.Position + vec3{0, -Global_Camera_OffsetY, -Global_Camera_OffsetZ};
     }
 
-    // update listener
-    {
-        static float *Orient = new float[6];
-        Orient[0] = Camera.View[2][0];
-        Orient[1] = Camera.View[2][1];
-        Orient[2] = Camera.View[2][2];
-        Orient[3] = Camera.View[0][0];
-        Orient[4] = Camera.View[0][1];
-        Orient[5] = Camera.View[0][2];
-        alListenerfv(AL_ORIENTATION, Orient);
-        alListenerfv(AL_POSITION, &Camera.Position[0]);
-        alListener3f(AL_VELOCITY, 0, 0, 0);
-
-        alSourcefv(Game.DraftBoostAudio->Source, AL_POSITION, &PlayerPosition[0]);
-    }
-
+    alSourcefv(Game.DraftBoostAudio->Source, AL_POSITION, &PlayerPosition[0]);
+    UpdateListener(Game.Camera, PlayerPosition);
     UpdateProjectionView(Game.Camera);
     RenderBegin(Game.RenderState, DeltaTime);
 
@@ -597,27 +586,9 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         float MoveY = 0.0f;
         if (Entity->Transform.Position.y < PlayerPosition.y)
         {
-            MoveY = 4.0f;
+            MoveY = 0.1f;
         }
         MoveShipEntity(Entity, sin(EnemyMoveH), MoveY, DeltaTime);
-    }
-
-    for (auto *Entity : Game.WallEntities)
-    {
-        if (!Entity) continue;
-
-        auto *WallState = Entity->WallState;
-        if (WallState->Timer >= Global_Game_WallRaiseTime)
-        {
-            WallState->Timer = Global_Game_WallRaiseTime;
-        }
-        else
-        {
-            WallState->Timer += DeltaTime;
-        }
-
-        float Amount = 1.0f - (WallState->Timer / Global_Game_WallRaiseTime);
-        Entity->Transform.Position.z = WallState->BaseZ + (Global_Game_WallStartOffset * Amount);
     }
 
     for (auto *Entity : Game.TrailEntities)
@@ -663,7 +634,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
             float CurrentTrailTime = Trail->Timer/Global_Game_TrailRecordTimer;
             if (i == 0)
             {
-                c1 += (c2 - c1) * CurrentTrailTime;
+                c1 -= (c2 - c1) * CurrentTrailTime;
             }
 
             const float r = 0.5f;
@@ -734,16 +705,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
         PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
     }
 
-    for (auto *Entity : Game.TrackEntities)
-    {
-        if (!Entity) continue;
-
-        if (Entity->Transform.Position.y + TrackSegmentLength+TrackSegmentPadding < Game.Camera.Position.y)
-        {
-            Entity->Transform.Position.y += TrackSegmentCount*TrackSegmentLength + (TrackSegmentPadding*TrackSegmentCount);
-        }
-    }
-
     for (auto *Entity : Game.ModelEntities)
     {
         if (!Entity) continue;
@@ -801,7 +762,7 @@ StartLoadingScreen(game_state &Game)
     AddAssetEntry(
         Game.AssetLoader,
         AssetType_Texture,
-        "data/textures/grid.png",
+        "data/textures/grid1.png",
         "grid",
         (void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
     );

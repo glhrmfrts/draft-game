@@ -115,13 +115,6 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
         Entry.Sound.Result = Result;
         break;
     }
-
-    case AssetType_Script:
-    {
-        auto *Result = PushStruct<simple_lisp_script>(Loader.Arena);
-        Entry.Script.Result = Result;
-        break;
-    }
     }
     Loader.Entries.push_back(Entry);
 }
@@ -349,13 +342,6 @@ LoadAssetThreadSafePart(void *Arg)
         Result->Channels = Info.channels;
 
         Entry->Sound.Data = Data;
-    }
-
-    case AssetType_Script:
-    {
-        const char *Source = ReadFile(Entry->Filename.c_str());
-        CompileScript(Entry->Script.Result, Source);
-        break;
     }
     }
 

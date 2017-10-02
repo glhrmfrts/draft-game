@@ -370,11 +370,11 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     float MinVel = ShipMinVel;
     if (Entity->Flags & Entity_IsPlayer)
     {
-        MinVel = PlayerMinVel;
+        //MinVel = PlayerMinVel;
     }
     if (Entity->Transform.Velocity.y < MinVel)
     {
-        MoveV = 0.1f;
+        //MoveV = 0.1f;
     }
 
     float MaxVel = ShipMaxVel;
@@ -383,15 +383,7 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
         MaxVel = PlayerMaxVel;
     }
 
-    if (MoveV > 0.0f && Entity->Transform.Velocity.y < MaxVel)
-    {
-        Entity->Transform.Velocity.y += MoveV * ShipAcceleration * DeltaTime;
-    }
-    else if (MoveV < 0.0f && Entity->Transform.Velocity.y > 0)
-    {
-        Entity->Transform.Velocity.y = std::max(0.0f, Entity->Transform.Velocity.y + (MoveV * ShipBreakAcceleration * DeltaTime));
-    }
-
+    Entity->Transform.Velocity.y += MoveV * ShipAcceleration * DeltaTime;
     if ((MoveV <= 0.0f && Entity->Transform.Velocity.y > 0) || Entity->Transform.Velocity.y > MaxVel)
     {
         Entity->Transform.Velocity.y -= ShipFriction * DeltaTime;
@@ -403,7 +395,7 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
                                           ShipSteerAcceleration,
                                           DeltaTime);
 
-    Entity->Transform.Rotation.y = 20.0f * (Entity->Transform.Velocity.x / ShipSteerSpeed);
+    Entity->Transform.Rotation.y = 20.0f * (MoveH / 1.0f);
     Entity->Transform.Rotation.x = Interp(Entity->Transform.Rotation.x,
                                           5.0f * MoveV,
                                           20.0f,
