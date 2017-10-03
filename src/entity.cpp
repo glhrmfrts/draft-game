@@ -189,6 +189,8 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
     Entity->Bounds = PushStruct<collision_bounds>(Game.Arena);
+    Entity->Bounds->Vertices = Game.ShipCollision;
+
     Entity->Ship = PushStruct<ship>(Game.Arena);
     Entity->Ship->Color = Color;
     Entity->Ship->OutlineColor = OutlineColor;

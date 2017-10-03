@@ -191,6 +191,7 @@ StartLevel(game_state &Game)
 
     {
         auto &ShipMesh = Game.ShipMesh;
+        auto &ShipCollision = Game.ShipCollision;
         float h = 0.5f;
 
         InitMeshBuffer(ShipMesh.Buffer);
@@ -205,6 +206,10 @@ StartLevel(game_state &Game)
         AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
 
         EndMesh(ShipMesh, GL_STATIC_DRAW);
+
+        ShipCollision.push_back(vec2{-1, 0});
+        ShipCollision.push_back(vec2{1, 0});
+        ShipCollision.push_back(vec2{0, 1});
     }
 
     {

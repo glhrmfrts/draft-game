@@ -7,8 +7,30 @@ struct bounding_box
     vec3 Half = vec3(0.0f);
 };
 
+struct circle
+{
+    vec2 Center;
+    float Radius;
+};
+
+struct polygon
+{
+    std::vector<vec2> Vertices;
+};
+
+struct collision_shape
+{
+    shape_type Type;
+    union
+    {
+        bounding_box Box;
+        circle Circle;
+        polygon Polygon;
+    };
+};
+
 struct entity;
-struct collision
+struct collision_result
 {
     vec3 Normal;
     float Depth;

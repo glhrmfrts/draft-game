@@ -1,19 +1,17 @@
+// Copyright
+
 #include "collision.h"
 
 inline static void
-UpdateEntityBounds(entity *Entity)
+UpdateEntityCollisionVertices(entity *Entity)
 {
-    // TODO: this is not good
-    if (Entity->Model)
+    auto &Verts = Entity->Bounds->Vertices;
+    size_t Size = Verts.size();
+    for (size_t i = 0; i < Size; i++)
     {
-        Entity->Bounds->Box = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Transform.Scale,
-                                               Entity->Model->Mesh->Max*Entity->Transform.Scale);
-        Entity->Bounds->Box.Center += Entity->Transform.Position;
-    }
-    else
-    {
-        //Entity->Bounds->Center = Entity->Position;
-        //Entity->Bounds->Half = Entity->Size*0.5f;
+        vec4 Vert = vec4{Verts[i].x, Verts[i].y, 0.0f, 1.0f};
+        Vert *= GetTransformMatrix(Entity->Transform);
+        Verts[i] = vec2{Vert.x, Vert.y};
     }
 }
 
@@ -37,10 +35,145 @@ ApplyCorrection(entity *Entity, vec3 Correction)
     Entity->Transform.Position += Correction;
 }
 
+static vec2
+Support(collision_shape *Shape, vec2 Direction)
+{
+    switch (Shape->Type)
+    {
+    case ShapeType_Circle:
+        return Shape->Circle.Center * Shape->Circle.Radius * Direction;
+
+    case ShapeType_Polygon:
+    {
+        float MaxDistance = std::numeric_limits<float>::lowest();
+        vec2 MaxVertex;
+        for (auto &Vert : Shape->Polygon.Vertices)
+        {
+            float Distance = glm::dot(Vert, Direction);
+            if (Distance > MaxDistance)
+            {
+                MaxDistance = Distance;
+                MaxVertex = Vert;
+            }
+        }
+        return MaxVertex;
+    }
+    }
+}
+
+static vec2
+AverageCenter(collision_shape *Shape)
+{
+    switch (Shape->Type)
+    {
+    case ShapeType_Circle:
+        return Shape->Circle.Center;
+
+    case ShapeType_Polygon:
+    {
+        vec2 Average(0.0f);
+        size_t Count = Shape->Polygon.Vertices.size();
+        for (auto &Vert : Shape->Polygon.Vertices)
+        {
+            Average += Vert;
+        }
+        Average /= Count;
+        return Average;
+    }
+    }
+}
+
+static float
+TripleProduct(vec2 a, vec2 b, vec2 c)
+{
+    float ac = glm::dot(a, c);
+    float bc = glm::dot(b, c);
+    vec2 Result = (b * ac) - (a * bc);
+    return Result;
+}
+
+static bool
+GJKCollision(collision_shape *Shape1, collision_shape *Shape2, collision *Col)
+{
+    vec2 Simplex[3];
+    int  SimplexCount = 0;
+    int  SimplexIndex = 0;
+    vec2 Direction;
+
+    for (;;)
+    {
+        switch (SimplexCount)
+        {
+        case 0:
+            Direction = AverageCenter(Shape2) - AverageCenter(Shape1);
+            SimplexIndex = SimplexCount++;
+            break;
+
+        case 1:
+            Direction *= -1;
+            SimplexIndex = SimplexCount++;
+            break;
+
+        case 2:
+        {
+            vec2 b = Simplex[1];
+            vec2 c = Simplex[0];
+
+            // cb is the line formed by the two vertices
+            vec2 cb = b - c;
+
+            // c0 is the line from the first vertex to the origin
+            vec2 c0 = c * -1;
+            Direction = TripleProduct(cb, c0, cb);
+            SimplexIndex = SimplexCount++;
+        }
+
+        case 3:
+        {
+            vec2 a = Simplex[2];
+            vec2 b = Simplex[1];
+            vec2 c = Simplex[0];
+
+            vec2 a0 = a * -1;
+            vec2 ab = b - a;
+            vec2 ac = c - a;
+            vec2 abPerp = TripleProduct(ac, ab, ab);
+            vec2 acPerp = TripleProduct(ab, ac, ac);
+
+            if (glm::dot(abPerp, a0) > 0.0f)
+            {
+                // get rid of c
+                SimplexIndex = 0;
+                Direction = abPerp;
+            }
+            else if (glm::dot(acPerp, a0) > 0.0f)
+            {
+                // get rid of b
+                SimplexIndex = 1;
+                Direction = acPerp;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        vec2 NewVertex = Support(Shape1, Direction) - Support(Shape2, Direction);
+        if (glm::dot(Direction, NewVertex) > 0.0f)
+        {
+            Simplex[SimplexIndex] = NewVertex;
+        }
+        else
+        {
+            return false;
+        }
+    }
+}
+
 #define ClimbHeight 0.26f
 void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collisions, size_t &NumCollisions)
 {
-    // The entities' bounding boxes only get updated in the integration
+    // The entities' vertices only get updated in the integration
     // phase, which happens after the collision detection so we need
     // to skip the first frame
     static bool FirstFrame = true;
@@ -65,60 +198,23 @@ void DetectCollisions(const vector<entity *> Entities, vector<collision> &Collis
             auto *EntityB = *it2;
             if (!EntityB) continue;
 
-            auto &First = EntityA->Bounds->Box;
-            auto &Second = EntityB->Bounds->Box;
-            vec3 Dif = Second.Center - First.Center;
-            float dx = First.Half.x + Second.Half.x - std::abs(Dif.x);
-            if (dx <= 0)
+            collision_result Col;
+            if (GJKCollision(EntityA->Shape, EntityB->Shape, &Col))
             {
-                continue;
-            }
-
-            float dy = First.Half.y + Second.Half.y - std::abs(Dif.y);
-            if (dy <= 0)
-            {
-                continue;
-            }
-
-            float dz = First.Half.z + Second.Half.z - std::abs(Dif.z);
-            if (dz <= 0)
-            {
-                continue;
-            }
-
-            // At this point we have a collision
-            collision Col;
-            Col.Normal = vec3(0.0f);
-            if (dx < dy && dy > ClimbHeight)
-            {
-                Col.Normal.x = std::copysign(1, Dif.x);
-                Col.Depth = dx;
-            }
-            else if (dz < dy && dy > ClimbHeight)
-            {
-                Col.Normal.z = std::copysign(1, Dif.z);
-                Col.Depth = dz;
-            }
-            else
-            {
-                Col.Normal.y = std::copysign(1, Dif.y);
-                Col.Depth = dy;
-            }
-
-            size_t Size = Collisions.size();
-            if (NumCollisions + 1 > Size)
-            {
-                if (Size == 0)
+                size_t Size = Collisions.size();
+                if (NumCollisions + 1 > Size)
                 {
-                    Size = 4;
+                    if (Size == 0)
+                    {
+                        Size = 4;
+                    }
+
+                    Collisions.resize(Size * 2);
                 }
-
-                Collisions.resize(Size * 2);
+                Col.First = EntityA;
+                Col.Second = EntityB;
+                Collisions[NumCollisions++] = Col;
             }
-
-            Col.First = EntityA;
-            Col.Second = EntityB;
-            Collisions[NumCollisions++] = Col;
         }
     }
 }
@@ -138,7 +234,7 @@ void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
     }
 }
 
-void ResolveCollision(collision &Col)
+void ResolveCollision(collision_result &Col)
 {
     vec3 rv = Col.Second->Transform.Velocity - Col.First->Transform.Velocity;
     float VelNormal = glm::dot(rv, Col.Normal);
