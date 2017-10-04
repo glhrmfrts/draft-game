@@ -9,7 +9,7 @@
 #include "draft.h"
 
 #undef main
- 
+
 #ifdef _WIN32
 #include "lib_win32.cpp"
 #else
@@ -41,8 +41,8 @@ int main(int argc, char **argv)
 
     int Width = 1280;
     int Height = 720;
-    int vWidth = Width/2;
-    int vHeight = Height/2;
+    int vWidth = Width;
+    int vHeight = Height;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           Width, Height, SDL_WINDOW_OPENGL);
 
@@ -84,6 +84,8 @@ int main(int argc, char **argv)
 
     game_state Game;
     Game.Window = Window;
+    Game.RealWidth = Width;
+    Game.RealHeight = Height;
     Game.Width = vWidth;
     Game.Height = vHeight;
     Game.Platform.CompareFileTime = PlatformCompareFileTime;

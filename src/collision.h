@@ -18,24 +18,37 @@ struct polygon
     std::vector<vec2> Vertices;
 };
 
+enum collision_shape_type
+{
+    CollisionShapeType_Circle,
+    CollisionShapeType_Polygon,
+};
+
 struct collision_shape
 {
-    shape_type Type;
+    collision_shape_type Type;
     union
     {
         bounding_box Box;
         circle Circle;
         polygon Polygon;
     };
+
+    collision_shape() {}
 };
 
 struct entity;
 struct collision_result
 {
-    vec3 Normal;
+    vec2  Normal;
     float Depth;
     entity *First;
     entity *Second;
+};
+
+struct physics_state
+{
+    std::vector<vec2> Simplex;
 };
 
 inline static bounding_box

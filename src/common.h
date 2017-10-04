@@ -28,6 +28,12 @@ typedef glm::vec3 vec3;
 typedef glm::vec4 vec4;
 typedef glm::mat4 mat4;
 
+struct ray
+{
+    vec3 Origin;
+    vec3 Direction;
+};
+
 typedef vec4 color;
 
 using std::string;
@@ -51,6 +57,19 @@ ToString(vec3 v3)
     std::ostringstream stream;
     stream << "[";
     stream << v3.x << "," << v3.y << "," << v3.z;
+    stream << "]";
+
+    return stream.str();
+}
+
+inline string
+ToString(ray Ray)
+{
+    std::ostringstream stream;
+    stream << "[";
+    stream << ToString(Ray.Origin);
+    stream << ",";
+    stream << ToString(Ray.Direction);
     stream << "]";
 
     return stream.str();

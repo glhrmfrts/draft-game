@@ -159,6 +159,7 @@ struct material
     material(color c, float e, float tw, texture *t, uint32 f = 0, vec2 us = vec2{ 1, 1 })
         : DiffuseColor(c), Emission(e), TexWeight(tw), Texture(t), Flags(f), UvScale(us) {}
 };
+static material BlankMaterial{Color_white, 0, 0, NULL};
 
 struct mesh_part
 {

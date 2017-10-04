@@ -1,108 +1,5 @@
 // Copyright
 
-static void
-AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
-{
-    PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c, n });
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c, n });
-}
-
-static void
-AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1 = Color_white, vec3 n = vec3(1), bool FlipV = false)
-{
-    color c2 = c1;
-    color c3 = c1;
-    color c4 = c1;
-
-    texture_rect Uv = {0, 0, 1, 1};
-    if (FlipV)
-    {
-        Uv.v = 1;
-        Uv.v2 = 0;
-    }
-    PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
-    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
-
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
-    PushVertex(Buffer, mesh_vertex{ p3, vec2{ Uv.u2, Uv.v2 }, c3, n });
-    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
-}
-
-static void
-AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1, color c2, color c3, color c4,
-        vec3 n = vec3(1), bool FlipV = false)
-{
-    texture_rect Uv = { 0, 0, 1, 1 };
-    if (FlipV)
-    {
-        Uv.v = 1;
-        Uv.v2 = 0;
-    }
-    PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
-    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
-
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
-    PushVertex(Buffer, mesh_vertex{ p3, vec2{ Uv.u2, Uv.v2 }, c3, n });
-    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
-}
-
-inline static vec3
-GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
-{
-    vec3 v1 = p2 - p1;
-    vec3 v2 = p3 - p1;
-    return glm::normalize(glm::cross(v1, v2));
-}
-
-void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
-{
-    color c2 = c1;
-    color c3 = c1;
-
-    PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c1, n });
-    PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c2, n });
-    PushVertex(Buffer, mesh_vertex{ p3, vec2{ 0, 0 }, c3, n });
-}
-
-void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
-{
-    AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
-}
-
-static void
-AddCube(vertex_buffer &Buffer, color c = Color_white, bool NoLight = false)
-{
-    float z = -0.5;
-    float h = z+1;
-    float x = -0.5f;
-    float w = x+1;
-    float y = -0.5f;
-    float d = y+1;
-
-    if (NoLight)
-    {
-        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1,1,1));
-        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(1, 1, 1));
-    }
-    else
-    {
-        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(0, -1, 0));
-        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 0, 0));
-        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(0, 1, 0));
-        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(-1, 0, 0));
-        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(0, 0, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(0, 0, -1));
-    }
-}
-
 inline static void
 AddFlags(entity *Entity, uint32 Flags)
 {
@@ -129,19 +26,6 @@ CreateModel(memory_arena &Arena, mesh *Mesh)
     return Result;
 }
 
-inline static void
-AddPart(mesh &Mesh, const mesh_part &MeshPart)
-{
-    Mesh.Parts.push_back(MeshPart);
-}
-
-static void
-AddSkyboxFace(mesh &Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
-{
-    AddQuad(Mesh.Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
-    AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
-}
-
 static trail *
 CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 {
@@ -155,16 +39,16 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     const float emission = 4.0f;
 
     // Plane parts
-    AddPart(Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 0, 6, GL_TRIANGLES});
-    AddPart(Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
+    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 0, 6, GL_TRIANGLES});
+    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
 
     // Left line parts
-    AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
-    AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + 2, LineCount - 2, GL_LINES});
+    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
+    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + 2, LineCount - 2, GL_LINES});
 
     // Right line parts
-    AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
-    AddPart(Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
+    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
+    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
 
     for (int i = 0; i < TrailCount; i++)
     {
@@ -183,14 +67,12 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
 {
     auto *Entity = PushStruct<entity>(Game.Arena);
     Entity->Type = EntityType_Ship;
-    Entity->Model = CreateModel(Game.Arena, &Game.ShipMesh);
+    Entity->Model = CreateModel(Game.Arena, GetShipMesh(Game));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, Material_PolygonLines));
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
-    Entity->Bounds = PushStruct<collision_bounds>(Game.Arena);
-    Entity->Bounds->Vertices = Game.ShipCollision;
-
+    //Entity->Bounds = PushStruct<collision_shape>(Game.Arena);
     Entity->Ship = PushStruct<ship>(Game.Arena);
     Entity->Ship->Color = Color;
     Entity->Ship->OutlineColor = OutlineColor;
@@ -289,13 +171,13 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
         Normals[i] = GenerateNormal(p1, p2, p3);
     }
 
-    AddPart(Explosion->Mesh,
+    AddPart(&Explosion->Mesh,
             mesh_part{
                 material{Color, 0, 0, NULL, Material_ForceTransparent},
                 0,
                 Explosion->Triangles.size(),
                 GL_TRIANGLES});
-    AddPart(Explosion->Mesh,
+    AddPart(&Explosion->Mesh,
             mesh_part{
                 material{OutlineColor, 2.0f, 0, NULL, Material_ForceTransparent | Material_PolygonLines},
                 0,
@@ -322,7 +204,7 @@ entity *CreateCrystalEntity(game_state &Game, vec3 Position)
     Result->Transform.Position = Position;
     Result->Transform.Scale = vec3{0.5f, 0.5f, 0.75f};
     Result->Type = EntityType_Crystal;
-    Result->Model = CreateModel(Game.Arena, &Game.CrystalMesh);
+    Result->Model = CreateModel(Game.Arena, GetCrystalMesh(Game));
     Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
     return Result;
 }
@@ -338,7 +220,7 @@ entity *CreateWallEntity(game_state &Game, vec3 Position, float Width)
     Result->Transform.Position = Position;
     Result->Transform.Scale = vec3{Width, Depth, Height};
     Result->Type = EntityType_Wall;
-    Result->Model = CreateModel(Game.Arena, &Game.WallMesh);
+    Result->Model = CreateModel(Game.Arena, NULL);
     Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
     Result->WallState = PushStruct<wall_state>(Game.Arena);
     Result->WallState->BaseZ = Position.z;

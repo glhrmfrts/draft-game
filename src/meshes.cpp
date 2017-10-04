@@ -1,0 +1,204 @@
+// Copyright
+
+static void
+AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
+{
+    PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c, n });
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c, n });
+}
+
+static void
+AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
+        color c1 = Color_white, vec3 n = vec3(1), bool FlipV = false)
+{
+    color c2 = c1;
+    color c3 = c1;
+    color c4 = c1;
+
+    texture_rect Uv = {0, 0, 1, 1};
+    if (FlipV)
+    {
+        Uv.v = 1;
+        Uv.v2 = 0;
+    }
+    PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
+    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
+
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
+    PushVertex(Buffer, mesh_vertex{ p3, vec2{ Uv.u2, Uv.v2 }, c3, n });
+    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
+}
+
+static void
+AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
+        color c1, color c2, color c3, color c4,
+        vec3 n = vec3(1), bool FlipV = false)
+{
+    texture_rect Uv = { 0, 0, 1, 1 };
+    if (FlipV)
+    {
+        Uv.v = 1;
+        Uv.v2 = 0;
+    }
+    PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
+    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
+
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
+    PushVertex(Buffer, mesh_vertex{ p3, vec2{ Uv.u2, Uv.v2 }, c3, n });
+    PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
+}
+
+inline static vec3
+GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
+{
+    vec3 v1 = p2 - p1;
+    vec3 v2 = p3 - p1;
+    return glm::normalize(glm::cross(v1, v2));
+}
+
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
+{
+    color c2 = c1;
+    color c3 = c1;
+
+    PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c1, n });
+    PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c2, n });
+    PushVertex(Buffer, mesh_vertex{ p3, vec2{ 0, 0 }, c3, n });
+}
+
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
+{
+    AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
+}
+
+static void
+AddCube(vertex_buffer &Buffer, color c = Color_white, bool NoLight = false)
+{
+    float z = -0.5;
+    float h = z+1;
+    float x = -0.5f;
+    float w = x+1;
+    float y = -0.5f;
+    float d = y+1;
+
+    if (NoLight)
+    {
+        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1,1,1));
+        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 1, 1));
+        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(1, 1, 1));
+        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(1, 1, 1));
+        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(1, 1, 1));
+        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(1, 1, 1));
+    }
+    else
+    {
+        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(0, -1, 0));
+        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 0, 0));
+        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(0, 1, 0));
+        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(-1, 0, 0));
+        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(0, 0, 1));
+        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(0, 0, -1));
+    }
+}
+
+inline static void
+AddPart(mesh *Mesh, const mesh_part &MeshPart)
+{
+    Mesh->Parts.push_back(MeshPart);
+}
+
+static void
+AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
+{
+    AddQuad(Mesh->Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
+    AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
+}
+
+#define LEVEL_PLANE_SIZE  512
+#define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
+
+mesh *GetFloorMesh(game_state &Game)
+{
+    auto &m = Game.Meshes;
+    if (m.FloorMesh)
+    {
+        return m.FloorMesh;
+    }
+
+    auto *FloorMesh = PushStruct<mesh>(Game.Arena);
+    InitMeshBuffer(FloorMesh->Buffer);
+
+    material FloorMaterial = {
+        IntColor(SecondPalette.Colors[2]),
+        1.0f,
+        1,
+        FindTexture(Game.AssetLoader, "grid"),
+        0,
+        vec2{LEVEL_PLANE_SIZE/16,LEVEL_PLANE_SIZE/16}
+    };
+
+    float w = 1.0f;
+    float l = -w/2;
+    float r = w/2;
+    AddQuad(FloorMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
+    AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh->Buffer.VertexCount, GL_TRIANGLES});
+    EndMesh(FloorMesh, GL_STATIC_DRAW);
+
+    return m.FloorMesh = FloorMesh;
+}
+
+mesh *GetShipMesh(game_state &Game)
+{
+    auto &m = Game.Meshes;
+    if (m.ShipMesh)
+    {
+        return m.ShipMesh;
+    }
+
+    auto *ShipMesh = PushStruct<mesh>(Game.Arena);
+    float h = 0.5f;
+
+    InitMeshBuffer(ShipMesh->Buffer);
+    AddTriangle(ShipMesh->Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, h), vec3(0, 1, 0.1f));
+    AddTriangle(ShipMesh->Buffer, vec3(1, 0, 0),  vec3(0, 1, 0.1f), vec3(0, 0.1f, h));
+    AddTriangle(ShipMesh->Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, 0), vec3(0, 0.1f, h));
+    AddTriangle(ShipMesh->Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
+
+    material ShipMaterial = {Color_white, 0, 0, NULL};
+    material ShipOutlineMaterial = {Color_white, 1, 0, NULL, Material_PolygonLines};
+    AddPart(ShipMesh, {ShipMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
+    AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
+
+    EndMesh(ShipMesh, GL_STATIC_DRAW);
+
+    return m.ShipMesh = ShipMesh;
+}
+
+mesh *GetCrystalMesh(game_state &Game)
+{
+    auto &m = Game.Meshes;
+    if (m.CrystalMesh)
+    {
+        return m.CrystalMesh;
+    }
+
+    auto *CrystalMesh = PushStruct<mesh>(Game.Arena);
+    InitMeshBuffer(CrystalMesh->Buffer);
+
+    AddTriangle(CrystalMesh->Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ 1, -1, 0 }, vec3{ 1, 1, 0 }, vec3{ 0, 0, 1 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ 1, 1, 0 }, vec3{ -1, 1, 0 }, vec3{ 0, 0, 1 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ -1, 1, 0 }, vec3{ -1, -1, 0 }, vec3{ 0, 0, 1 });
+
+    AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ 1, -1, 0 }, vec3{ -1, -1, 0 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ 1, 1, 0 }, vec3{ 1, -1, 0 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
+    AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
+
+    AddPart(CrystalMesh, mesh_part{ material{ CRYSTAL_COLOR, 1.0f, 0, NULL }, 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
+    EndMesh(CrystalMesh, GL_STATIC_DRAW);
+
+    return m.CrystalMesh = CrystalMesh;
+}

@@ -16,6 +16,7 @@
 #include "entity.h"
 #include "random.h"
 #include "level.h"
+#include "editor.h"
 
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
@@ -26,7 +27,7 @@ typedef PLATFORM_COMPARE_FILE_TIME(platform_compare_file_time_func);
 struct platform_api
 {
     platform_get_file_last_write_time_func *GetFileLastWriteTime;
-    platform_compare_file_time_func *CompareFileTime;    
+    platform_compare_file_time_func *CompareFileTime;
 };
 
 #define GAME_INIT(name) void name(game_state *Game)
@@ -132,12 +133,20 @@ struct game_input
 	game_input() {}
 };
 
+struct game_meshes
+{
+    mesh *FloorMesh = NULL;
+    mesh *ShipMesh = NULL;
+    mesh *CrystalMesh = NULL;
+};
+
 struct audio_source;
 
 enum game_mode
 {
 	GameMode_LoadingScreen,
     GameMode_Level,
+    GameMode_Editor,
 };
 struct game_state
 {
@@ -149,14 +158,11 @@ struct game_state
     gui GUI;
     camera GUICamera;
     render_state RenderState;
+    editor_state EditorState;
 
     memory_arena Arena;
     camera Camera;
-    mesh FloorMesh;
-    mesh ShipMesh;
-    mesh SkyboxMesh;
-	mesh CrystalMesh;
-    mesh WallMesh;
+    game_meshes Meshes;
     vec3 Gravity;
 
     vector<entity *> ModelEntities;
@@ -166,7 +172,7 @@ struct game_state
 	vector<entity *> ExplosionEntities;
 	vector<entity *> ShipEntities;
     vector<entity *> WallEntities;
-    vector<collision> CollisionCache;
+    vector<collision_result> CollisionCache;
     entity *SkyboxEntity;
     entity *PlayerEntity;
     level *CurrentLevel = 0;
@@ -180,9 +186,24 @@ struct game_state
 	SDL_Window *Window;
     int Width;
     int Height;
+    int RealWidth;
+    int RealHeight;
     bool Running = true;
 
     game_state() {}
 };
+
+inline static float
+GetAxisValue(game_input &Input, action_type Type)
+{
+    return Input.Actions[Type].AxisValue;
+}
+
+inline static bool
+IsJustPressed(game_state &Game, action_type Type)
+{
+    return Game.Input.Actions[Type].Pressed > 0 &&
+        Game.PrevInput.Actions[Type].Pressed == 0;
+}
 
 #endif

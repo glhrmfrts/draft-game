@@ -16,8 +16,10 @@
 #include "asset.cpp"
 #include "gui.cpp"
 #include "debug_ui.cpp"
+#include "meshes.cpp"
 #include "entity.cpp"
 #include "level.cpp"
+#include "editor.cpp"
 
 struct audio_source
 {
@@ -157,10 +159,8 @@ RemoveEntity(game_state &Game, entity *Entity)
     Game.NumEntities = std::max(0, Game.NumEntities - 1);
 }
 
-#define MapPlaneSize  512
-#define CrystalColor  IntColor(FirstPalette.Colors[1])
 static void
-StartLevel(game_state &Game)
+InitLevel(game_state &Game)
 {
     Game.Mode = GameMode_Level;
     FreeArena(Game.Arena);
@@ -168,77 +168,6 @@ StartLevel(game_state &Game)
     Game.RenderState.FogColor.a = 1.0f;
     ApplyExplosionLight(Game.RenderState, IntColor(FirstPalette.Colors[3]));
 
-    {
-        auto &FloorMesh = Game.FloorMesh;
-        InitMeshBuffer(FloorMesh.Buffer);
-
-        material FloorMaterial = {
-            Game.RenderState.FogColor,
-            1.0f,
-            1,
-            FindTexture(Game.AssetLoader, "grid"),
-            0,
-            vec2{MapPlaneSize/16,MapPlaneSize/16}
-        };
-
-        float w = 1.0f;
-        float l = -w/2;
-        float r = w/2;
-        AddQuad(FloorMesh.Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
-        AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh.Buffer.VertexCount, GL_TRIANGLES});
-        EndMesh(FloorMesh, GL_STATIC_DRAW);
-    }
-
-    {
-        auto &ShipMesh = Game.ShipMesh;
-        auto &ShipCollision = Game.ShipCollision;
-        float h = 0.5f;
-
-        InitMeshBuffer(ShipMesh.Buffer);
-        AddTriangle(ShipMesh.Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, h), vec3(0, 1, 0.1f));
-        AddTriangle(ShipMesh.Buffer, vec3(1, 0, 0),  vec3(0, 1, 0.1f), vec3(0, 0.1f, h));
-        AddTriangle(ShipMesh.Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, 0), vec3(0, 0.1f, h));
-        AddTriangle(ShipMesh.Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
-
-        material ShipMaterial = {Color_white, 0, 0, NULL};
-        material ShipOutlineMaterial = {Color_white, 1, 0, NULL, Material_PolygonLines};
-        AddPart(ShipMesh, {ShipMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
-        AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh.Buffer.VertexCount, GL_TRIANGLES});
-
-        EndMesh(ShipMesh, GL_STATIC_DRAW);
-
-        ShipCollision.push_back(vec2{-1, 0});
-        ShipCollision.push_back(vec2{1, 0});
-        ShipCollision.push_back(vec2{0, 1});
-    }
-
-    {
-        auto &CrystalMesh = Game.CrystalMesh;
-        InitMeshBuffer(CrystalMesh.Buffer);
-
-        AddTriangle(CrystalMesh.Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ 1, -1, 0 }, vec3{ 1, 1, 0 }, vec3{ 0, 0, 1 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ 1, 1, 0 }, vec3{ -1, 1, 0 }, vec3{ 0, 0, 1 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ -1, 1, 0 }, vec3{ -1, -1, 0 }, vec3{ 0, 0, 1 });
-
-        AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ 1, -1, 0 }, vec3{ -1, -1, 0 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ 1, 1, 0 }, vec3{ 1, -1, 0 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
-        AddTriangle(CrystalMesh.Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
-
-        AddPart(CrystalMesh, mesh_part{ material{ CrystalColor, 1.0f, 0, NULL }, 0, CrystalMesh.Buffer.VertexCount, GL_TRIANGLES });
-        EndMesh(CrystalMesh, GL_STATIC_DRAW);
-    }
-
-    {
-        auto &WallMesh = Game.WallMesh;
-        InitMeshBuffer(WallMesh.Buffer);
-        AddCube(WallMesh.Buffer);
-        AddPart(WallMesh, mesh_part{ material{ IntColor(0xffffff, 0.75f), 0.0f, 0.0f, NULL }, 0, WallMesh.Buffer.VertexCount, GL_TRIANGLES });
-        EndMesh(WallMesh, GL_STATIC_DRAW);
-    }
-
-    MakeCameraPerspective(Game.Camera, (float)Game.Width, (float)Game.Height, 70.0f, 0.1f, 1000.0f);
     Game.Gravity = vec3(0, 0, 0);
 
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
@@ -248,8 +177,8 @@ StartLevel(game_state &Game)
         auto *Entity = PushStruct<entity>(Game.Arena);
         Entity->Type = EntityType_TrackSegment;
         Entity->Transform.Position.z = -0.25f;
-        Entity->Transform.Scale = vec3(MapPlaneSize, MapPlaneSize, 0);
-        Entity->Model = CreateModel(Game.Arena, &Game.FloorMesh);
+        Entity->Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 0};
+        Entity->Model = CreateModel(Game.Arena, GetFloorMesh(Game));
         AddEntity(Game, Entity);
     }
 
@@ -261,25 +190,6 @@ StartLevel(game_state &Game)
 static void
 DebugReset(game_state &Game)
 {
-}
-
-inline static float
-GetAxisValue(game_input &Input, action_type Type)
-{
-    return Input.Actions[Type].AxisValue;
-}
-
-inline static bool
-IsJustPressed(game_state &Game, action_type Type)
-{
-    return Game.Input.Actions[Type].Pressed > 0 &&
-        Game.PrevInput.Actions[Type].Pressed == 0;
-}
-
-inline static vec3
-CameraDir(camera &Camera)
-{
-    return glm::normalize(Camera.LookAt - Camera.Position);
 }
 
 struct find_entity_result
@@ -345,8 +255,8 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
             CrystalEntity->Transform.Position,
             OtherEntity->Transform.Velocity,
             CrystalEntity->Transform.Scale,
-            CrystalColor,
-            CrystalColor,
+            CRYSTAL_COLOR,
+            CRYSTAL_COLOR,
             vec3{ 0, 1, 1 }
         );
         AddEntity(Game, Explosion);
@@ -420,34 +330,6 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
 }
 
 static void
-UpdateFreeCam(camera &Camera, game_input &Input, float DeltaTime)
-{
-    static float Pitch;
-    static float Yaw;
-    float Speed = 50.0f;
-    float AxisValue = GetAxisValue(Input, Action_camVertical);
-    vec3 CamDir = CameraDir(Camera);
-
-    Camera.Position += CamDir * AxisValue * Speed * DeltaTime;
-
-    if (Input.MouseState.Buttons & MouseButton_middle)
-    {
-        Yaw += Input.MouseState.dX * DeltaTime;
-        Pitch -= Input.MouseState.dY * DeltaTime;
-        Pitch = glm::clamp(Pitch, -1.5f, 1.5f);
-    }
-
-    CamDir.x = sin(Yaw);
-    CamDir.y = cos(Yaw);
-    CamDir.z = Pitch;
-    Camera.LookAt = Camera.Position + CamDir * 50.0f;
-
-    float StrafeYaw = Yaw + (M_PI / 2);
-    float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
-    Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
-}
-
-static void
 UpdateListener(camera &Camera, vec3 PlayerPosition)
 {
     static float *Orient = new float[6];
@@ -463,7 +345,7 @@ UpdateListener(camera &Camera, vec3 PlayerPosition)
 }
 
 static void
-UpdateAndRenderLevel(game_state &Game, float DeltaTime)
+RenderLevel(game_state &Game, float DeltaTime)
 {
     auto &Input = Game.Input;
     auto &Camera = Game.Camera;
@@ -478,14 +360,6 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
     }
     if (Paused) return;
 
-    if (Global_Camera_FreeCam)
-    {
-        UpdateFreeCam(Camera, Input, DeltaTime);
-    }
-    if (IsJustPressed(Game, Action_debugUI))
-    {
-        Global_DebugUI = !Global_DebugUI;
-    }
     if (Game.Input.Keys[SDL_SCANCODE_R])
     {
         DebugReset(Game);
@@ -549,7 +423,7 @@ UpdateAndRenderLevel(game_state &Game, float DeltaTime)
 
     size_t FrameCollisionCount = 0;
     PlayerShip->NumTrailCollisions = 0;
-    DetectCollisions(Game.ShapedEntities, Game.CollisionCache, FrameCollisionCount);
+    //DetectCollisions(Game.ShapedEntities, Game.CollisionCache, FrameCollisionCount);
     for (size_t i = 0; i < FrameCollisionCount; i++)
     {
         auto &Col = Game.CollisionCache[i];
@@ -759,7 +633,7 @@ RegisterInputActions(game_input &Input)
 }
 
 static void
-StartLoadingScreen(game_state &Game)
+InitLoadingScreen(game_state &Game)
 {
     Game.Mode = GameMode_LoadingScreen;
     InitAssetLoader(Game.AssetLoader, Game.Platform);
@@ -816,7 +690,7 @@ RenderLoadingScreen(game_state &Game, float DeltaTime)
 
     if (Update(Game.AssetLoader))
     {
-        StartLevel(Game);
+        InitEditor(Game);
     }
 }
 
@@ -839,8 +713,9 @@ extern "C"
         RegisterInputActions(Game->Input);
         InitGUI(Game->GUI, Game->Input);
         MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
+        MakeCameraPerspective(Game->Camera, (float)Game->Width, (float)Game->Height, 70.0f, 0.1f, 1000.0f);
         InitRenderState(Game->RenderState, Width, Height);
-        StartLoadingScreen(*Game);
+        InitLoadingScreen(*Game);
     }
 
     // @TODO: this exists only for imgui, remove in the future
@@ -852,13 +727,23 @@ extern "C"
     export_func GAME_RENDER(GameRender)
     {
         ImGui_ImplSdlGL3_NewFrame(Game->Window);
+        if (IsJustPressed(*Game, Action_debugUI))
+        {
+            Global_DebugUI = !Global_DebugUI;
+        }
+
         switch (Game->Mode)
         {
         case GameMode_LoadingScreen:
             RenderLoadingScreen(*Game, DeltaTime);
             break;
+
         case GameMode_Level:
-            UpdateAndRenderLevel(*Game, DeltaTime);
+            RenderLevel(*Game, DeltaTime);
+            break;
+
+        case GameMode_Editor:
+            RenderEditor(*Game, DeltaTime);
             break;
         }
 

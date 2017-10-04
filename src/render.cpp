@@ -472,9 +472,9 @@ void InitMeshBuffer(vertex_buffer &Buffer)
                vertex_attribute{3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
 }
 
-void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
+void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
 {
-    auto &b = Mesh.Buffer;
+    auto &b = Mesh->Buffer;
     UploadVertices(b, Usage);
 
     if (!ComputeBounds) return;
@@ -496,8 +496,8 @@ void EndMesh(mesh &Mesh, GLenum Usage, bool ComputeBounds = true)
         Max.z = std::max(Max.z, Pos.z);
     }
 
-    Mesh.Min = Min;
-    Mesh.Max = Max;
+    Mesh->Min = Min;
+    Mesh->Max = Max;
 }
 
 // returns the index of the next available renderable
@@ -836,8 +836,6 @@ RenderBlur(render_state &RenderState, blur_program *Program)
     UnbindShaderProgram();
     return Dests;
 }
-
-static material BlankMaterial{Color_white, 0, 0, NULL};
 
 void RenderEnd(render_state &RenderState, camera &Camera)
 {
