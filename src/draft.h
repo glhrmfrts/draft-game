@@ -109,9 +109,9 @@ struct action_state
 		  AxisID(ai), ButtonID(bi) {}
 };
 
-#define MouseButton_left 0x1
-#define MouseButton_middle 0x2
-#define MouseButton_right 0x4
+#define MouseButton_Left 0x1
+#define MouseButton_Middle 0x2
+#define MouseButton_Right 0x4
 struct mouse_state
 {
     int X, Y;
@@ -158,7 +158,7 @@ struct game_state
     gui GUI;
     camera GUICamera;
     render_state RenderState;
-    editor_state EditorState;
+    vector<asset_entry> Assets;
 
     memory_arena Arena;
     camera Camera;
@@ -190,6 +190,8 @@ struct game_state
     int RealHeight;
     bool Running = true;
 
+    editor_state *EditorState = NULL;
+
     game_state() {}
 };
 
@@ -204,6 +206,13 @@ IsJustPressed(game_state &Game, action_type Type)
 {
     return Game.Input.Actions[Type].Pressed > 0 &&
         Game.PrevInput.Actions[Type].Pressed == 0;
+}
+
+inline static bool
+IsJustPressed(game_state &Game, uint8 Button)
+{
+    return (Game.Input.MouseState.Buttons & Button) &&
+        !(Game.PrevInput.MouseState.Buttons & Button);
 }
 
 #endif

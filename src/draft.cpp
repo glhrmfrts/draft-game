@@ -19,7 +19,7 @@
 #include "meshes.cpp"
 #include "entity.cpp"
 #include "level.cpp"
-#include "editor.cpp"
+#include "init.cpp"
 
 struct audio_source
 {
@@ -51,8 +51,7 @@ inline static void
 AddEntityToList(vector<entity *> &List, entity *Entity)
 {
     for (auto it = List.begin(), end = List.end(); it != end; it++)
-    {
-        if (!(*it))
+    {        if (!(*it))
         {
             *it = Entity;
             return;
@@ -620,80 +619,6 @@ RenderLevel(game_state &Game, float DeltaTime)
     }
 }
 
-static void
-RegisterInputActions(game_input &Input)
-{
-    Input.Actions[Action_camHorizontal] = action_state{ SDL_SCANCODE_D, SDL_SCANCODE_A, 0, 0, Axis_Invalid, Button_Invalid };
-    Input.Actions[Action_camVertical] = action_state{ SDL_SCANCODE_W, SDL_SCANCODE_S, 0, 0, Axis_Invalid, Button_Invalid};
-    Input.Actions[Action_horizontal] = action_state{ SDL_SCANCODE_RIGHT, SDL_SCANCODE_LEFT, 0, 0, Axis_LeftX, Button_Invalid };
-    Input.Actions[Action_vertical] = action_state{ SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, 0, 0, Axis_RightTrigger, Button_Invalid };
-    Input.Actions[Action_boost] = action_state{ SDL_SCANCODE_SPACE, 0, 0, 0, Axis_Invalid, XboxButton_X };
-    Input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
-    Input.Actions[Action_debugPause] = action_state{ SDL_SCANCODE_P, 0, 0, 0, Axis_Invalid, Button_Invalid };
-}
-
-static void
-InitLoadingScreen(game_state &Game)
-{
-    Game.Mode = GameMode_LoadingScreen;
-    InitAssetLoader(Game.AssetLoader, Game.Platform);
-
-    AddAssetEntry(
-        Game.AssetLoader,
-        AssetType_Texture,
-        "data/textures/grid1.png",
-        "grid",
-        (void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
-    );
-    AddAssetEntry(
-        Game.AssetLoader,
-        AssetType_Font,
-        "data/fonts/vcr.ttf",
-        "vcr_16",
-        (void *)16
-    );
-    AddAssetEntry(
-        Game.AssetLoader,
-        AssetType_Sound,
-        "data/audio/boost.wav",
-        "boost",
-        NULL
-    );
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.ModelProgram);
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlurHorizontalProgram);
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlurVerticalProgram);
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlendProgram);
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.BlitProgram);
-    AddShaderProgramEntries(Game.AssetLoader, Game.RenderState.ResolveMultisampleProgram);
-
-    StartLoading(Game.AssetLoader);
-}
-
-static void
-RenderLoadingScreen(game_state &Game, float DeltaTime)
-{
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    auto &g = Game.GUI;
-    float Width = Game.Width * 0.5f;
-    float Height = Game.Height * 0.1f;
-    float x = (float)Game.Width/2 - Width/2;
-    float y = (float)Game.Height/2 - Height/2;
-    float LoadingPercentage = (float)(int)Game.AssetLoader.NumLoadedEntries / (float)Game.AssetLoader.Entries.size();
-    float ProgressBarWidth = Width*LoadingPercentage;
-
-    UpdateProjectionView(Game.GUICamera);
-    Begin(g, Game.GUICamera);
-    PushRect(g, rect{ x, y, Width, Height }, Color_white, GL_LINE_LOOP);
-    PushRect(g, rect{ x + 5, y + 5, ProgressBarWidth - 10, Height - 10 }, Color_white);
-    End(g);
-
-    if (Update(Game.AssetLoader))
-    {
-        InitEditor(Game);
-    }
-}
-
 #ifdef _WIN32
 #define export_func __declspec(dllexport)
 #else
@@ -715,6 +640,32 @@ extern "C"
         MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(Game->Camera, (float)Game->Width, (float)Game->Height, 70.0f, 0.1f, 1000.0f);
         InitRenderState(Game->RenderState, Width, Height);
+
+        Game->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Texture,
+                "data/textures/grid1.png",
+                "grid",
+                (void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
+            )
+        );
+        Game->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Font,
+                "data/fonts/vcr.ttf",
+                "vcr_16",
+                (void *)16
+            )
+        );
+        Game->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Sound,
+                "data/audio/boost.wav",
+                "boost",
+                NULL
+            )
+        );
+
         InitLoadingScreen(*Game);
     }
 
@@ -735,15 +686,11 @@ extern "C"
         switch (Game->Mode)
         {
         case GameMode_LoadingScreen:
-            RenderLoadingScreen(*Game, DeltaTime);
+            RenderLoadingScreen(*Game, DeltaTime, InitLevel);
             break;
 
         case GameMode_Level:
             RenderLevel(*Game, DeltaTime);
-            break;
-
-        case GameMode_Editor:
-            RenderEditor(*Game, DeltaTime);
             break;
         }
 

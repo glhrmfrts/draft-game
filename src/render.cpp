@@ -63,9 +63,21 @@ InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
     va_end(Args);
 }
 
+// InitMeshBuffer initializes a vertex_buffer with the common attributes
+// used by all meshes in the game
+void InitMeshBuffer(vertex_buffer &Buffer)
+{
+    size_t Stride = sizeof(mesh_vertex);
+    InitBuffer(Buffer, 12, 4,
+               vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
+               vertex_attribute{1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
+               vertex_attribute{2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
+               vertex_attribute{3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
+}
+
 // PushVertex pushes a single vertex to the buffer, the vertex size
 // is known by the VertexSize field
-inline void
+inline size_t
 PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
 {
     EnsureCapacity(Buffer, Buffer.VertexSize);
@@ -76,16 +88,17 @@ PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
     }
     Buffer.RawIndex += Buffer.VertexSize;
     Buffer.VertexCount++;
+    return Buffer.VertexCount - 1;
 }
 
-inline static void
+inline size_t
 PushVertex(vertex_buffer &Buffer, const mesh_vertex &Vertex)
 {
     vec3 p = Vertex.Position;
     vec2 uv = Vertex.Uv;
     color c = Vertex.Color;
     vec3 n = Vertex.Normal;
-    PushVertex(Buffer, {p.x, p.y, p.z, uv.x, uv.y, c.r, c.g, c.b, c.a, n.x, n.y, n.z});
+    return PushVertex(Buffer, {p.x, p.y, p.z, uv.x, uv.y, c.r, c.g, c.b, c.a, n.x, n.y, n.z});
 }
 
 void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
@@ -105,7 +118,14 @@ void UploadVertices(vertex_buffer &Buffer, size_t Index, size_t Count)
     size_t ByteIndex = Index * Buffer.VertexSize * sizeof(float);
     size_t ByteCount = Count * Buffer.VertexSize * sizeof(float);
     glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
-    glBufferSubData(GL_ARRAY_BUFFER, ByteIndex, ByteCount, &Buffer.Vertices[Index]);
+    glBufferSubData(GL_ARRAY_BUFFER, ByteIndex, ByteCount, &Buffer.Vertices[Index * Buffer.VertexSize]);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void ReserveVertices(vertex_buffer &Buffer, size_t Size, GLenum Usage)
+{
+    glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
+    glBufferData(GL_ARRAY_BUFFER, Size * Buffer.VertexSize * sizeof(float), NULL, Usage);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -460,18 +480,6 @@ UnbindFramebuffer(render_state &RenderState)
     glViewport(0, 0, 1280, 720);
 }
 
-// InitMeshBuffer initializes a vertex_buffer with the common attributes
-// used by all meshes in the game
-void InitMeshBuffer(vertex_buffer &Buffer)
-{
-    size_t Stride = sizeof(mesh_vertex);
-    InitBuffer(Buffer, 12, 4,
-               vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
-               vertex_attribute{1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
-               vertex_attribute{2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
-               vertex_attribute{3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
-}
-
 void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
 {
     auto &b = Mesh->Buffer;
@@ -691,11 +699,11 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
     InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, Framebuffer_HasDepth | Framebuffer_Multisampled, ColorTexture_Count);
     InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
-    for (int i = 0; i < BloomBlurPassCount; i++)
+    for (int i = 0; i < BloomBlurPassCount-1; i++)
     {
         // @TODO: maybe it is not necessary to scale down
-        size_t BlurWidth = Width >> i;
-        size_t BlurHeight = Height >> i;
+        size_t BlurWidth = Width >> (i + 1);
+        size_t BlurHeight = Height >> (i + 1);
 
         InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
         InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
@@ -943,7 +951,7 @@ AddRenderable(render_state &RenderState, size_t Index, material *Material)
     }
 }
 
-void PushMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const transform &Transform)
+void DrawMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const transform &Transform)
 {
     size_t Index = NextRenderable(RenderState);
     auto &r = RenderState.Renderables[Index];
@@ -958,7 +966,7 @@ void PushMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const 
     AddRenderable(RenderState, Index, &Part.Material);
 }
 
-void PushModel(render_state &RenderState, model &Model, const transform &Transform)
+void DrawModel(render_state &RenderState, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
     for (auto &Part : Mesh->Parts)
@@ -985,7 +993,7 @@ void PushModel(render_state &RenderState, model &Model, const transform &Transfo
 }
 
 #ifdef DRAFT_DEBUG
-void PushDebugBounds(render_state &RenderState, const bounding_box &Box, bool Colliding)
+void DrawDebugBounds(render_state &RenderState, const bounding_box &Box, bool Colliding)
 {
     color Color = Color_green;
     if (Colliding)

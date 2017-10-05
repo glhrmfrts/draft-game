@@ -72,16 +72,21 @@ void DestroyAssetLoader(asset_loader &Loader)
     DestroyThreadPool(Loader.Pool);
 }
 
-void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename, const string &ID, void *Param)
+asset_entry CreateAssetEntry(asset_type Type, const string &Filename, const string &ID, void *Param)
 {
-    asset_entry Entry;
-    Entry.Type = Type;
-    Entry.Filename = Filename;
-    Entry.ID = ID;
+    asset_entry Result = {};
+    Result.Type = Type;
+    Result.Filename = Filename;
+    Result.ID = ID;
+    Result.Param = Param;
+    return Result;
+}
+
+void AddAssetEntry(asset_loader &Loader, asset_entry Entry)
+{
     Entry.Completion = AssetCompletion_Incomplete;
     Entry.Loader = &Loader;
-    Entry.Param = Param;
-    switch (Type)
+    switch (Entry.Type)
     {
     case AssetType_Texture:
     {
@@ -102,7 +107,7 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
 
     case AssetType_Shader:
     {
-        auto *ShaderParam = (shader_asset_param *)Param;
+        auto *ShaderParam = (shader_asset_param *)Entry.Param;
         GLuint Result = glCreateShader(ShaderParam->Type);
         Entry.Shader.Result = Result;
         break;
@@ -122,20 +127,20 @@ void AddAssetEntry(asset_loader &Loader, asset_type Type, const string &Filename
 inline void
 AddShaderProgramEntries(asset_loader &Loader, shader_program &Program)
 {
-    AddAssetEntry(
-        Loader,
+    asset_entry VertexEntry = CreateAssetEntry(
         AssetType_Shader,
         Program.VertexShaderParam.Path,
         Program.VertexShaderParam.Path,
         (void *)&Program.VertexShaderParam
     );
-    AddAssetEntry(
-        Loader,
+    asset_entry FragmentEntry = CreateAssetEntry(
         AssetType_Shader,
         Program.FragmentShaderParam.Path,
         Program.FragmentShaderParam.Path,
         (void *)&Program.FragmentShaderParam
     );
+    AddAssetEntry(Loader, VertexEntry);
+    AddAssetEntry(Loader, FragmentEntry);
 }
 
 inline bitmap_font *

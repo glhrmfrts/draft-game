@@ -18,7 +18,9 @@ struct editor_state
     memory_arena Arena;
 
     mesh CursorMesh;
-    transform CursorTransform;
+    mesh LineMesh;
+    std::vector<vec3> LinePoints;
+    bool EditingLines;
 
     char *Name;
     char *Filename;

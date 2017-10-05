@@ -2,14 +2,14 @@
 
 #include <Windows.h>
 
-#define GameLibraryPath "Draft.dll"
-#define TempLibraryPath "_temp.dll"
+#define GameLibraryPath       "Draft.dll"
 #define GameLibraryReloadTime 1.0f
 
 struct game_library
 {
     HMODULE                 Library;
     uint64                  LoadTime;
+    const char              *Path;
     game_init_func          *GameInit;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
@@ -21,7 +21,7 @@ Uint64ToFileTime(uint64 t)
 {
     ULARGE_INTEGER LargeInteger = {};
     LargeInteger.QuadPart = t;
-    
+
     FILETIME Result = {};
     Result.dwLowDateTime = LargeInteger.LowPart;
     Result.dwHighDateTime = LargeInteger.HighPart;
@@ -53,13 +53,14 @@ PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
 }
 
 static void
-LoadGameLibrary(game_library &Lib)
+LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
 {
-    //CopyFile(GameLibraryPath, TempLibraryPath, FALSE);
-    Lib.Library = LoadLibrary(GameLibraryPath);
+    //CopyFile(Path, TempLibraryPath, FALSE);
+    Lib.Path = Path;
+    Lib.Library = LoadLibrary(Path);
     if (Lib.Library)
     {
-        Lib.LoadTime = PlatformGetFileLastWriteTime(GameLibraryPath);
+        Lib.LoadTime = PlatformGetFileLastWriteTime(Path);
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
@@ -88,7 +89,7 @@ UnloadGameLibrary(game_library &Lib)
 static bool
 GameLibraryChanged(game_library &Lib)
 {
-    uint64 LastWriteTime = PlatformGetFileLastWriteTime(GameLibraryPath);
+    uint64 LastWriteTime = PlatformGetFileLastWriteTime(Lib.Path);
     bool Result = (PlatformCompareFileTime(LastWriteTime, Lib.LoadTime) > 0);
     return Result;
 }

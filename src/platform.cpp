@@ -11,13 +11,12 @@
 #undef main
 
 #ifdef _WIN32
-#include "lib_win32.cpp"
+#include "platform_win.cpp"
 #else
-#include "lib_linux.cpp"
+#include "platform_linux.cpp"
 #endif
 
-static void
-OpenGameController(game_input &Input)
+static void OpenGameController(game_input &Input)
 {
     Input.Controller.Joystick = SDL_JoystickOpen(0);
     if (Input.Controller.Joystick)
@@ -29,6 +28,13 @@ OpenGameController(game_input &Input)
         fprintf(stderr, "Could not open joystick %i: %s\n", 0, SDL_GetError());
     }
     SDL_JoystickEventState(SDL_IGNORE);
+}
+
+static void SplitExtension(const std::string &Path, std::string &Filename, std::string &Extension)
+{
+    auto Idx = Path.find_last_of('.');
+    Filename = Path.substr(0, Idx);
+    Extension = Path.substr(Idx+1);
 }
 
 #define GameControllerAxisDeadzone 5000
@@ -43,8 +49,7 @@ int main(int argc, char **argv)
     int Height = 720;
     int vWidth = Width;
     int vHeight = Height;
-    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          Width, Height, SDL_WINDOW_OPENGL);
+    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_WINDOW_OPENGL);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -98,7 +103,17 @@ int main(int argc, char **argv)
     }
 
     game_library Lib;
-    LoadGameLibrary(Lib);
+    std::string LibPath = GameLibraryPath;
+    std::string TempPath;
+    std::string LibFilename;
+    std::string LibExtension;
+    if (argc > 1)
+    {
+        LibPath = std::string(argv[1]);
+    }
+    SplitExtension(LibPath, LibFilename, LibExtension);
+    TempPath = LibFilename + "_temp." + LibExtension;
+    LoadGameLibrary(Lib, LibPath.c_str(), TempPath.c_str());
 
     Lib.GameInit(&Game);
 
@@ -119,7 +134,7 @@ int main(int argc, char **argv)
             if (GameLibraryChanged(Lib))
             {
                 UnloadGameLibrary(Lib);
-                LoadGameLibrary(Lib);
+                LoadGameLibrary(Lib, LibPath.c_str(), TempPath.c_str());
             }
         }
 #endif
@@ -209,15 +224,15 @@ int main(int argc, char **argv)
                 auto &Button = Event.button;
                 switch (Button.button) {
                 case SDL_BUTTON_LEFT:
-                    Input.MouseState.Buttons |= MouseButton_left;
+                    Input.MouseState.Buttons |= MouseButton_Left;
                     break;
 
                 case SDL_BUTTON_MIDDLE:
-                    Input.MouseState.Buttons |= MouseButton_middle;
+                    Input.MouseState.Buttons |= MouseButton_Middle;
                     break;
 
                 case SDL_BUTTON_RIGHT:
-                    Input.MouseState.Buttons |= MouseButton_right;
+                    Input.MouseState.Buttons |= MouseButton_Right;
                     break;
                 }
                 break;
@@ -227,15 +242,15 @@ int main(int argc, char **argv)
                 auto &Button = Event.button;
                 switch (Button.button) {
                 case SDL_BUTTON_LEFT:
-                    Input.MouseState.Buttons &= ~MouseButton_left;
+                    Input.MouseState.Buttons &= ~MouseButton_Left;
                     break;
 
                 case SDL_BUTTON_MIDDLE:
-                    Input.MouseState.Buttons &= ~MouseButton_middle;
+                    Input.MouseState.Buttons &= ~MouseButton_Middle;
                     break;
 
                 case SDL_BUTTON_RIGHT:
-                    Input.MouseState.Buttons &= ~MouseButton_right;
+                    Input.MouseState.Buttons &= ~MouseButton_Right;
                     break;
                 }
                 break;

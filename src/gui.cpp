@@ -50,7 +50,7 @@ CheckElementState(game_input &Input, rect Rect)
         MouseState.Y < Rect.Y + Rect.Height)
     {
         Result |= GUIElementState_hovered;
-        if (MouseState.Buttons & MouseButton_left)
+        if (MouseState.Buttons & MouseButton_Left)
         {
             Result |= GUIElementState_left_pressed;
         }
