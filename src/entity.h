@@ -1,6 +1,7 @@
 #ifndef DRAFT_ENTITY_H
 #define DRAFT_ENTITY_H
 
+/*
 struct model
 {
     vector<material *> Materials;
@@ -93,51 +94,6 @@ struct trail_piece
 {
     entity *Owner;
 };
-
-/*
-Playing with level format
-
-tick 5
-{
-  ship(lane=2)
-  ship(lane=4)
-
-  tick 3
-  {
-    block(lane=3)
-    block(lane=2, distance=40)
-    block(lane=4, distance=40)
-  }
-}
-
-struct level
-{
-  u16 NumOfRootTicks;
-  level_tick Ticks[NumOfRootTicks];
-};
-
-struct level_tick
-{
-  int Milliseconds;
-
-  u16 NumOfEvents;
-  level_event Events[NumOfEvents];
-
-  u16 NumOfChildTicks;
-  level_tick Ticks[NumOfChildTicks];
-};
-
-struct level_event
-{
-  level_event_type Type;
-  union
-  {
-    level_ship_event  ShipEvent;
-    level_block_event BlockEvent;
-    level_track_event TrackEvent;
-  };
-};
-
- */
+*/
 
 #endif

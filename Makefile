@@ -7,7 +7,7 @@ EDITOR_CFILES = deps/imgui.cpp deps/imgui_draw.cpp deps/imgui_demo.cpp deps/imgu
 PLATFORM_CFILES = src/platform.cpp
 LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW -ldl
 
-INCLUDE_PATHS = -Ideps
+INCLUDE_PATHS = -Ideps -Isimple_lisp
 
 CC = clang++
 CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DDRAFT_DEBUG

@@ -20,21 +20,13 @@ UpdateEntityCollisionVertices(entity *Entity)
 inline static void
 ApplyVelocity(entity *Entity, vec2 Velocity)
 {
-    if (Entity->Flags & Entity_Kinematic)
-    {
-        return;
-    }
-    Entity->Transform.Velocity += vec3{Velocity.x, Velocity.y, 0};
+
 }
 
 inline static void
 ApplyCorrection(entity *Entity, vec2 Correction)
 {
-    if (Entity->Flags & Entity_Kinematic)
-    {
-        return;
-    }
-    Entity->Transform.Position += vec3{Correction.x, Correction.y, 0};
+
 }
 
 static vec2
@@ -348,7 +340,7 @@ void Integrate(const vector<entity *> Entities, vec3 Gravity, float DeltaTime)
     {
         if (!Entity) continue;
 
-        if (!(Entity->Flags & Entity_Kinematic))
+        if (false)
         {
             Entity->Transform.Velocity += Gravity * DeltaTime;
         }

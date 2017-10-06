@@ -1,5 +1,6 @@
 // Copyright
 
+/*
 inline static void
 AddFlags(entity *Entity, uint32 Flags)
 {
@@ -301,3 +302,4 @@ void PushPosition(trail *Trail, vec3 Pos)
     }
     Trail->Entities[Trail->PositionStackIndex++].Transform.Position = Pos;
 }
+*/

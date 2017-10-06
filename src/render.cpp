@@ -449,6 +449,7 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
     }
 
     GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    printf("%x\n", Status);
     assert(Status == GL_FRAMEBUFFER_COMPLETE);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -966,6 +967,7 @@ void DrawMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const 
     AddRenderable(RenderState, Index, &Part.Material);
 }
 
+#if 0
 void DrawModel(render_state &RenderState, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
@@ -991,6 +993,7 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
         AddRenderable(RenderState, Index, Material);
     }
 }
+#endif
 
 #ifdef DRAFT_DEBUG
 void DrawDebugBounds(render_state &RenderState, const bounding_box &Box, bool Colliding)

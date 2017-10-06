@@ -7,13 +7,6 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     ImGui::Text("ms: %.2f", DeltaTime * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
 
-    if (Game.Mode == GameMode_Level)
-    {
-        ImGui::Text("Player Position: %s", ToString(Game.PlayerEntity->Transform.Position).c_str());
-        ImGui::Text("Player Velocity: %s", ToString(Game.PlayerEntity->Transform.Velocity).c_str());
-        ImGui::Text("Player Score: %d", Game.PlayerEntity->PlayerState->Score);
-    }
-
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);
@@ -28,15 +21,6 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Game"))
     {
-		ImGui::Text("Entities: %d", Game.NumEntities);
-        ImGui::SliderFloat("Time Speed", &Global_Game_TimeSpeed, -2.0f, 2.0f, "%.2f");
-		ImGui::Spacing();
-        if (ImGui::TreeNode("Trail"))
-        {
-            ImGui::SliderFloat("Record Timer", &Global_Game_TrailRecordTimer, 0.0f, 4.0f, "%.3f");
-            ImGui::TreePop();
-        }
-
         ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Renderer"))

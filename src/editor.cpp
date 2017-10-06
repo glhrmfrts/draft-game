@@ -17,9 +17,29 @@
 #include "gui.cpp"
 #include "debug_ui.cpp"
 #include "meshes.cpp"
-#include "entity.cpp"
-#include "level.cpp"
 #include "init.cpp"
+
+entity *CreateEntity(level *Level, entity_type Type)
+{
+    auto *Result = PushStruct<entity>(Level->Arena);
+    Result->Type = Type;
+    //Result->NameIndex = AddString(Level, Name);
+    return Result;
+}
+
+void AddChild(entity *Entity, entity *Child)
+{
+    if (Entity->FirstChild)
+    {
+        auto *Prev = Entity->FirstChild;
+        Entity->FirstChild = Child;
+        Child->NextSibling = Prev;
+    }
+    else
+    {
+        Entity->FirstChild = Child;
+    }
+}
 
 #define EDITOR_MAX_LINES 16
 
@@ -143,8 +163,7 @@ static void EditorCommit(editor_state *Editor)
     {
     case EditorMode_Collision:
     {
-        auto *Entity = CreateEntity(Editor->Arena, EntityType_Collision);
-        Entity->Shape.Vertices = Editor->LinePoints;
+        auto *Entity = CreateEntity(Editor->Level, EntityType_Collision);
         Editor->LinePoints.clear();
 
         auto *Parent = Editor->SelectedEntity;
@@ -156,15 +175,25 @@ static void EditorCommit(editor_state *Editor)
         break;
     }
     }
+
+    Editor->Mode = EditorMode_None;
 }
 
 static void DrawEntityTree(editor_state *Editor, entity *Entity)
 {
-    if (ImGui::TreeNode(Entity->Name))
+    if (ImGui::TreeNode("Entity"))
     {
         Editor->SelectedEntity = Entity;
-        DrawEntityTree(Editor, Entity->FirstChild);
+        if (Entity->FirstChild)
+        {
+            DrawEntityTree(Editor, Entity->FirstChild);
+        }
         ImGui::TreePop();
+    }
+
+    if (Entity->NextSibling)
+    {
+        DrawEntityTree(Editor, Entity->NextSibling);
     }
 }
 
@@ -287,11 +316,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
     ImGui::Spacing();
 
     auto *Entity = Editor->Level->RootEntity;
-    while (Entity)
-    {
-        DrawEntityTree(Entity);
-        Entity = Entity->NextSibling;
-    }
+    DrawEntityTree(Editor, Entity);
 
     ImGui::End();
 }

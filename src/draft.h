@@ -13,9 +13,7 @@
 #include "render.h"
 #include "asset.h"
 #include "gui.h"
-#include "entity.h"
 #include "random.h"
-#include "level.h"
 #include "editor.h"
 
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
@@ -165,18 +163,7 @@ struct game_state
     game_meshes Meshes;
     vec3 Gravity;
 
-    vector<entity *> ModelEntities;
-	vector<entity *> ShapedEntities;
-	vector<entity *> TrackEntities;
-	vector<entity *> TrailEntities;
-	vector<entity *> ExplosionEntities;
-	vector<entity *> ShipEntities;
-    vector<entity *> WallEntities;
     vector<collision_result> CollisionCache;
-    entity *SkyboxEntity;
-    entity *PlayerEntity;
-    level *CurrentLevel = 0;
-	int NumEntities = 0;
 
     random_series ExplosionEntropy;
     bitmap_font *TestFont;

@@ -1,0 +1,3 @@
+[submodule "simple_lisp"]
+	path = simple_lisp
+	url = https://github.com/glhrmfrts/simple_lisp
