@@ -14,6 +14,7 @@ static const char *EntityTypeStrings[] = {
 struct entity
 {
     entity_type Type;
+    int         ID;
     transform   Transform;
 
     union
@@ -34,6 +35,7 @@ struct level
     //std::vector<sl_string> Strings;
 
     entity *RootEntity;
+    int    NextEntityID = 0;
 };
 
 enum editor_mode

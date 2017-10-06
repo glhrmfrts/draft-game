@@ -23,7 +23,7 @@ entity *CreateEntity(level *Level, entity_type Type)
 {
     auto *Result = PushStruct<entity>(Level->Arena);
     Result->Type = Type;
-    //Result->NameIndex = AddString(Level, Name);
+    Result->ID = Level->NextEntityID++;
     return Result;
 }
 
@@ -48,6 +48,8 @@ void InitEditor(game_state &Game)
     Game.Mode = GameMode_Editor;
     Game.EditorState = PushStruct<editor_state>(Game.Arena);
     auto Editor = Game.EditorState;
+    Editor->Level = PushStruct<level>(Editor->Arena);
+    Editor->Level->RootEntity = CreateEntity(Editor->Level, EntityType_Empty);
 
     Editor->Name = (char *)PushSize(Editor->Arena, 128, "editor name");
     Editor->Filename = (char *)PushSize(Editor->Arena, 128, "editor filename");
@@ -181,16 +183,25 @@ static void EditorCommit(editor_state *Editor)
 
 static void DrawEntityTree(editor_state *Editor, entity *Entity)
 {
-    if (ImGui::TreeNode("Entity"))
+    ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_OpenOnArrow;
+    if (Editor->SelectedEntity == Entity)
+    {
+        Flags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    bool NodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)Entity->ID, Flags, "%s %d", EntityTypeStrings[Entity->Type], Entity->ID);
+    if (ImGui::IsItemClicked())
     {
         Editor->SelectedEntity = Entity;
+    }
+    if (NodeOpen)
+    {
         if (Entity->FirstChild)
         {
             DrawEntityTree(Editor, Entity->FirstChild);
         }
         ImGui::TreePop();
     }
-
     if (Entity->NextSibling)
     {
         DrawEntityTree(Editor, Entity->NextSibling);
@@ -319,6 +330,9 @@ void RenderEditor(game_state &Game, float DeltaTime)
     DrawEntityTree(Editor, Entity);
 
     ImGui::End();
+
+    //bool Open = true;
+    //ImGui::ShowTestWindow(&Open);
 }
 
 #ifdef _WIN32
