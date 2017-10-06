@@ -27,20 +27,20 @@ void InitEditor(game_state &Game)
 {
     Game.Mode = GameMode_Editor;
     Game.EditorState = PushStruct<editor_state>(Game.Arena);
-    auto &Editor = *Game.EditorState;
+    auto Editor = Game.EditorState;
 
-    Editor.Name = (char *)PushSize(Editor.Arena, 128, "editor name");
-    Editor.Filename = (char *)PushSize(Editor.Arena, 128, "editor filename");
+    Editor->Name = (char *)PushSize(Editor->Arena, 128, "editor name");
+    Editor->Filename = (char *)PushSize(Editor->Arena, 128, "editor filename");
 
-    *Editor.Name = 0;
-    *Editor.Filename = 0;
-    Editor.Mode = EditorMode_None;
+    *Editor->Name = 0;
+    *Editor->Filename = 0;
+    Editor->Mode = EditorMode_None;
 
     Game.Camera.Position = vec3{0, 0, 10};
     Game.Camera.LookAt = vec3{0, 10, 0};
 
     {
-        auto &CursorMesh = Editor.CursorMesh;
+        auto &CursorMesh = Editor->CursorMesh;
         InitMeshBuffer(CursorMesh.Buffer);
 
         float w = 1.0f;
@@ -51,7 +51,7 @@ void InitEditor(game_state &Game)
         EndMesh(&CursorMesh, GL_STATIC_DRAW);
     }
     {
-        auto &LineMesh = Editor.LineMesh;
+        auto &LineMesh = Editor->LineMesh;
         InitMeshBuffer(LineMesh.Buffer);
         AddPart(&LineMesh, {BlankMaterial, 0, 0, GL_LINES});
         ReserveVertices(LineMesh.Buffer, EDITOR_MAX_LINES*2, GL_DYNAMIC_DRAW);
@@ -137,13 +137,40 @@ static vec3 GetCursorPositionOnFloor(ray Ray)
     }
 }
 
-void EditorCommit(editor_state &Editor)
+static void EditorCommit(editor_state *Editor)
 {
+    switch (Editor->Mode)
+    {
+    case EditorMode_Collision:
+    {
+        auto *Entity = CreateEntity(Editor->Arena, EntityType_Collision);
+        Entity->Shape.Vertices = Editor->LinePoints;
+        Editor->LinePoints.clear();
+
+        auto *Parent = Editor->SelectedEntity;
+        if (!Parent)
+        {
+            Parent = Editor->Level->RootEntity;
+        }
+        AddChild(Parent, Entity);
+        break;
+    }
+    }
+}
+
+static void DrawEntityTree(editor_state *Editor, entity *Entity)
+{
+    if (ImGui::TreeNode(Entity->Name))
+    {
+        Editor->SelectedEntity = Entity;
+        DrawEntityTree(Editor, Entity->FirstChild);
+        ImGui::TreePop();
+    }
 }
 
 void RenderEditor(game_state &Game, float DeltaTime)
 {
-    auto &Editor = *Game.EditorState;
+    auto *Editor = Game.EditorState;
     auto *FloorMesh = GetFloorMesh(Game);
 
     UpdateFreeCam(Game.Camera, Game.Input, DeltaTime);
@@ -154,7 +181,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
     transform Transform;
     Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 1};
     DrawMeshPart(Game.RenderState, *FloorMesh, FloorMesh->Parts[0], Transform);
-    if (Editor.Mode != EditorMode_None)
+    if (Editor->Mode != EditorMode_None)
     {
         float MouseX = float(Game.Input.MouseState.X);
         float MouseY = float(Game.Height - Game.Input.MouseState.Y);
@@ -165,28 +192,28 @@ void RenderEditor(game_state &Game, float DeltaTime)
         transform Transform;
         Transform.Position = CursorPos;
         Transform.Scale *= 0.5f;
-        DrawMeshPart(Game.RenderState, Editor.CursorMesh, Editor.CursorMesh.Parts[0], Transform);
+        DrawMeshPart(Game.RenderState, Editor->CursorMesh, Editor->CursorMesh.Parts[0], Transform);
 
-        if (IsJustPressed(Game, MouseButton_Left) && Editor.EditingLines)
+        if (IsJustPressed(Game, MouseButton_Left) && Editor->EditingLines)
         {
-            Editor.LinePoints.push_back(CursorPos);
+            Editor->LinePoints.push_back(CursorPos);
         }
         else if (IsJustPressed(Game, MouseButton_Right))
         {
-            Editor.EditingLines = false;
+            Editor->EditingLines = false;
         }
 
-        auto &LineBuffer = Editor.LineMesh.Buffer;
+        auto &LineBuffer = Editor->LineMesh.Buffer;
         ResetBuffer(LineBuffer, 0);
 
-        size_t PointsCount = Editor.LinePoints.size();
+        size_t PointsCount = Editor->LinePoints.size();
         for (size_t i = 0; i < PointsCount; i++)
         {
-            vec3 Pos = Editor.LinePoints[i];
+            vec3 Pos = Editor->LinePoints[i];
             vec3 NextPos;
             if (i == PointsCount - 1)
             {
-                if (Editor.EditingLines)
+                if (Editor->EditingLines)
                 {
                     NextPos = CursorPos;
                 }
@@ -197,24 +224,24 @@ void RenderEditor(game_state &Game, float DeltaTime)
             }
             else
             {
-                NextPos = Editor.LinePoints[i+1];
+                NextPos = Editor->LinePoints[i+1];
             }
             PushVertex(LineBuffer, mesh_vertex{Pos, vec2{0,0}, Color_white, vec3{1,1,1}});
             PushVertex(LineBuffer, mesh_vertex{NextPos, vec2{0,0}, Color_white, vec3{1,1,1}});
         }
         UploadVertices(LineBuffer, 0, LineBuffer.VertexCount);
 
-        auto &Part = Editor.LineMesh.Parts[0];
+        auto &Part = Editor->LineMesh.Parts[0];
         Part.Count = LineBuffer.VertexCount;
-        DrawMeshPart(Game.RenderState, Editor.LineMesh, Part, transform{});
+        DrawMeshPart(Game.RenderState, Editor->LineMesh, Part, transform{});
     }
 
     RenderEnd(Game.RenderState, Game.Camera);
 
     ImGui::SetNextWindowSize(ImVec2(Game.RealWidth*0.25f, Game.RealHeight*1.0f), ImGuiSetCond_Always);
     ImGui::Begin("Editor Main");
-    ImGui::InputText("name", Editor.Name, 128);
-    ImGui::InputText("filename", Editor.Filename, 128);
+    ImGui::InputText("name", Editor->Name, 128);
+    ImGui::InputText("filename", Editor->Filename, 128);
     ImGui::Spacing();
     if (ImGui::Button("Save"))
     {
@@ -225,8 +252,8 @@ void RenderEditor(game_state &Game, float DeltaTime)
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::Text("Current Mode: %s", EditorModeStrings[Editor.Mode]);
-    if (Editor.Mode != EditorMode_None)
+    ImGui::Text("Current Mode: %s", EditorModeStrings[Editor->Mode]);
+    if (Editor->Mode != EditorMode_None)
     {
         if (ImGui::Button("Commit"))
         {
@@ -235,7 +262,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
         ImGui::SameLine();
         if (ImGui::Button("Cancel"))
         {
-            Editor.Mode = EditorMode_None;
+            Editor->Mode = EditorMode_None;
         }
     }
 
@@ -243,16 +270,27 @@ void RenderEditor(game_state &Game, float DeltaTime)
     {
         if (ImGui::Button("Wall"))
         {
-            Editor.Mode = EditorMode_Wall;
-            Editor.EditingLines = true;
+            Editor->Mode = EditorMode_Wall;
+            Editor->EditingLines = true;
         }
         if (ImGui::Button("Collision"))
         {
-            Editor.Mode = EditorMode_Collision;
-            Editor.EditingLines = true;
+            Editor->Mode = EditorMode_Collision;
+            Editor->EditingLines = true;
         }
 
         ImGui::Spacing();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    auto *Entity = Editor->Level->RootEntity;
+    while (Entity)
+    {
+        DrawEntityTree(Entity);
+        Entity = Entity->NextSibling;
     }
 
     ImGui::End();
