@@ -115,6 +115,8 @@ void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
 
 void UploadVertices(vertex_buffer &Buffer, size_t Index, size_t Count)
 {
+    if (Count == 0) return;
+
     size_t ByteIndex = Index * Buffer.VertexSize * sizeof(float);
     size_t ByteCount = Count * Buffer.VertexSize * sizeof(float);
     glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
@@ -860,6 +862,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         r.VertexCount = RenderState.DebugBuffer.VertexCount;
         r.Material = &BlankMaterial;
         r.PrimitiveType = GL_LINES;
+        r.Transform = transform{};
         RenderState.FrameSolidRenderables.push_back(i);
         UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
     }
@@ -996,42 +999,34 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
 #endif
 
 #ifdef DRAFT_DEBUG
-void DrawDebugBounds(render_state &RenderState, const bounding_box &Box, bool Colliding)
+void DrawDebugShape(render_state &RenderState, collision_shape *Shape)
 {
     color Color = Color_green;
-    if (Colliding)
+    switch (Shape->Type)
     {
-        Color = Color_red;
+    case CollisionShapeType_Polygon:
+    {
+        size_t VertCount = Shape->Polygon.Vertices.size();
+        for (size_t i = 0; i < VertCount; i++)
+        {
+            vec2 Vert = Shape->Polygon.Vertices[i];
+            vec2 Next;
+            if (i == VertCount - 1)
+            {
+                Next = Shape->Polygon.Vertices[0];
+            }
+            else
+            {
+                Next = Shape->Polygon.Vertices[i + 1];
+            }
+            vec3 v3 = vec3{ Vert.x, Vert.y, 0.25f };
+            vec3 v3Next = vec3{ Next.x, Next.y, 0.25f };
+            PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3, { 0, 0 }, Color, { 0, 0, 0 } });
+            PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3Next, { 0, 0 }, Color, { 0, 0, 0 } });
+        }
+        break;
     }
-    vec3 a = Box.Center - Box.Half;
-    vec3 b = Box.Center + Box.Half;
-
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, a.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{b.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, a.y, b.z}, {0, 0}, Color, {0, 0, 0}});
-    PushVertex(RenderState.DebugBuffer, {{a.x, b.y, b.z}, {0, 0}, Color, {0, 0, 0}});
+    }
 }
 #endif
 

@@ -2,7 +2,12 @@
 
 #include <Windows.h>
 
-#define GameLibraryPath       "Draft.dll"
+#ifdef DRAFT_EDITOR
+#define GameLibraryPath "DraftEditor.dll"
+#else
+#define GameLibraryPath "Draft.dll"
+#endif
+
 #define GameLibraryReloadTime 1.0f
 
 struct game_library
@@ -16,8 +21,7 @@ struct game_library
     game_process_event_func *GameProcessEvent;
 };
 
-static inline FILETIME
-Uint64ToFileTime(uint64 t)
+static inline FILETIME Uint64ToFileTime(uint64 t)
 {
     ULARGE_INTEGER LargeInteger = {};
     LargeInteger.QuadPart = t;
@@ -52,8 +56,7 @@ PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
     return Result;
 }
 
-static void
-LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
+static void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
 {
     //CopyFile(Path, TempLibraryPath, FALSE);
     Lib.Path = Path;
@@ -75,8 +78,7 @@ LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
     }
 }
 
-static void
-UnloadGameLibrary(game_library &Lib)
+static void UnloadGameLibrary(game_library &Lib)
 {
     FreeLibrary(Lib.Library);
     Lib.Library = 0;

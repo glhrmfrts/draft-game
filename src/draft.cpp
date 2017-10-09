@@ -18,9 +18,9 @@
 #include "debug_ui.cpp"
 #include "meshes.cpp"
 #include "entity.cpp"
-#include "level.cpp"
 #include "init.cpp"
 
+/*
 struct audio_source
 {
     ALuint Source;
@@ -617,6 +617,15 @@ RenderLevel(game_state &Game, float DeltaTime)
 
         End(Game.GUI);
     }
+}
+*/
+
+static void InitLevel(game_state &Game)
+{
+}
+
+static void RenderLevel(game_state &Game, float Delta)
+{
 }
 
 #ifdef _WIN32

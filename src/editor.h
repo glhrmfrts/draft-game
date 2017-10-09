@@ -19,7 +19,7 @@ struct entity
 
     union
     {
-        collision_shape Shape;
+        collision_shape *Shape;
     };
 
     int    NameIndex;
@@ -58,9 +58,10 @@ struct editor_state
     mesh LineMesh;
     std::vector<vec3> LinePoints;
     bool EditingLines;
+    bool SnapToInteger = false;
 
     level *Level;
-    entity *SelectedEntity;
+    entity *SelectedEntity = NULL;
 
     char *Name;
     char *Filename;

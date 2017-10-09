@@ -17,6 +17,13 @@ UpdateEntityCollisionVertices(entity *Entity)
 }
 */
 
+inline collision_shape *CreateCollisionShape(memory_arena &Arena, collision_shape_type Type)
+{
+    auto *Result = PushStruct<collision_shape>(Arena);
+    Result->Type = Type;
+    return Result;
+}
+
 inline static void
 ApplyVelocity(entity *Entity, vec2 Velocity)
 {

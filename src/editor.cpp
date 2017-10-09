@@ -50,6 +50,7 @@ void InitEditor(game_state &Game)
     auto Editor = Game.EditorState;
     Editor->Level = PushStruct<level>(Editor->Arena);
     Editor->Level->RootEntity = CreateEntity(Editor->Level, EntityType_Empty);
+    Editor->SelectedEntity = Editor->Level->RootEntity;
 
     Editor->Name = (char *)PushSize(Editor->Arena, 128, "editor name");
     Editor->Filename = (char *)PushSize(Editor->Arena, 128, "editor filename");
@@ -166,22 +167,19 @@ static void EditorCommit(editor_state *Editor)
     case EditorMode_Collision:
     {
         auto *Entity = CreateEntity(Editor->Level, EntityType_Collision);
-        Editor->LinePoints.clear();
-
-        auto *Parent = Editor->SelectedEntity;
-        if (!Parent)
+        Entity->Shape = CreateCollisionShape(Editor->Arena, CollisionShapeType_Polygon);
+        for (auto &Vert : Editor->LinePoints)
         {
-            Parent = Editor->Level->RootEntity;
+            Entity->Shape->Polygon.Vertices.push_back(vec2{Vert.x, Vert.y});
         }
-        AddChild(Parent, Entity);
+        Editor->LinePoints.clear();
+        AddChild(Editor->SelectedEntity, Entity);
         break;
     }
     }
-
-    Editor->Mode = EditorMode_None;
 }
 
-static void DrawEntityTree(editor_state *Editor, entity *Entity)
+static entity *DrawEntityTree(editor_state *Editor, entity *Entity)
 {
     ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_OpenOnArrow;
     if (Editor->SelectedEntity == Entity)
@@ -196,16 +194,30 @@ static void DrawEntityTree(editor_state *Editor, entity *Entity)
     }
     if (NodeOpen)
     {
-        if (Entity->FirstChild)
+        auto *Child = Entity->FirstChild;
+        while (Child)
         {
-            DrawEntityTree(Editor, Entity->FirstChild);
+            Child = DrawEntityTree(Editor, Child);
         }
         ImGui::TreePop();
     }
-    if (Entity->NextSibling)
+    return Entity->NextSibling;
+}
+
+static entity *RenderEntity(render_state &RenderState, entity *Entity)
+{
+    switch (Entity->Type)
     {
-        DrawEntityTree(Editor, Entity->NextSibling);
+    case EntityType_Collision:
+        DrawDebugShape(RenderState, Entity->Shape);
+        break;
     }
+    auto *Child = Entity->FirstChild;
+    while (Child)
+    {
+        Child = RenderEntity(RenderState, Child);
+    }
+    return Entity->NextSibling;
 }
 
 void RenderEditor(game_state &Game, float DeltaTime)
@@ -228,6 +240,11 @@ void RenderEditor(game_state &Game, float DeltaTime)
         ray Ray = PickRay(Game.Camera, MouseX, MouseY, 0, 0, Game.Width, Game.Height);
         vec3 CursorPos = GetCursorPositionOnFloor(Ray);
         CursorPos.z = 0.25f;
+        if (Editor->SnapToInteger)
+        {
+            CursorPos.x = std::floor(CursorPos.x);
+            CursorPos.y = std::floor(CursorPos.y);
+        }
 
         transform Transform;
         Transform.Position = CursorPos;
@@ -237,6 +254,10 @@ void RenderEditor(game_state &Game, float DeltaTime)
         if (IsJustPressed(Game, MouseButton_Left) && Editor->EditingLines)
         {
             Editor->LinePoints.push_back(CursorPos);
+            if (Editor->Mode == EditorMode_Collision && Editor->LinePoints.size() == 3)
+            {
+                EditorCommit(Editor);
+            }
         }
         else if (IsJustPressed(Game, MouseButton_Right))
         {
@@ -276,6 +297,14 @@ void RenderEditor(game_state &Game, float DeltaTime)
         DrawMeshPart(Game.RenderState, Editor->LineMesh, Part, transform{});
     }
 
+    {
+        auto *Entity = Editor->Level->RootEntity;
+        while (Entity)
+        {
+            Entity = RenderEntity(Game.RenderState, Entity);
+        }
+    }
+
     RenderEnd(Game.RenderState, Game.Camera);
 
     ImGui::SetNextWindowSize(ImVec2(Game.RealWidth*0.25f, Game.RealHeight*1.0f), ImGuiSetCond_Always);
@@ -293,16 +322,20 @@ void RenderEditor(game_state &Game, float DeltaTime)
     ImGui::Spacing();
 
     ImGui::Text("Current Mode: %s", EditorModeStrings[Editor->Mode]);
+    ImGui::Checkbox("Snap to integer", &Editor->SnapToInteger);
     if (Editor->Mode != EditorMode_None)
     {
         if (ImGui::Button("Commit"))
         {
             EditorCommit(Editor);
+            Editor->Mode = EditorMode_None;
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel"))
         {
             Editor->Mode = EditorMode_None;
+            Editor->LinePoints.clear();
+            Editor->EditingLines = false;
         }
     }
 
@@ -326,8 +359,13 @@ void RenderEditor(game_state &Game, float DeltaTime)
     ImGui::Separator();
     ImGui::Spacing();
 
-    auto *Entity = Editor->Level->RootEntity;
-    DrawEntityTree(Editor, Entity);
+    {
+        auto *Entity = Editor->Level->RootEntity;
+        while (Entity)
+        {
+            Entity = DrawEntityTree(Editor, Entity);
+        }
+    }
 
     ImGui::End();
 

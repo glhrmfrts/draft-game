@@ -73,19 +73,20 @@ void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
     AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
 }
 
-static void
-AddCube(vertex_buffer &Buffer, color c = Color_white, bool NoLight = false)
+static void AddCube(vertex_buffer &Buffer, color c = Color_white,
+                    bool NoLight = false, vec3 Scale = vec3(1.0f),
+                    float Angle = 0.0f)
 {
-    float z = -0.5;
-    float h = z+1;
-    float x = -0.5f;
-    float w = x+1;
-    float y = -0.5f;
-    float d = y+1;
+    float z = -0.5f * Scale.z;
+    float h = 0.5f * Scale.z;
+    float x = -0.5f * Scale.x;
+    float w = 0.5f * Scale.x;
+    float y = -0.5f * Scale.y;
+    float d = 0.5f * Scale.y;
 
     if (NoLight)
     {
-        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1,1,1));
+        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1, 1, 1));
         AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 1, 1));
         AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(1, 1, 1));
         AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(1, 1, 1));
@@ -201,4 +202,23 @@ mesh *GetCrystalMesh(game_state &Game)
     EndMesh(CrystalMesh, GL_STATIC_DRAW);
 
     return m.CrystalMesh = CrystalMesh;
+}
+
+#define WALL_HEIGHT 2.0f
+#define WALL_WIDTH  0.5f
+mesh *GenerateWallMesh(memory_arena &Arena, const std::vector<vec2> &Points)
+{
+    auto *Mesh = PushStruct<mesh>(Arena);
+    InitMeshBuffer(Mesh->Buffer);
+
+    size_t VertCount = Points.size();
+    assert(VertCount > 0);
+    for (size_t i = 0; i < VertCount - 1; i++)
+    {
+        vec2 First = Points[i];
+        vec2 Second = Points[i + 1];
+        vec2 Dif = Second - First;
+        float Angle = std::atan2(First.y - Second.y, First.x - Second.x);
+        AddCube(Mesh->Buffer, Color_white, false, vec3{std::abs(Dif.x) + 1.0f, WALL_WIDTH, WALL_HEIGHT}, Angle);
+    }
 }

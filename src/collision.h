@@ -29,9 +29,9 @@ struct collision_shape
     collision_shape_type Type;
     union
     {
-        bounding_box Box;
-        circle Circle;
-        polygon Polygon;
+        struct { bounding_box Box; };
+        struct { circle Circle; };
+        struct { polygon Polygon; };
     };
 
     collision_shape() {}
