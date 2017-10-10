@@ -202,4 +202,11 @@ IsJustPressed(game_state &Game, uint8 Button)
         !(Game.PrevInput.MouseState.Buttons & Button);
 }
 
+inline static bool
+IsJustReleased(game_state &Game, uint8 Button)
+{
+    return !(Game.Input.MouseState.Buttons & Button) &&
+        (Game.PrevInput.MouseState.Buttons & Button);
+}
+
 #endif

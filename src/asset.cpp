@@ -4,8 +4,7 @@
 #define DefaultTextureFilter GL_NEAREST
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
 
-static inline int
-NextP2(int n)
+static inline int NextP2(int n)
 {
     int Result = 1;
     while (Result < n)
@@ -15,8 +14,7 @@ NextP2(int n)
     return Result;
 }
 
-static long int
-GetFileSize(FILE *handle)
+static long int GetFileSize(FILE *handle)
 {
     long int result = 0;
 
@@ -27,16 +25,20 @@ GetFileSize(FILE *handle)
     return result;
 }
 
-static const char *
-ReadFile(const char *filename)
+static FILE *OpenFile(const char *Filename, const char *Mode)
 {
-    FILE *handle;
+    FILE *Handle;
 #ifdef _WIN32
-    fopen_s(&handle, filename, "r");
+    fopen_s(&Handle, Filename, Mode);
 #else
-    handle = fopen(filename, "r");
+    Handle = fopen(Filename, Mode);
 #endif
+    return Handle;
+}
 
+static const char *ReadFile(const char *filename)
+{
+    FILE *handle = OpenFile(filename, "r");
     long int length = GetFileSize(handle);
     char *buffer = new char[length + 1];
     int i = 0;

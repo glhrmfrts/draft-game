@@ -19,11 +19,28 @@
 #include "meshes.cpp"
 #include "init.cpp"
 
+#define IterEntities(First, Func, Arg) \
+    {\
+        auto *It = First;\
+        while (It)\
+        {\
+            It = Func(It, Arg);\
+        }\
+    }
+
 entity *CreateEntity(level *Level, entity_type Type)
 {
     auto *Result = PushStruct<entity>(Level->Arena);
     Result->Type = Type;
     Result->ID = Level->NextEntityID++;
+    return Result;
+}
+
+entity *CreateModelEntity(level *Level, mesh *Mesh)
+{
+    auto *Result = CreateEntity(Level, EntityType_Model);
+    Result->Model = PushStruct<model>(Level->Arena);
+    Result->Model->Mesh = Mesh;
     return Result;
 }
 
@@ -41,8 +58,76 @@ void AddChild(entity *Entity, entity *Child)
     }
 }
 
-#define EDITOR_MAX_LINES 16
+static void WriteCollisionShape(collision_shape *Shape, FILE *Handle)
+{
+    uint8 Type = uint8(Shape->Type);
+    fwrite(&Type, sizeof(uint8), 1, Handle);
+    switch (Shape->Type)
+    {
+    case CollisionShapeType_Polygon:
+    {
+        uint32 NumVertices = uint32(Shape->Polygon.Vertices.size());
+        fwrite(&NumVertices, sizeof(uint32), 1, Handle);
+        fwrite(&Shape->Polygon.Vertices[0], sizeof(vec2), NumVertices, Handle);
+        break;
+    }
 
+    case CollisionShapeType_Circle:
+    {
+        uint32 Radius = uint32(Shape->Circle.Radius);
+        fwrite(&Radius, sizeof(uint32), 1, Handle);
+        fwrite(&Shape->Circle.Center, sizeof(vec2), 1, Handle);
+        break;
+    }
+    }
+}
+
+static void WriteWall(level_wall *Wall, FILE *Handle)
+{
+    uint32 NumPoints = uint32(Wall->Points.size());
+    fwrite(&NumPoints, sizeof(uint32), 1, Handle);
+    fwrite(&Wall->Points[0], sizeof(vec2), NumPoints, Handle);
+}
+
+static entity *WriteEntity(entity *Entity, FILE *Handle)
+{
+    uint8 Type = uint8(Entity->Type);
+    uint32 Id = uint32(Entity->ID);
+    uint32 NumChildren = uint32(Entity->NumChildren);
+    fwrite(&Type, sizeof(uint8), 1, Handle);
+    fwrite(&Id, sizeof(uint32), 1, Handle);
+    fwrite(&NumChildren, sizeof(uint32), 1, Handle);
+    fwrite(&Entity->Transform.Position, sizeof(float), 3, Handle);
+    fwrite(&Entity->Transform.Scale, sizeof(float), 3, Handle);
+    fwrite(&Entity->Transform.Rotation, sizeof(float), 3, Handle);
+    switch (Entity->Type)
+    {
+    case EntityType_Collision:
+        WriteCollisionShape(Entity->Shape, Handle);
+        break;
+
+    case EntityType_Wall:
+        WriteWall(Entity->Wall, Handle);
+        break;
+    }
+    IterEntities(Entity->FirstChild, WriteEntity, Handle);
+    return Entity->NextSibling;
+}
+
+static void WriteLevel(void *Arg)
+{
+    auto *Level = static_cast<level *>(Arg);
+    FILE *Handle = fopen(Level->Filename, "wb");
+    fseek(Handle, SEEK_SET, 0);
+
+    uint16 NameLen = uint16(strlen(Level->Name));
+    fwrite(&NameLen, sizeof(uint16), 1, Handle);
+    fwrite(Level->Name, sizeof(char), NameLen, Handle);
+    IterEntities(Level->RootEntity, WriteEntity, Handle);
+    fclose(Handle);
+}
+
+#define EDITOR_MAX_LINES 16
 void InitEditor(game_state &Game)
 {
     Game.Mode = GameMode_Editor;
@@ -52,12 +137,12 @@ void InitEditor(game_state &Game)
     Editor->Level->RootEntity = CreateEntity(Editor->Level, EntityType_Empty);
     Editor->SelectedEntity = Editor->Level->RootEntity;
 
-    Editor->Name = (char *)PushSize(Editor->Arena, 128, "editor name");
-    Editor->Filename = (char *)PushSize(Editor->Arena, 128, "editor filename");
-
-    *Editor->Name = 0;
-    *Editor->Filename = 0;
+    Editor->Level->Name = (char *)PushSize(Editor->Level->Arena, 128, "editor name");
+    Editor->Level->Filename = (char *)PushSize(Editor->Level->Arena, 128, "editor filename");
+    *Editor->Level->Name = 0;
+    *Editor->Level->Filename = 0;
     Editor->Mode = EditorMode_None;
+    CreateThreadPool(Editor->Pool, 1, 8);
 
     Game.Camera.Position = vec3{0, 0, 10};
     Game.Camera.LookAt = vec3{0, 10, 0};
@@ -176,10 +261,27 @@ static void EditorCommit(editor_state *Editor)
         AddChild(Editor->SelectedEntity, Entity);
         break;
     }
+
+    case EditorMode_Wall:
+    {
+        auto *Entity = CreateEntity(Editor->Level, EntityType_Wall);
+        Entity->Wall = PushStruct<level_wall>(Editor->Arena);
+        for (auto &Vert : Editor->LinePoints)
+        {
+            Entity->Wall->Points.push_back(vec2{Vert.x, Vert.y});
+        }
+        Editor->LinePoints.clear();
+
+        auto *Mesh = GenerateWallMesh(Editor->Arena, Entity->Wall->Points);
+        auto *ModelEntity = CreateModelEntity(Editor->Level, Mesh);
+        AddChild(Entity, ModelEntity);
+        AddChild(Editor->SelectedEntity, Entity);
+        break;
+    }
     }
 }
 
-static entity *DrawEntityTree(editor_state *Editor, entity *Entity)
+static entity *DrawEntityTree(entity *Entity, editor_state *Editor)
 {
     ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_OpenOnArrow;
     if (Editor->SelectedEntity == Entity)
@@ -194,29 +296,25 @@ static entity *DrawEntityTree(editor_state *Editor, entity *Entity)
     }
     if (NodeOpen)
     {
-        auto *Child = Entity->FirstChild;
-        while (Child)
-        {
-            Child = DrawEntityTree(Editor, Child);
-        }
+        IterEntities(Entity->FirstChild, DrawEntityTree, Editor);
         ImGui::TreePop();
     }
     return Entity->NextSibling;
 }
 
-static entity *RenderEntity(render_state &RenderState, entity *Entity)
+static entity *RenderEntity(entity *Entity, render_state &RenderState)
 {
     switch (Entity->Type)
     {
     case EntityType_Collision:
         DrawDebugShape(RenderState, Entity->Shape);
         break;
+
+    case EntityType_Model:
+        DrawModel(RenderState, *Entity->Model, Entity->Transform);
+        break;
     }
-    auto *Child = Entity->FirstChild;
-    while (Child)
-    {
-        Child = RenderEntity(RenderState, Child);
-    }
+    IterEntities(Entity->FirstChild, RenderEntity, RenderState);
     return Entity->NextSibling;
 }
 
@@ -230,16 +328,19 @@ void RenderEditor(game_state &Game, float DeltaTime)
 
     RenderBegin(Game.RenderState, DeltaTime);
 
-    transform Transform;
-    Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 1};
-    DrawMeshPart(Game.RenderState, *FloorMesh, FloorMesh->Parts[0], Transform);
+    {
+        transform Transform;
+        Transform.Position.z = -0.1f;
+        Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 1};
+        DrawMeshPart(Game.RenderState, *FloorMesh, FloorMesh->Parts[0], Transform);
+    }
     if (Editor->Mode != EditorMode_None)
     {
         float MouseX = float(Game.Input.MouseState.X);
-        float MouseY = float(Game.Height - Game.Input.MouseState.Y);
-        ray Ray = PickRay(Game.Camera, MouseX, MouseY, 0, 0, Game.Width, Game.Height);
+        float MouseY = float(Game.RealHeight - Game.Input.MouseState.Y);
+        ray Ray = PickRay(Game.Camera, MouseX, MouseY, 0, 0, Game.RealWidth, Game.RealHeight);
         vec3 CursorPos = GetCursorPositionOnFloor(Ray);
-        CursorPos.z = 0.25f;
+        CursorPos.z = 0.0f;
         if (Editor->SnapToInteger)
         {
             CursorPos.x = std::floor(CursorPos.x);
@@ -251,7 +352,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
         Transform.Scale *= 0.5f;
         DrawMeshPart(Game.RenderState, Editor->CursorMesh, Editor->CursorMesh.Parts[0], Transform);
 
-        if (IsJustPressed(Game, MouseButton_Left) && Editor->EditingLines)
+        if (IsJustReleased(Game, MouseButton_Left) && Editor->EditingLines)
         {
             Editor->LinePoints.push_back(CursorPos);
             if (Editor->Mode == EditorMode_Collision && Editor->LinePoints.size() == 3)
@@ -259,7 +360,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
                 EditorCommit(Editor);
             }
         }
-        else if (IsJustPressed(Game, MouseButton_Right))
+        else if (IsJustReleased(Game, MouseButton_Right))
         {
             Editor->EditingLines = false;
         }
@@ -297,24 +398,17 @@ void RenderEditor(game_state &Game, float DeltaTime)
         DrawMeshPart(Game.RenderState, Editor->LineMesh, Part, transform{});
     }
 
-    {
-        auto *Entity = Editor->Level->RootEntity;
-        while (Entity)
-        {
-            Entity = RenderEntity(Game.RenderState, Entity);
-        }
-    }
-
+    IterEntities(Editor->Level->RootEntity, RenderEntity, Game.RenderState);
     RenderEnd(Game.RenderState, Game.Camera);
 
     ImGui::SetNextWindowSize(ImVec2(Game.RealWidth*0.25f, Game.RealHeight*1.0f), ImGuiSetCond_Always);
     ImGui::Begin("Editor Main");
-    ImGui::InputText("name", Editor->Name, 128);
-    ImGui::InputText("filename", Editor->Filename, 128);
+    ImGui::InputText("name", Editor->Level->Name, 128);
+    ImGui::InputText("filename", Editor->Level->Filename, 128);
     ImGui::Spacing();
     if (ImGui::Button("Save"))
     {
-        Println("Save");
+        AddJob(Editor->Pool, WriteLevel, Editor->Level);
     }
 
     ImGui::Spacing();
@@ -359,15 +453,14 @@ void RenderEditor(game_state &Game, float DeltaTime)
     ImGui::Separator();
     ImGui::Spacing();
 
-    {
-        auto *Entity = Editor->Level->RootEntity;
-        while (Entity)
-        {
-            Entity = DrawEntityTree(Editor, Entity);
-        }
-    }
-
+    IterEntities(Editor->Level->RootEntity, DrawEntityTree, Editor);
     ImGui::End();
+
+    if (int(Editor->Pool.NumJobs) == 0 && Editor->NumCurrentJobs > 0)
+    {
+        Println("finish WriteLevel");
+    }
+    Editor->NumCurrentJobs = int(Editor->Pool.NumJobs);
 
     //bool Open = true;
     //ImGui::ShowTestWindow(&Open);

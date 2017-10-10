@@ -73,45 +73,54 @@ void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
     AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
 }
 
-static void AddCube(vertex_buffer &Buffer, color c = Color_white,
-                    bool NoLight = false, vec3 Scale = vec3(1.0f),
-                    float Angle = 0.0f)
+static void AddCubeWithRotation(vertex_buffer &Buffer, color c = Color_white,
+                                bool NoLight = false, vec3 Center = vec3(0.0f),
+                                vec3 Scale = vec3(1.0f), float Angle = 0.0f)
 {
-    float z = -0.5f * Scale.z;
-    float h = 0.5f * Scale.z;
-    float x = -0.5f * Scale.x;
-    float w = 0.5f * Scale.x;
-    float y = -0.5f * Scale.y;
-    float d = 0.5f * Scale.y;
+    float z = -0.5f;
+    float h = 0.5f;
+    float x = -0.5f;
+    float w = 0.5f;
+    float y = -0.5f;
+    float d = 0.5f;
+
+    transform Transform;
+    Transform.Position = Center;
+    Transform.Scale = Scale;
+    Transform.Rotation.z = glm::degrees(Angle);
+    mat4 TransformMatrix = GetTransformMatrix(Transform);
+    auto r = [TransformMatrix](float x, float y, float z){
+        vec4 v4 = vec4{x, y, z, 1.0f};
+        v4 = TransformMatrix * v4;
+        return vec3{v4.x, v4.y, v4.z};
+    };
 
     if (NoLight)
     {
-        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(1, 1, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(1, 1, 1));
+        AddQuad(Buffer, r(x, y, z), r(w, y, z), r(w, y, h), r(x, y, h), c, r(1, 1, 1));
+        AddQuad(Buffer, r(w, y, z), r(w, d, z), r(w, d, h), r(w, y, h), c, r(1, 1, 1));
+        AddQuad(Buffer, r(w, d, z), r(x, d, z), r(x, d, h), r(w, d, h), c, r(1, 1, 1));
+        AddQuad(Buffer, r(x, d, z), r(x, y, z), r(x, y, h), r(x, d, h), c, r(1, 1, 1));
+        AddQuad(Buffer, r(x, y, h), r(w, y, h), r(w, d, h), r(x, d, h), c, r(1, 1, 1));
+        AddQuad(Buffer, r(x, d, z), r(w, d, z), r(w, y, z), r(x, y, z), c, r(1, 1, 1));
     }
     else
     {
-        AddQuad(Buffer, vec3(x, y, z), vec3(w, y, z), vec3(w, y, h), vec3(x, y, h), c, vec3(0, -1, 0));
-        AddQuad(Buffer, vec3(w, y, z), vec3(w, d, z), vec3(w, d, h), vec3(w, y, h), c, vec3(1, 0, 0));
-        AddQuad(Buffer, vec3(w, d, z), vec3(x, d, z), vec3(x, d, h), vec3(w, d, h), c, vec3(0, 1, 0));
-        AddQuad(Buffer, vec3(x, d, z), vec3(x, y, z), vec3(x, y, h), vec3(x, d, h), c, vec3(-1, 0, 0));
-        AddQuad(Buffer, vec3(x, y, h), vec3(w, y, h), vec3(w, d, h), vec3(x, d, h), c, vec3(0, 0, 1));
-        AddQuad(Buffer, vec3(x, d, z), vec3(w, d, z), vec3(w, y, z), vec3(x, y, z), c, vec3(0, 0, -1));
+        AddQuad(Buffer, r(x, y, z), r(w, y, z), r(w, y, h), r(x, y, h), c, r(0, -1, 0));
+        AddQuad(Buffer, r(w, y, z), r(w, d, z), r(w, d, h), r(w, y, h), c, r(1, 0, 0));
+        AddQuad(Buffer, r(w, d, z), r(x, d, z), r(x, d, h), r(w, d, h), c, r(0, 1, 0));
+        AddQuad(Buffer, r(x, d, z), r(x, y, z), r(x, y, h), r(x, d, h), c, r(-1, 0, 0));
+        AddQuad(Buffer, r(x, y, h), r(w, y, h), r(w, d, h), r(x, d, h), c, r(0, 0, 1));
+        AddQuad(Buffer, r(x, d, z), r(w, d, z), r(w, y, z), r(x, y, z), c, r(0, 0, -1));
     }
 }
 
-inline static void
-AddPart(mesh *Mesh, const mesh_part &MeshPart)
+inline static void AddPart(mesh *Mesh, const mesh_part &MeshPart)
 {
     Mesh->Parts.push_back(MeshPart);
 }
 
-static void
-AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
+static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
 {
     AddQuad(Mesh->Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
     AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
@@ -218,7 +227,16 @@ mesh *GenerateWallMesh(memory_arena &Arena, const std::vector<vec2> &Points)
         vec2 First = Points[i];
         vec2 Second = Points[i + 1];
         vec2 Dif = Second - First;
+        vec2 Center = First + Dif*0.5f;
         float Angle = std::atan2(First.y - Second.y, First.x - Second.x);
-        AddCube(Mesh->Buffer, Color_white, false, vec3{std::abs(Dif.x) + 1.0f, WALL_WIDTH, WALL_HEIGHT}, Angle);
+        AddCubeWithRotation(Mesh->Buffer,
+                            Color_white,
+                            false,
+                            vec3{Center.x, Center.y, 0.0f},
+                            vec3{glm::length(Dif) + 0.25f, WALL_WIDTH, WALL_HEIGHT},
+                            Angle);
     }
+    AddPart(Mesh, mesh_part{BlankMaterial, 0, Mesh->Buffer.VertexCount, GL_TRIANGLES});
+    EndMesh(Mesh, GL_STATIC_DRAW);
+    return Mesh;
 }

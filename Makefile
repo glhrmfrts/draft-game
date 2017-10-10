@@ -29,7 +29,7 @@ platform: $(PLATFORM_SRC)
 run: platform
 	@cd build && ./../$(PLATFORM_OUT)
 
-run_editor:
+run_editor: platform
 	@cd build && ./../$(PLATFORM_OUT) ./editor.so
 
 clean:

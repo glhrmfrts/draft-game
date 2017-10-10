@@ -705,8 +705,8 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     for (int i = 0; i < BloomBlurPassCount-1; i++)
     {
         // @TODO: maybe it is not necessary to scale down
-        size_t BlurWidth = Width >> (i + 1);
-        size_t BlurHeight = Height >> (i + 1);
+        size_t BlurWidth = Width >> i;
+        size_t BlurHeight = Height >> i;
 
         InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
         InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
@@ -970,7 +970,6 @@ void DrawMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const 
     AddRenderable(RenderState, Index, &Part.Material);
 }
 
-#if 0
 void DrawModel(render_state &RenderState, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
@@ -996,7 +995,6 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
         AddRenderable(RenderState, Index, Material);
     }
 }
-#endif
 
 #ifdef DRAFT_DEBUG
 void DrawDebugShape(render_state &RenderState, collision_shape *Shape)
@@ -1019,8 +1017,8 @@ void DrawDebugShape(render_state &RenderState, collision_shape *Shape)
             {
                 Next = Shape->Polygon.Vertices[i + 1];
             }
-            vec3 v3 = vec3{ Vert.x, Vert.y, 0.25f };
-            vec3 v3Next = vec3{ Next.x, Next.y, 0.25f };
+            vec3 v3 = vec3{ Vert.x, Vert.y, 0.0f };
+            vec3 v3Next = vec3{ Next.x, Next.y, 0.0f };
             PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3, { 0, 0 }, Color, { 0, 0, 0 } });
             PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3Next, { 0, 0 }, Color, { 0, 0, 0 } });
         }
