@@ -8,6 +8,7 @@
 #include "thread_pool.h"
 #include "config.h"
 #include "common.h"
+#include "tween.h"
 #include "collision.h"
 #include "memory.h"
 #include "render.h"
@@ -157,6 +158,7 @@ struct game_state
     camera GUICamera;
     render_state RenderState;
     vector<asset_entry> Assets;
+    tween_state TweenState;
 
     memory_arena Arena;
     camera Camera;

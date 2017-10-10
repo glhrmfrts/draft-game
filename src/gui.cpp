@@ -39,8 +39,7 @@ void main() {
 }
 )FOO";
 
-static uint32
-CheckElementState(game_input &Input, rect Rect)
+static uint32 CheckElementState(game_input &Input, rect Rect)
 {
     uint32 Result = GUIElementState_none;
     auto &MouseState = Input.MouseState;
@@ -59,8 +58,7 @@ CheckElementState(game_input &Input, rect Rect)
     return Result;
 }
 
-static void
-CompileGUIShader(gui &g)
+static void CompileGUIShader(gui &g)
 {
     g.Program.VertexShader = glCreateShader(GL_VERTEX_SHADER);
     g.Program.FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -106,15 +104,13 @@ void Begin(gui &g, camera &Camera)
     ResetBuffer(g.Buffer);
 }
 
-static gui_draw_command
-NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
+static gui_draw_command NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
     gui_draw_command Command{DiffuseColor, PrimType, g.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 
-static void
-PushDrawCommand(gui &g)
+static void PushDrawCommand(gui &g)
 {
     if (!g.Buffer.VertexCount) return;
 
@@ -123,7 +119,7 @@ PushDrawCommand(gui &g)
     g.DrawCommandList.push_back(Curr);
 }
 
-uint32 PushRect(gui &g, rect Rect, color vColor, color DiffuseColor,
+uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
                 texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
                 bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
@@ -183,17 +179,41 @@ uint32 PushRect(gui &g, rect Rect, color vColor, color DiffuseColor,
     return GUIElementState_none;
 }
 
-uint32 PushRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
-    return PushRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
+    return DrawRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-uint32 PushTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
+uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
 {
-    return PushRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
+    return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-uint32 PushText(gui &g, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
+vec2 MeasureText(bitmap_font *Font, const std::string &Text)
+{
+    vec2 Result = {};
+    int CurX = 0;
+    int CurY = 0;
+    for (size_t i = 0; i < Text.size(); i++)
+    {
+        if (Text[i] == '\n')
+        {
+            CurX = 0;
+            CurY -= Font->NewLine;
+            continue;
+        }
+
+        int Index = int(Text[i]);
+        CurX += Font->BearingX[Index];
+        CurX += Font->AdvX[Index] - Font->BearingX[Index];
+        Result.x = std::max((int)Result.x, CurX);
+    }
+
+    Result.y = CurY;
+    return Result;
+}
+
+uint32 DrawText(gui &g, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
@@ -213,7 +233,7 @@ uint32 PushText(gui &g, bitmap_font *Font, const string &Text, rect r, color c, 
             int Diff = Font->CharHeight[Index] - Font->BearingY[Index];
             int Width = Font->CharWidth[Index];
             int Height = Font->CharHeight[Index];
-            PushRect(g,
+            DrawRect(g,
                      rect{ (float)CurX, (float)CurY - Diff, (float)Width, (float)Height },
                      Color_white,
                      c,

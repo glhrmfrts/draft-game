@@ -46,8 +46,8 @@ void RenderLoadingScreen(game_state &Game, float DeltaTime, init_func *NextModeI
 
     UpdateProjectionView(Game.GUICamera);
     Begin(g, Game.GUICamera);
-    PushRect(g, rect{ x, y, Width, Height }, Color_white, GL_LINE_LOOP);
-    PushRect(g, rect{ x + 5, y + 5, ProgressBarWidth - 10, Height - 10 }, Color_white);
+    DrawRect(g, rect{ x, y, Width, Height }, Color_white, GL_LINE_LOOP);
+    DrawRect(g, rect{ x + 5, y + 5, ProgressBarWidth - 10, Height - 10 }, Color_white);
     End(g);
 
     if (Update(Game.AssetLoader))

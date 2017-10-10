@@ -80,6 +80,9 @@ struct editor_state
 
     level *Level;
     entity *SelectedEntity = NULL;
+
+    tween_sequence *LevelTextSequence = NULL;
+    float LevelTextAlpha = 0;
 };
 
 #endif

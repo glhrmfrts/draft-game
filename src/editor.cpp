@@ -11,6 +11,7 @@
 #include "draft.h"
 #include "memory.cpp"
 #include "thread_pool.cpp"
+#include "tween.cpp"
 #include "collision.cpp"
 #include "render.cpp"
 #include "asset.cpp"
@@ -143,6 +144,14 @@ void InitEditor(game_state &Game)
     *Editor->Level->Filename = 0;
     Editor->Mode = EditorMode_None;
     CreateThreadPool(Editor->Pool, 1, 8);
+
+    Editor->LevelTextSequence = PushStruct<tween_sequence>(Editor->Arena);
+    AddSequences(Game.TweenState, Editor->LevelTextSequence, 1);
+
+    float *Target = &Editor->LevelTextAlpha;
+    AddTween(Editor->LevelTextSequence, CreateTween(float_tween{0.0f,1.0f,Target}, 0.5f));
+    AddTween(Editor->LevelTextSequence, CreateTween(float_tween{1.0f,1.0f,Target}, 1.0f));
+    AddTween(Editor->LevelTextSequence, CreateTween(float_tween{1.0f,0.0f,Target}, 0.5f));
 
     Game.Camera.Position = vec3{0, 0, 10};
     Game.Camera.LookAt = vec3{0, 10, 0};
@@ -401,6 +410,23 @@ void RenderEditor(game_state &Game, float DeltaTime)
     IterEntities(Editor->Level->RootEntity, RenderEntity, Game.RenderState);
     RenderEnd(Game.RenderState, Game.Camera);
 
+    if (Editor->LevelTextAlpha > 0.0f)
+    {
+        auto &g = Game.GUI;
+        auto Font = FindBitmapFont(Game.AssetLoader, "vcr_16");
+        auto Text = "Level Saved";
+        vec2 Size = MeasureText(Font, Text);
+        float x = Game.Width/2 - Size.x/2;
+        float y = Game.Height/2 - Size.y/2;
+        color Color = Color_white;
+        Color.a = Editor->LevelTextAlpha;
+
+        UpdateProjectionView(Game.GUICamera);
+        Begin(g, Game.GUICamera);
+        DrawText(g, Font, Text, rect{x, y}, Color, false);
+        End(g);
+    }
+
     ImGui::SetNextWindowSize(ImVec2(Game.RealWidth*0.25f, Game.RealHeight*1.0f), ImGuiSetCond_Always);
     ImGui::Begin("Editor Main");
     ImGui::InputText("name", Editor->Level->Name, 128);
@@ -458,7 +484,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
 
     if (int(Editor->Pool.NumJobs) == 0 && Editor->NumCurrentJobs > 0)
     {
-        PlaySequence(&Game.TweenState, Editor->LevelTextSequence);
+        PlaySequence(Game.TweenState, Editor->LevelTextSequence);
     }
     Editor->NumCurrentJobs = int(Editor->Pool.NumJobs);
 
@@ -487,6 +513,7 @@ extern "C"
         MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(Game->Camera, (float)Game->Width, (float)Game->Height, 70.0f, 0.1f, 1000.0f);
         InitRenderState(Game->RenderState, Width, Height);
+        InitTweenState(Game->TweenState);
 
         Game->Assets.push_back(
             CreateAssetEntry(
@@ -522,6 +549,7 @@ extern "C"
             Global_DebugUI = !Global_DebugUI;
         }
 
+        Update(Game->TweenState, DeltaTime);
         switch (Game->Mode)
         {
         case GameMode_LoadingScreen:
