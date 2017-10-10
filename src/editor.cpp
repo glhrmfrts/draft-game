@@ -458,7 +458,7 @@ void RenderEditor(game_state &Game, float DeltaTime)
 
     if (int(Editor->Pool.NumJobs) == 0 && Editor->NumCurrentJobs > 0)
     {
-        Println("finish WriteLevel");
+        PlaySequence(&Game.TweenState, Editor->LevelTextSequence);
     }
     Editor->NumCurrentJobs = int(Editor->Pool.NumJobs);
 
