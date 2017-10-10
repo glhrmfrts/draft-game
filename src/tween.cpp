@@ -18,8 +18,14 @@ struct tween_id
     int Main;
 };
 
+enum tween_type
+{
+    TweenType_Float,
+};
+
 struct tween_data
 {
+    tween_type Type;
 };
 
 struct tween_state
@@ -67,6 +73,10 @@ void PlaySequence(tween_state *State, sequence_id Seq)
 	Seq->Active = State->ActiveSequences.size() - 1;
 }
 
+void PauseSequence(tween_state *State, sequence_id Seq)
+{
+}
+
 void StopSequence(tween_state *State, sequence_id Seq)
 {
 }
@@ -91,7 +101,14 @@ void Update(tween_state *State, float Delta)
             Seq->ActiveTween++;
             if (Seq->ActiveTween >= Seq->TweenCount)
             {
-                StopSequence(State, SeqId);
+                if (Seq->Loop)
+                {
+                    Seq->ActiveTween = 0;
+                }
+                else
+                {
+                    StopSequence(State, SeqId);
+                }
             }
         }
     }
