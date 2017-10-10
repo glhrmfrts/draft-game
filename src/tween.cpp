@@ -44,14 +44,22 @@ inline void AddTween(tween_sequence *Seq, const tween &t)
 
 void PlaySequence(tween_state &State, tween_sequence *Seq)
 {
-    State.ActiveSequences.push_back(Seq);
-    Seq->ActiveID = State.ActiveSequences.size() - 1;
+    if (Seq->ActiveID == -1)
+    {
+        State.ActiveSequences.push_back(Seq);
+        Seq->ActiveID = State.ActiveSequences.size() - 1;
+        for (auto &Tween : Seq->Tweens)
+        {
+            Tween.Timer = 0.0f;
+        }
+    }
 }
 
 void StopSequence(tween_state &State, tween_sequence *Seq)
 {
     auto Pos = State.ActiveSequences.begin() + Seq->ActiveID;
     State.ActiveSequences.erase(Pos);
+    Seq->ActiveID = -1;
 }
 
 void Update(tween_state &State, float Delta)
@@ -63,7 +71,7 @@ void Update(tween_state &State, float Delta)
         {
         case TweenType_Float:
         {
-            float Amount = State.Funcs[Tween.Easing](Tween.Timer);
+            float Amount = State.Funcs[Tween.Easing](Tween.Timer/Tween.Duration);
             float Dif = Tween.Float.To - Tween.Float.From;
             *Tween.Float.Target = Tween.Float.From + Dif*Amount;
             break;
