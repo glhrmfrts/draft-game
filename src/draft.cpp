@@ -622,6 +622,8 @@ RenderLevel(game_state &Game, float DeltaTime)
 
 static void InitLevel(game_state &Game)
 {
+    auto State = Game.LevelState;
+    State->Level = FindLevel(Game.AssetLoader, "test");
 }
 
 static void RenderLevel(game_state &Game, float Delta)
@@ -649,6 +651,7 @@ extern "C"
         MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(Game->Camera, (float)Game->Width, (float)Game->Height, 70.0f, 0.1f, 1000.0f);
         InitRenderState(Game->RenderState, Width, Height);
+        InitTweenState(Game->TweenState);
 
         Game->Assets.push_back(
             CreateAssetEntry(
@@ -672,6 +675,14 @@ extern "C"
                 "data/audio/boost.wav",
                 "boost",
                 NULL
+            )
+        );
+        Game->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Level,
+                "data/levels/test.bl",
+                "test",
+                NULL,
             )
         );
 

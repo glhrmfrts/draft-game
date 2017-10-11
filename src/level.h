@@ -1,61 +1,108 @@
 #ifndef DRAFT_LEVEL_H
 #define DRAFT_LEVEL_H
 
-#include <list>
-
-struct crystal_event
+enum entity_type
 {
-    float x, y, z;
+    EntityType_Empty,
+    EntityType_Collision,
+    EntityType_Wall,
+    EntityType_Model,
 };
 
-struct ship_event
-{
-    enemy_type EnemyType;
-    float x, y, z;
-    float vy;
+static const char *EntityTypeStrings[] = {
+    "empty", "collision", "wall", "model"
 };
 
-struct wall_event
+struct level_wall
 {
-    float x, y, z;
-    float Width;
+    std::vector<vec2> Points;
 };
 
-enum level_event_type
+struct model
 {
-    LevelEventType_Crystal,
-    LevelEventType_Ship,
-    LevelEventType_Wall,
+    std::vector<material *> Materials;
+    mesh *Mesh;
 };
-struct level_event
+
+struct entity
 {
-    level_event_type Type;
-    float Delay = 0;
-    float Timer = 0;
-    float ResetTimer = 0; // Set the timer to this value if the
-                          // MinScore condition does not evaluate
-    int MinScore = 0;
+    entity_type Type;
+    int         ID;
+    transform   Transform;
 
     union
     {
-        crystal_event Crystal;
-        ship_event Ship;
-        wall_event Wall;
+        collision_shape *Shape;
+        level_wall *Wall;
+        model *Model;
     };
-};
 
-struct level_tick
-{
-    vector<level_event> Events;
-    float TriggerDistance = 0;
+    entity *FirstChild = NULL;
+    entity *NextSibling = NULL;
+    int NumChildren = 0;
+
+    entity() {}
 };
 
 struct level
 {
-    vector<entity *> EntitiesToRemove;
-    vector<level_tick> Ticks;
-    std::list<level_event> DelayedEvents;
-    int CurrentTick = 0;
+    memory_arena Arena;
+    char *Name;
+    char *Filename;
+
+    int NextEntityID = 0;
+    entity *RootEntity;
+};
+
+// structs representing the level binary data in file
+struct collision_shape_data
+{
+};
+
+struct level_wall_data
+{
+    uint32 NumPoints;
+    vec2 *Points;
+};
+
+struct entity_data
+{
+    uint8 Type;
+    uint32 Id;
+    uint32 NumChildren;
+    vec3 Position;
+    vec3 Scale;
+    vec3 Rotation;
+    uint32 WallIndex;
+    uint32 ColliderIndex;
+
+    entity_data *FirstChild;
+    entity_data *NextSibling;
+};
+
+struct level_data
+{
+    memory_arena TempArena;
+    uint32 NameLen;
+    char *Name;
+
+    uint32 WallCount;
+    level_wall_data *Walls;
+
+    uint32 ColliderCount;
+    collider_data *Colliders;
+
+    entity_data *RootEntity;
+};
+
+enum level_action_type
+{
+    LevelAction_TranslateEntity,
+    LevelAction_AddEntity,
+    LevelAction_RemoveEntity,
+    LevelAction_WakeEntity,
+    LevelAction_SleepEntity,
+    LevelAction_Finish,
 };
 
 #endif
