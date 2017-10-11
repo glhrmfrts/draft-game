@@ -122,6 +122,13 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry)
         Entry.Sound.Result = Result;
         break;
     }
+
+    case AssetType_Level:
+    {
+        auto *Result = PushStruct<level>(Loader.Arena);
+        Entry.Level.Result = Result;
+        break;
+    }
     }
     Loader.Entries.push_back(Entry);
 }
@@ -350,6 +357,14 @@ LoadAssetThreadSafePart(void *Arg)
 
         Entry->Sound.Data = Data;
     }
+
+    case AssetType_Level:
+    {
+        FILE *Handle = OpenFile(Entry->Filename, "rb");
+        UnmarshalLevel(Entry->Level->Data, Handle);
+        fclose(Handle);
+        break;
+    }
     }
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -429,6 +444,11 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
             Result->SampleCount * sizeof(short),
             Result->SampleRate
         );
+        break;
+    }
+
+    case AssetType_Level:
+    {
         break;
     }
     }
