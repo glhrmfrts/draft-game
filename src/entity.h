@@ -7,11 +7,6 @@ struct model
     mesh *Mesh;
 };
 
-struct collision_bounds
-{
-    bounding_box Box;
-};
-
 enum enemy_type
 {
     EnemyType_Default,
@@ -55,7 +50,7 @@ enum collider_type
 struct collider
 {
     collider_type Type;
-    collision_shape Shape;
+    bounding_box Box;
 };
 
 struct entity

@@ -7,48 +7,13 @@ struct bounding_box
     vec3 Half = vec3(0.0f);
 };
 
-struct circle
-{
-    vec2 Center;
-    float Radius;
-};
-
-struct polygon
-{
-    std::vector<vec2> Vertices;
-};
-
-enum collision_shape_type
-{
-    CollisionShapeType_Circle,
-    CollisionShapeType_Polygon,
-};
-
-struct collision_shape
-{
-    collision_shape_type Type;
-    union
-    {
-        struct { bounding_box Box; };
-        struct { circle Circle; };
-        struct { polygon Polygon; };
-    };
-
-    collision_shape() {}
-};
-
 struct entity;
 struct collision_result
 {
-    vec2  Normal;
+    vec3 Normal;
     float Depth;
     entity *First;
     entity *Second;
-};
-
-struct physics_state
-{
-    std::vector<vec2> Simplex;
 };
 
 inline static bounding_box

@@ -165,12 +165,14 @@ struct game_state
     game_meshes Meshes;
     vec3 Gravity;
 
+    entity *PlayerEntity;
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;
     std::vector<entity *> TrailEntities;
     std::vector<entity *> ShipEntities;
     std::vector<entity *> ExplosionEntities;
     std::vector<collision_result> CollisionCache;
+    int NumEntities;
 
     random_series ExplosionEntropy;
     bitmap_font *TestFont;

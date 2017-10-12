@@ -7,7 +7,7 @@ static bool  Global_Camera_FreeCam = false;
 static float Global_Camera_OffsetY = -10.0f;
 static float Global_Camera_OffsetZ = 5.0f;
 
-static bool  Global_Collision_DrawBounds = false;
+static bool  Global_Collision_DrawCollider = false;
 
 static float Global_Game_TimeSpeed          = 1.0f;
 static float Global_Game_BoostVelocity      = 75.0f;

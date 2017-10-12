@@ -11,6 +11,7 @@
 #include "draft.h"
 #include "memory.cpp"
 #include "thread_pool.cpp"
+#include "tween.cpp"
 #include "collision.cpp"
 #include "render.cpp"
 #include "asset.cpp"
@@ -74,7 +75,7 @@ void AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ModelEntities, Entity);
     }
-    if (Entity->Bounds)
+    if (Entity->Collider)
     {
         AddEntityToList(Game.CollisionEntities, Entity);
     }
@@ -91,7 +92,7 @@ void AddEntity(game_state &Game, entity *Entity)
         ApplyExplosionLight(Game.RenderState, Entity->Explosion->Color);
         AddEntityToList(Game.ExplosionEntities, Entity);
     }
-    if (Entity->Ship && !(Entity->Flags & Entity_IsPlayer))
+    if (Entity->Ship && !(Entity->Flags & EntityFlag_IsPlayer))
     {
         AddEntityToList(Game.ShipEntities, Entity);
     }
@@ -118,7 +119,7 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.ModelEntities, Entity);
     }
-    if (Entity->Bounds)
+    if (Entity->Collider)
     {
         RemoveEntityFromList(Game.CollisionEntities, Entity);
     }
@@ -155,6 +156,7 @@ InitLevel(game_state &Game)
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
     AddEntity(Game, Game.PlayerEntity);
 
+    for (int i = 0; i < 10; i++)
     {
         auto *Entity = PushStruct<entity>(Game.Arena);
         Entity->Transform.Position.z = -0.25f;
@@ -172,21 +174,21 @@ DebugReset(game_state &Game)
 {
 }
 
-struct find_collider_result
+struct find_entity_result
 {
     entity *Found = NULL;
     entity *Other = NULL;
 };
-static find_collider_result
-FindColliderOfType(collider *First, collider *Second, entity_type Type)
+static find_entity_result
+FindEntityOfType(entity *First, entity *Second, collider_type Type)
 {
-    find_collider_result Result;
-    if (First->Type == Type)
+    find_entity_result Result;
+    if (First->Collider->Type == Type)
     {
         Result.Found = First;
         Result.Other = Second;
     }
-    else if (Second->Type == Type)
+    else if (Second->Collider->Type == Type)
     {
         Result.Found = Second;
         Result.Other = First;
@@ -208,10 +210,10 @@ ApplyBoostToShip(entity *Entity, float Boost, float Max)
 static bool
 HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime)
 {
-    auto *ShipEntity = FindColliderOfType(First->Collider, Second->Collider, ColliderType_Ship).Found;
-    if (First->Type == ColliderType_TrailPiece || Second->Type == ColliderType_TrailPiece)
+    auto *ShipEntity = FindEntityOfType(First, Second, ColliderType_Ship).Found;
+    if (First->Collider->Type == ColliderType_TrailPiece || Second->Collider->Type == ColliderType_TrailPiece)
     {
-        auto *TrailPieceEntity = FindColliderOfType(First, Second, ColliderType_TrailPiece).Found;
+        auto *TrailPieceEntity = FindEntityOfType(First, Second, ColliderType_TrailPiece).Found;
         if (ShipEntity && ShipEntity != TrailPieceEntity->TrailPiece->Owner)
         {
             auto *Ship = ShipEntity->Ship;
@@ -223,7 +225,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
         }
         return false;
     }
-    if (First->Type == ColliderType_Ship && Second->Type == ColliderType_Ship)
+    if (First->Collider->Type == ColliderType_Ship && Second->Collider->Type == ColliderType_Ship)
     {
         vec3 rv = First->Transform.Velocity - Second->Transform.Velocity;
         if (std::abs(rv.y) > 20.0f)
@@ -315,7 +317,7 @@ RenderLevel(game_state &Game, float DeltaTime)
 
     size_t FrameCollisionCount = 0;
     PlayerShip->NumTrailCollisions = 0;
-    //DetectCollisions(Game.CollisionEntities, Game.CollisionCache, FrameCollisionCount);
+    DetectCollisions(Game.CollisionEntities, Game.CollisionCache, FrameCollisionCount);
     for (size_t i = 0; i < FrameCollisionCount; i++)
     {
         auto &Col = Game.CollisionCache[i];
@@ -426,7 +428,7 @@ RenderLevel(game_state &Game, float DeltaTime)
             PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
             PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
 
-            auto &Box = PieceEntity->Bounds->Box;
+            auto &Box = PieceEntity->Collider->Box;
             Box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
             Box.Center = vec3(c1.x, c1.y + Box.Half.y, c1.z + Box.Half.z);
         }
@@ -442,7 +444,7 @@ RenderLevel(game_state &Game, float DeltaTime)
         }
         UploadVertices(Mesh.Buffer, 0, Mesh.Buffer.VertexCount);
 
-        PushModel(Game.RenderState, Trail->Model, transform{});
+        DrawModel(Game.RenderState, Trail->Model, transform{});
     }
 
     for (auto *Entity : Game.ExplosionEntities)
@@ -473,25 +475,25 @@ RenderLevel(game_state &Game, float DeltaTime)
         }
         UploadVertices(Explosion->Mesh.Buffer, GL_DYNAMIC_DRAW);
 
-        PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[0], transform{});
-        PushMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
+        DrawMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[0], transform{});
+        DrawMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
     }
 
     for (auto *Entity : Game.ModelEntities)
     {
         if (!Entity) continue;
 
-        PushModel(Game.RenderState, *Entity->Model, Entity->Transform);
+        DrawModel(Game.RenderState, *Entity->Model, Entity->Transform);
     }
 
 #ifdef DRAFT_DEBUG
-    if (Global_Collision_DrawBounds)
+    if (Global_Collision_DrawCollider)
     {
-        for (auto *Entity : Game..CollisionEntities)
+        for (auto *Entity : Game.CollisionEntities)
         {
             if (!Entity) continue;
 
-            PushDebugBounds(Game.RenderState, Entity->Bounds->Box, Entity->NumCollisions > 0);
+            DrawDebugCollider(Game.RenderState, Entity->Collider->Box, Entity->NumCollisions > 0);
         }
     }
 #endif
@@ -501,13 +503,13 @@ RenderLevel(game_state &Game, float DeltaTime)
     {
         UpdateProjectionView(Game.GUICamera);
         Begin(Game.GUI, Game.GUICamera);
-        PushRect(Game.GUI, rect{20,20,200,20},
+        DrawRect(Game.GUI, rect{20,20,200,20},
                  IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
 
-        PushRect(Game.GUI, rect{25,25,190 * PlayerShip->DraftCharge,10},
+        DrawRect(Game.GUI, rect{25,25,190 * PlayerShip->DraftCharge,10},
                  IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
-        PushText(Game.GUI, Game.TestFont, "Score gui", rect{50, 20, 0, 0}, Color_white);
+        DrawText(Game.GUI, Game.TestFont, "Score gui", rect{50, 20, 0, 0}, Color_white);
 
         End(Game.GUI);
     }
@@ -558,14 +560,6 @@ extern "C"
                 "data/audio/boost.wav",
                 "boost",
                 NULL
-            )
-        );
-        Game->Assets.push_back(
-            CreateAssetEntry(
-                AssetType_Level,
-                "data/levels/test.bl",
-                "test",
-                NULL,
             )
         );
 

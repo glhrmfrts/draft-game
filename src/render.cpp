@@ -997,34 +997,8 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
 }
 
 #ifdef DRAFT_DEBUG
-void DrawDebugShape(render_state &RenderState, collision_shape *Shape)
+void DrawDebugCollider(render_state &RenderState, bounding_box &Box, bool IsColliding)
 {
-    color Color = Color_green;
-    switch (Shape->Type)
-    {
-    case CollisionShapeType_Polygon:
-    {
-        size_t VertCount = Shape->Polygon.Vertices.size();
-        for (size_t i = 0; i < VertCount; i++)
-        {
-            vec2 Vert = Shape->Polygon.Vertices[i];
-            vec2 Next;
-            if (i == VertCount - 1)
-            {
-                Next = Shape->Polygon.Vertices[0];
-            }
-            else
-            {
-                Next = Shape->Polygon.Vertices[i + 1];
-            }
-            vec3 v3 = vec3{ Vert.x, Vert.y, 0.0f };
-            vec3 v3Next = vec3{ Next.x, Next.y, 0.0f };
-            PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3, { 0, 0 }, Color, { 0, 0, 0 } });
-            PushVertex(RenderState.DebugBuffer, mesh_vertex{ v3Next, { 0, 0 }, Color, { 0, 0, 0 } });
-        }
-        break;
-    }
-    }
 }
 #endif
 

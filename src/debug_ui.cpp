@@ -16,7 +16,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Collision"))
     {
-        ImGui::Checkbox("Draw Bounds", &Global_Collision_DrawBounds);
+        ImGui::Checkbox("Draw Bounds", &Global_Collision_DrawCollider);
         ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Game"))

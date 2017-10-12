@@ -55,12 +55,12 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     for (int i = 0; i < TrailCount; i++)
     {
         auto Entity = Result->Entities + i;
-        Entity->Type = EntityType_TrailPiece;
         Entity->TrailPiece = PushStruct<trail_piece>(Arena);
         Entity->TrailPiece->Owner = Owner;
         Entity->Transform.Position = vec3(0.0f);
-        Entity->Bounds = PushStruct<collision_bounds>(Arena);
-        AddFlags(Entity, Entity_Kinematic);
+        Entity->Collider = PushStruct<collider>(Arena);
+        Entity->Collider->Type = ColliderType_TrailPiece;
+        AddFlags(Entity, EntityFlag_Kinematic);
     }
     return Result;
 }
@@ -68,13 +68,13 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
 {
     auto *Entity = PushStruct<entity>(Game.Arena);
-    Entity->Type = EntityType_Ship;
     Entity->Model = CreateModel(Game.Arena, GetShipMesh(Game));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, Material_PolygonLines));
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
-    //Entity->Bounds = PushStruct<collision_shape>(Game.Arena);
+    Entity->Collider = PushStruct<collider>(Game.Arena);
+    Entity->Collider->Type = ColliderType_Ship;
     Entity->Ship = PushStruct<ship>(Game.Arena);
     Entity->Ship->Color = Color;
     Entity->Ship->OutlineColor = OutlineColor;
@@ -82,7 +82,7 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     if (IsPlayer)
     {
         Entity->PlayerState = PushStruct<player_state>(Game.Arena);
-        AddFlags(Entity, Entity_IsPlayer);
+        AddFlags(Entity, EntityFlag_IsPlayer);
     }
     return Entity;
 }
@@ -224,7 +224,7 @@ Interp(float c, float t, float a, float dt)
 void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
 {
     float MinVel = ShipMinVel;
-    if (Entity->Flags & Entity_IsPlayer)
+    if (Entity->Flags & EntityFlag_IsPlayer)
     {
         //MinVel = PlayerMinVel;
     }
@@ -234,7 +234,7 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     }
 
     float MaxVel = ShipMaxVel;
-    if (Entity->Flags & Entity_IsPlayer)
+    if (Entity->Flags & EntityFlag_IsPlayer)
     {
         MaxVel = PlayerMaxVel;
     }
