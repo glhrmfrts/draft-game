@@ -29,34 +29,24 @@
         }\
     }
 
-entity *CreateEntity(level *Level, entity_type Type)
+entity *CreateEntity(level *Level)
 {
     auto *Result = PushStruct<entity>(Level->Arena);
-    Result->Type = Type;
     Result->ID = Level->NextEntityID++;
     return Result;
 }
 
 entity *CreateModelEntity(level *Level, mesh *Mesh)
 {
-    auto *Result = CreateEntity(Level, EntityType_Model);
+    auto *Result = CreateEntity(Level);
     Result->Model = PushStruct<model>(Level->Arena);
     Result->Model->Mesh = Mesh;
     return Result;
 }
 
-void AddChild(entity *Entity, entity *Child)
+inline void AddEntity(level *Level, entity *Entity)
 {
-    if (Entity->FirstChild)
-    {
-        auto *Prev = Entity->FirstChild;
-        Entity->FirstChild = Child;
-        Child->NextSibling = Prev;
-    }
-    else
-    {
-        Entity->FirstChild = Child;
-    }
+    Level->Entities.push_back(Entity);
 }
 
 static void WriteCollisionShape(collision_shape *Shape, FILE *Handle)
@@ -290,41 +280,31 @@ static void EditorCommit(editor_state *Editor)
     }
 }
 
-static entity *DrawEntityTree(entity *Entity, editor_state *Editor)
+static void DrawEntityList(editor_state *Editor, entity *Entity)
 {
     ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_OpenOnArrow;
     if (Editor->SelectedEntity == Entity)
     {
         Flags |= ImGuiTreeNodeFlags_Selected;
     }
-
-    bool NodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)Entity->ID, Flags, "%s %d", EntityTypeStrings[Entity->Type], Entity->ID);
+    ImGui::TreeNodeEx((void*)(intptr_t)Entity->ID, Flags, "%s %d", "entity", Entity->ID);
     if (ImGui::IsItemClicked())
     {
         Editor->SelectedEntity = Entity;
     }
-    if (NodeOpen)
-    {
-        IterEntities(Entity->FirstChild, DrawEntityTree, Editor);
-        ImGui::TreePop();
-    }
-    return Entity->NextSibling;
+    ImGui::TreePop();
 }
 
-static entity *RenderEntity(entity *Entity, render_state &RenderState)
+static void RenderEntity(entity *Entity, render_state &RenderState)
 {
-    switch (Entity->Type)
+    if (Entity->Collider)
     {
-    case EntityType_Collision:
-        DrawDebugShape(RenderState, Entity->Shape);
-        break;
-
-    case EntityType_Model:
-        DrawModel(RenderState, *Entity->Model, Entity->Transform);
-        break;
+        DrawDebugShape(RenderState, Entity->Collider->Shape);
     }
-    IterEntities(Entity->FirstChild, RenderEntity, RenderState);
-    return Entity->NextSibling;
+    if (Entity->Model)
+    {
+        DrawModel(RenderState, *Entity->Model, Entity->Transform);
+    }
 }
 
 void RenderEditor(game_state &Game, float DeltaTime)

@@ -73,8 +73,11 @@ struct entity_data
     vec3 Position;
     vec3 Scale;
     vec3 Rotation;
-    uint32 WallIndex;
-    uint32 ColliderIndex;
+    union
+    {
+        collision_shape_data Data;
+        level_wall_data Data;
+    };
 
     entity_data *FirstChild;
     entity_data *NextSibling;
@@ -85,12 +88,6 @@ struct level_data
     memory_arena TempArena;
     uint32 NameLen;
     char *Name;
-
-    uint32 WallCount;
-    level_wall_data *Walls;
-
-    uint32 ColliderCount;
-    collider_data *Colliders;
 
     entity_data *RootEntity;
 };
