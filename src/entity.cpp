@@ -1,6 +1,5 @@
 // Copyright
 
-/*
 inline static void
 AddFlags(entity *Entity, uint32 Flags)
 {
@@ -50,6 +49,8 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     // Right line parts
     AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
     AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
+
+    ReserveVertices(Result->Mesh.Buffer, PlaneCount + LineCount*2, GL_DYNAMIC_DRAW);
 
     for (int i = 0; i < TrailCount; i++)
     {
@@ -199,36 +200,6 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
     return Result;
 }
 
-entity *CreateCrystalEntity(game_state &Game, vec3 Position)
-{
-    auto *Result = PushStruct<entity>(Game.Arena);
-    Result->Transform.Position = Position;
-    Result->Transform.Scale = vec3{0.5f, 0.5f, 0.75f};
-    Result->Type = EntityType_Crystal;
-    Result->Model = CreateModel(Game.Arena, GetCrystalMesh(Game));
-    Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
-    return Result;
-}
-
-entity *CreateWallEntity(game_state &Game, vec3 Position, float Width)
-{
-    const float Depth = 2.0f;
-    const float Height = 10.0f;
-    Position.x += Width/2;
-    Position.y += Depth/2;
-
-    auto *Result = PushStruct<entity>(Game.Arena);
-    Result->Transform.Position = Position;
-    Result->Transform.Scale = vec3{Width, Depth, Height};
-    Result->Type = EntityType_Wall;
-    Result->Model = CreateModel(Game.Arena, NULL);
-    Result->Bounds = PushStruct<collision_bounds>(Game.Arena);
-    Result->WallState = PushStruct<wall_state>(Game.Arena);
-    Result->WallState->BaseZ = Position.z;
-    AddFlags(Result, Entity_Kinematic);
-    return Result;
-}
-
 static float
 Interp(float c, float t, float a, float dt)
 {
@@ -302,4 +273,3 @@ void PushPosition(trail *Trail, vec3 Pos)
     }
     Trail->Entities[Trail->PositionStackIndex++].Transform.Position = Pos;
 }
-*/

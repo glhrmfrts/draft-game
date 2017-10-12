@@ -15,7 +15,7 @@
 #include "asset.h"
 #include "gui.h"
 #include "random.h"
-#include "editor.h"
+#include "entity.h"
 
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
@@ -165,7 +165,12 @@ struct game_state
     game_meshes Meshes;
     vec3 Gravity;
 
-    vector<collision_result> CollisionCache;
+    std::vector<entity *> ModelEntities;
+    std::vector<entity *> CollisionEntities;
+    std::vector<entity *> TrailEntities;
+    std::vector<entity *> ShipEntities;
+    std::vector<entity *> ExplosionEntities;
+    std::vector<collision_result> CollisionCache;
 
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
@@ -178,8 +183,6 @@ struct game_state
     int RealWidth;
     int RealHeight;
     bool Running = true;
-
-    editor_state *EditorState = NULL;
 
     game_state() {}
 };

@@ -5,7 +5,7 @@ static bool  Global_DebugUI = false;
 
 static bool  Global_Camera_FreeCam = false;
 static float Global_Camera_OffsetY = -10.0f;
-static float Global_Camera_OffsetZ = 20.0f;
+static float Global_Camera_OffsetZ = 5.0f;
 
 static bool  Global_Collision_DrawBounds = false;
 
