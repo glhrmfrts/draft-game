@@ -30,18 +30,9 @@ struct entity
     int         ID;
     transform   Transform;
 
-    union
-    {
-        collision_shape *Shape;
-        level_wall *Wall;
-        model *Model;
-    };
-
-    entity *FirstChild = NULL;
-    entity *NextSibling = NULL;
-    int NumChildren = 0;
-
-    entity() {}
+    collider *Collider = NULL;
+    level_wall *Wall = NULL;
+    model *Model = NULL;
 };
 
 struct level
@@ -57,6 +48,15 @@ struct level
 // structs representing the level binary data in file
 struct collision_shape_data
 {
+    uint8 Type;
+    float CircleRadius;
+    vec2 *Vertices;
+};
+
+struct collider_data
+{
+    uint8 Type;
+    collision_shape_data Shape;
 };
 
 struct level_wall_data
@@ -73,33 +73,17 @@ struct entity_data
     vec3 Position;
     vec3 Scale;
     vec3 Rotation;
-    union
-    {
-        collision_shape_data Data;
-        level_wall_data Data;
-    };
-
-    entity_data *FirstChild;
-    entity_data *NextSibling;
+    uint32 WallIndex;
+    uint32 ColliderIndex;
 };
 
 struct level_data
 {
     memory_arena TempArena;
     uint32 NameLen;
-    char *Name;
+    char *Name;3
 
     entity_data *RootEntity;
-};
-
-enum level_action_type
-{
-    LevelAction_TranslateEntity,
-    LevelAction_AddEntity,
-    LevelAction_RemoveEntity,
-    LevelAction_WakeEntity,
-    LevelAction_SleepEntity,
-    LevelAction_Finish,
 };
 
 #endif

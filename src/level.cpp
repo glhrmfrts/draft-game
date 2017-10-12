@@ -18,6 +18,7 @@ void WriteCollection(T *Ptr, uint32 Count, FILE *Handle)
 void ReadLevel(level_data *Data, FILE *Handle)
 {
     ReadCollection<char>(Data->TempArena, &Data->Name, &Data->NameLen, Handle);
+    WriteCollection<vec3>(Data->TempArena, &Data->Vertices, &Data->NumVertices, Handle);
     ReadCollection<collider_data>(Data->TempArena, &Data->Colliders, &Data->NumColliders, Handle);
     ReadCollection<level_wall_data>(Data->TempArena, &Data->Walls, &Data->NumWalls, Handle);
     ReadCollection<entity_data>(Data->TempArena, &Data->Entities, &Data->NumEntities, Handle);
@@ -26,15 +27,23 @@ void ReadLevel(level_data *Data, FILE *Handle)
 void WriteLevel(level_data *Data, FILE *Handle)
 {
     WriteCollection<char>(Data->Name, Data->NameLen, Handle);
-    WriteCollection<char>(Data->Colliders, Data->NumColliders, Handle);
-    WriteCollection<char>(Data->Walls, Data->NumWalls, Handle);
-    WriteCollection<char>(Data->Entities, Data->NumEntities, Handle);
+    WriteCollection<vec3>(Data->Vertices, Data->NumVertices, Handle);
+    WriteCollection<collider_data>(Data->Colliders, Data->NumColliders, Handle);
+    WriteCollection<level_wall_data>(Data->Walls, Data->NumWalls, Handle);
+    WriteCollection<entity_data>(Data->Entities, Data->NumEntities, Handle);
 }
 
 void ExtractLevelData(Level *level, LevelData *data)
 {
-    std::vector<collider *> temp_colliders;
-    std::vector<level_wall *> temp_walls;
+    std::vector<collider *> TempColliders;
+    std::vector<level_wall *> TempWalls;
+
+    Data->NameLen = strlen(Level->Name);
+    Data->Name = Level->Name;
+    for (auto *Entity : Level->Entities)
+    {
+        Data->NumEntities++;
+    }
 
     data->name_len = strlen(level->name);
     data->name = level->name;
