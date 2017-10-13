@@ -96,6 +96,10 @@ void AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.ShipEntities, Entity);
     }
+    if (Entity->Repeat)
+    {
+        AddEntityToList(Game.RepeatingEntities, Entity);
+    }
     Game.NumEntities++;
 }
 
@@ -139,9 +143,15 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.ShipEntities, Entity);
     }
+    if (Entity->Repeat)
+    {
+        RemoveEntityFromList(Game.RepeatingEntities, Entity);
+    }
     Game.NumEntities = std::max(0, Game.NumEntities - 1);
 }
 
+#define ROAD_LANE_WIDTH   2
+#define LEVEL_PLANE_COUNT 5
 static void
 InitLevel(game_state &Game)
 {
@@ -154,14 +164,33 @@ InitLevel(game_state &Game)
     Game.Gravity = vec3(0, 0, 0);
 
     Game.PlayerEntity = CreateShipEntity(Game, Color_blue, IntColor(FirstPalette.Colors[1]), true);
+    Game.PlayerEntity->Transform.Position.z = 0.2f;
     AddEntity(Game, Game.PlayerEntity);
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
     {
         auto *Entity = PushStruct<entity>(Game.Arena);
+        Entity->Transform.Position.y = LEVEL_PLANE_SIZE * i;
         Entity->Transform.Position.z = -0.25f;
         Entity->Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 0};
         Entity->Model = CreateModel(Game.Arena, GetFloorMesh(Game));
+        Entity->Repeat = PushStruct<entity_repeat>(Game.Arena);
+        Entity->Repeat->Count = LEVEL_PLANE_COUNT;
+        Entity->Repeat->Size = LEVEL_PLANE_SIZE;
+        Entity->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE/2;
+        AddEntity(Game, Entity);
+    }
+    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
+    {
+        auto *Entity = PushStruct<entity>(Game.Arena);
+        Entity->Transform.Position.y = LEVEL_PLANE_SIZE * i;
+        Entity->Transform.Position.z = 0.0f;
+        Entity->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
+        Entity->Model = CreateModel(Game.Arena, GetRoadMesh(Game));
+        Entity->Repeat = PushStruct<entity_repeat>(Game.Arena);
+        Entity->Repeat->Count = LEVEL_PLANE_COUNT;
+        Entity->Repeat->Size = LEVEL_PLANE_SIZE;
+        Entity->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE / 2;
         AddEntity(Game, Entity);
     }
 
@@ -265,8 +294,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
     return true;
 }
 
-static void
-UpdateListener(camera &Camera, vec3 PlayerPosition)
+static void UpdateListener(camera &Camera, vec3 PlayerPosition)
 {
     static float *Orient = new float[6];
     Orient[0] = Camera.View[2][0];
@@ -280,6 +308,33 @@ UpdateListener(camera &Camera, vec3 PlayerPosition)
     alListener3f(AL_VELOCITY, 0, 0, 0);
 }
 
+static void UpdateFreeCam(camera &Camera, game_input &Input, float DeltaTime)
+{
+    static float Pitch;
+    static float Yaw;
+    float Speed = 50.0f;
+    float AxisValue = GetAxisValue(Input, Action_camVertical);
+    vec3 CamDir = glm::normalize(Camera.LookAt - Camera.Position);
+
+    Camera.Position += CamDir * AxisValue * Speed * DeltaTime;
+
+    if (Input.MouseState.Buttons & MouseButton_Middle)
+    {
+        Yaw += Input.MouseState.dX * DeltaTime;
+        Pitch -= Input.MouseState.dY * DeltaTime;
+        Pitch = glm::clamp(Pitch, -1.5f, 1.5f);
+    }
+
+    CamDir.x = sin(Yaw);
+    CamDir.y = cos(Yaw);
+    CamDir.z = Pitch;
+    Camera.LookAt = Camera.Position + CamDir * 50.0f;
+
+    float StrafeYaw = Yaw + (M_PI / 2);
+    float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
+    Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
+}
+
 static void
 RenderLevel(game_state &Game, float DeltaTime)
 {
@@ -288,6 +343,8 @@ RenderLevel(game_state &Game, float DeltaTime)
     auto *PlayerEntity = Game.PlayerEntity;
     auto *PlayerShip = PlayerEntity->Ship;
     DeltaTime *= Global_Game_TimeSpeed;
+
+    PlayerEntity->Transform.Position.y += 50 * DeltaTime;
 
     static bool Paused = false;
     if (IsJustPressed(Game, Action_debugPause))
@@ -299,6 +356,10 @@ RenderLevel(game_state &Game, float DeltaTime)
     if (Game.Input.Keys[SDL_SCANCODE_R])
     {
         DebugReset(Game);
+    }
+    if (Global_Camera_FreeCam)
+    {
+        UpdateFreeCam(Camera, Input, DeltaTime);
     }
 
     if (Game.Input.Keys[SDL_SCANCODE_E])
@@ -313,6 +374,26 @@ RenderLevel(game_state &Game, float DeltaTime)
                                                 Game.PlayerEntity->Ship->OutlineColor,
                                                 vec3{ 0, 1, 1 });
         AddEntity(Game, Explosion);
+    }
+
+    {
+        const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
+        float MoveX = GetAxisValue(Input, Action_horizontal);
+        MoveShipEntity(PlayerEntity, MoveX, 0, DeltaTime);
+
+        float &PlayerX = PlayerEntity->Transform.Position.x;
+        PlayerX = glm::clamp(PlayerX, -limit + 0.5f, limit - 0.5f);
+        float NearestLane = std::floor(std::ceil(PlayerX)/ROAD_LANE_WIDTH);
+        float TargetX = NearestLane * ROAD_LANE_WIDTH;
+        Println(ToString(vec3{ TargetX, PlayerX, 0 }));
+        if (MoveX == 0.0f)
+        {
+            float Dif = TargetX - PlayerX;
+            if (std::abs(Dif) > 0.05f)
+            {
+                PlayerEntity->Transform.Velocity.x = Dif*4.0f;
+            }
+        }
     }
 
     size_t FrameCollisionCount = 0;
@@ -363,6 +444,15 @@ RenderLevel(game_state &Game, float DeltaTime)
             MoveY = 0.1f;
         }
         MoveShipEntity(Entity, sin(EnemyMoveH), MoveY, DeltaTime);
+    }
+
+    for (auto *Entity : Game.RepeatingEntities)
+    {
+        auto *Repeat = Entity->Repeat;
+        if (Camera.Position.y - Entity->Transform.Position.y > Repeat->DistanceFromCamera)
+        {
+            Entity->Transform.Position.y += Repeat->Size * Repeat->Count;
+        }
     }
 
     for (auto *Entity : Game.TrailEntities)

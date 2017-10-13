@@ -159,6 +159,35 @@ mesh *GetFloorMesh(game_state &Game)
     return m.FloorMesh = FloorMesh;
 }
 
+#define ROAD_LANE_COUNT 5
+mesh *GetRoadMesh(game_state &Game)
+{
+    auto &m = Game.Meshes;
+    if (m.RoadMesh)
+    {
+        return m.RoadMesh;
+    }
+
+    auto *RoadMesh = PushStruct<mesh>(Game.Arena);
+    InitMeshBuffer(RoadMesh->Buffer);
+
+    material RoadMaterial = {Color_black, 0, 0, NULL, 0, vec2{0, 0}};
+    material LaneMaterial = {Color_white, 1.0f, 0, NULL, 0, vec2{0, 0}};
+    float w = 5.0f;
+    float l = -w/2;
+    float r = w/2;
+    AddQuad(RoadMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
+    AddPart(RoadMesh, {RoadMaterial, 0, RoadMesh->Buffer.VertexCount, GL_TRIANGLES});
+    for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
+    {
+        AddLine(RoadMesh->Buffer, vec3{l + i, -0.5f, 0.05f}, vec3{l + i, 0.5f, 0.05f});
+    }
+    AddPart(RoadMesh, {LaneMaterial, 6, RoadMesh->Buffer.VertexCount-6, GL_LINES});
+    EndMesh(RoadMesh, GL_STATIC_DRAW);
+
+    return m.RoadMesh = RoadMesh;
+}
+
 mesh *GetShipMesh(game_state &Game)
 {
     auto &m = Game.Meshes;

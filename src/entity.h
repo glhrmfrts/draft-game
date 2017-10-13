@@ -37,6 +37,13 @@ struct explosion
     std::vector<transform> Pieces;
 };
 
+struct entity_repeat
+{
+    int Count = 0;
+    float Size = 0;
+    float DistanceFromCamera = 0;
+};
+
 struct trail;
 struct trail_piece;
 
@@ -64,6 +71,7 @@ struct entity
     ship *Ship = NULL;
     trail *Trail = NULL;
     trail_piece *TrailPiece = NULL;
+    entity_repeat *Repeat = NULL;
     collider *Collider = NULL;
     model *Model = NULL;
 };

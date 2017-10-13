@@ -48,7 +48,6 @@ enum direction
     Direction_left,
 };
 
-#ifdef DRAFT_DEBUG
 #include <sstream>
 
 inline string
@@ -81,7 +80,6 @@ Println(T Arg)
 {
     std::cout << Arg << std::endl;
 }
-#endif
 
 inline float
 Lerp(float A, float t, float B)

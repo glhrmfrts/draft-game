@@ -760,11 +760,6 @@ mat4 GetTransformMatrix(transform &t)
 static void
 RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 {
-    if (r.Transform.Position.y - Camera.Position.y > Global_Renderer_FogEnd)
-    {
-        return;
-    }
-
     if (RenderState.LastVAO != r.VAO)
     {
         glBindVertexArray(RenderState.LastVAO = r.VAO);

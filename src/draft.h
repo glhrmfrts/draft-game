@@ -137,6 +137,7 @@ struct game_meshes
     mesh *FloorMesh = NULL;
     mesh *ShipMesh = NULL;
     mesh *CrystalMesh = NULL;
+    mesh *RoadMesh = NULL;
 };
 
 struct audio_source;
@@ -171,6 +172,7 @@ struct game_state
     std::vector<entity *> TrailEntities;
     std::vector<entity *> ShipEntities;
     std::vector<entity *> ExplosionEntities;
+    std::vector<entity *> RepeatingEntities;
     std::vector<collision_result> CollisionCache;
     int NumEntities;
 

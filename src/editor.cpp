@@ -171,33 +171,6 @@ CameraDir(camera &Camera)
     return glm::normalize(Camera.LookAt - Camera.Position);
 }
 
-static void UpdateFreeCam(camera &Camera, game_input &Input, float DeltaTime)
-{
-    static float Pitch;
-    static float Yaw;
-    float Speed = 50.0f;
-    float AxisValue = GetAxisValue(Input, Action_camVertical);
-    vec3 CamDir = CameraDir(Camera);
-
-    Camera.Position += CamDir * AxisValue * Speed * DeltaTime;
-
-    if (Input.MouseState.Buttons & MouseButton_Middle)
-    {
-        Yaw += Input.MouseState.dX * DeltaTime;
-        Pitch -= Input.MouseState.dY * DeltaTime;
-        Pitch = glm::clamp(Pitch, -1.5f, 1.5f);
-    }
-
-    CamDir.x = sin(Yaw);
-    CamDir.y = cos(Yaw);
-    CamDir.z = Pitch;
-    Camera.LookAt = Camera.Position + CamDir * 50.0f;
-
-    float StrafeYaw = Yaw + (M_PI / 2);
-    float hAxisValue = GetAxisValue(Input, Action_camHorizontal);
-    Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
-}
-
 static vec3 Unproject(camera &Camera, vec3 ScreenCoords, float vx, float vy, float vw, float vh)
 {
     float x = ScreenCoords.x;
