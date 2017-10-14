@@ -14,8 +14,11 @@ struct color_palette
     int Colors[5];
 };
 
+#define SPECIAL_YELLOW 0
+
 static color_palette FirstPalette = {{0x21042D, 0x6F0C74, 0x25006D, 0x0E00CA, 0xEE1F97}};
 static color_palette SecondPalette = {{0x86008A, 0x4B0034, 0x2703EC, 0x00BDFF, 0xB8C9EE}};
+static color_palette SpecialPalette = {{0xFCF195, 0, 0, 0, 0}};
 
 inline static color
 IntColor(int c, float alpha = 1.0f)

@@ -1,6 +1,8 @@
 #ifndef DRAFT_ENTITY_H
 #define DRAFT_ENTITY_H
 
+struct entity;
+
 struct model
 {
     std::vector<material *> Materials;
@@ -20,6 +22,7 @@ struct ship
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
     enemy_type EnemyType;
+    entity *DraftTarget;
 };
 
 struct player_state
@@ -51,6 +54,7 @@ struct trail_piece;
 #define EntityFlag_IsPlayer  0x2
 enum collider_type
 {
+    ColliderType_Crystal,
     ColliderType_Ship,
     ColliderType_TrailPiece,
 };
@@ -74,6 +78,11 @@ struct entity
     entity_repeat *Repeat = NULL;
     collider *Collider = NULL;
     model *Model = NULL;
+
+    inline vec3 &Pos() { return Transform.Position; }
+    inline vec3 &Vel() { return Transform.Velocity; }
+    inline vec3 &Scl() { return Transform.Scale; }
+    inline vec3 &Rot() { return Transform.Rotation; }
 };
 
 #define TrailCount 16

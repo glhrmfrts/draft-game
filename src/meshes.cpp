@@ -127,7 +127,7 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
 }
 
 #define LEVEL_PLANE_SIZE  512
-#define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
+#define CRYSTAL_COLOR     IntColor(SpecialPalette.Colors[SPECIAL_YELLOW])
 
 mesh *GetFloorMesh(game_state &Game)
 {

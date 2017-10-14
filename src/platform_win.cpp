@@ -21,7 +21,7 @@ struct game_library
     game_process_event_func *GameProcessEvent;
 };
 
-static inline FILETIME Uint64ToFileTime(uint64 t)
+static FILETIME Uint64ToFileTime(uint64 t)
 {
     ULARGE_INTEGER LargeInteger = {};
     LargeInteger.QuadPart = t;
@@ -30,6 +30,14 @@ static inline FILETIME Uint64ToFileTime(uint64 t)
     Result.dwLowDateTime = LargeInteger.LowPart;
     Result.dwHighDateTime = LargeInteger.HighPart;
     return Result;
+}
+
+static uint64 FileTimeToUint64(FILETIME *FileTime)
+{
+    ULARGE_INTEGER LargeInteger;
+    LargeInteger.LowPart = FileTime->dwLowDateTime;
+    LargeInteger.HighPart = FileTime->dwHighDateTime;
+    return (uint64)LargeInteger.QuadPart;
 }
 
 PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
@@ -41,11 +49,7 @@ PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
     {
         LastWriteTime = Data.ftLastWriteTime;
     }
-
-    ULARGE_INTEGER LargeInteger;
-    LargeInteger.LowPart = LastWriteTime.dwLowDateTime;
-    LargeInteger.HighPart = LastWriteTime.dwHighDateTime;
-    return (uint64)LargeInteger.QuadPart;
+    return FileTimeToUint64(&LastWriteTime);
 }
 
 PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
@@ -56,11 +60,20 @@ PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
     return Result;
 }
 
+PLATFORM_GET_MILLISECONDS(PlatformGetMilliseconds)
+{
+    SYSTEMTIME Time;
+    FILETIME FileTime;
+    GetSystemTime(&Time);
+    SystemTimeToFileTime(&Time, &FileTime);
+    return FileTimeToUint64(&FileTime)/10000;
+}
+
 static void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
 {
-    //CopyFile(Path, TempLibraryPath, FALSE);
+    CopyFile(Path, TempPath, FALSE);
     Lib.Path = Path;
-    Lib.Library = LoadLibrary(Path);
+    Lib.Library = LoadLibrary(TempPath);
     if (Lib.Library)
     {
         Lib.LoadTime = PlatformGetFileLastWriteTime(Path);

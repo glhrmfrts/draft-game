@@ -19,14 +19,17 @@
 
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
+#define PLATFORM_GET_MILLISECONDS(name)         uint64 name()
 
 typedef PLATFORM_GET_FILE_LAST_WRITE_TIME(platform_get_file_last_write_time_func);
 typedef PLATFORM_COMPARE_FILE_TIME(platform_compare_file_time_func);
+typedef PLATFORM_GET_MILLISECONDS(platform_get_milliseconds_func);
 
 struct platform_api
 {
     platform_get_file_last_write_time_func *GetFileLastWriteTime;
     platform_compare_file_time_func *CompareFileTime;
+    platform_get_milliseconds_func *GetMilliseconds;
 };
 
 #define GAME_INIT(name) void name(game_state *Game)
@@ -140,6 +143,12 @@ struct game_meshes
     mesh *RoadMesh = NULL;
 };
 
+struct profile_time
+{
+    uint64 Begin;
+    uint64 End;
+};
+
 struct audio_source;
 
 enum game_mode
@@ -153,6 +162,9 @@ struct game_state
 	game_mode Mode;
     game_input Input;
     game_input PrevInput;
+
+    profile_time UpdateTime;
+    profile_time RenderTime;
 
 	asset_loader AssetLoader;
     gui GUI;
@@ -176,6 +188,7 @@ struct game_state
     std::vector<collision_result> CollisionCache;
     int NumEntities;
 
+    random_series LevelEntropy;
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
     audio_source *DraftBoostAudio;

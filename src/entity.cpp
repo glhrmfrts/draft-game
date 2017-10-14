@@ -26,6 +26,14 @@ CreateModel(memory_arena &Arena, mesh *Mesh)
     return Result;
 }
 
+static collider *
+CreateCollider(memory_arena &Arena, collider_type Type)
+{
+    collider *Result = PushStruct<collider>(Arena);
+    Result->Type = Type;
+    return Result;
+}
+
 static trail *
 CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 {
@@ -107,6 +115,14 @@ entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, en
     Result->Transform.Position = Position;
     Result->Transform.Velocity = Velocity;
     Result->Ship->EnemyType = Type;
+    return Result;
+}
+
+entity *CreateCrystalEntity(game_state &Game)
+{
+    auto Result = PushStruct<entity>(Game.Arena);
+    Result->Model = CreateModel(Game.Arena, GetCrystalMesh(Game));
+    Result->Collider = CreateCollider(Game.Arena, ColliderType_Crystal);
     return Result;
 }
 
@@ -212,10 +228,10 @@ Interp(float c, float t, float a, float dt)
     return (dir == std::copysign(1, t - c)) ? c : t;
 }
 
-#define ShipMinVel              20.0f
-#define ShipMaxVel              100.0f
-#define PlayerMinVel            25.0f
-#define PlayerMaxVel            120.0f
+#define ShipMinVel              40.0f
+#define ShipMaxVel              200.0f
+#define PlayerMinVel            50.0f
+#define PlayerMaxVel            200.0f
 #define ShipAcceleration        20.0f
 #define ShipBreakAcceleration   30.0f
 #define ShipSteerSpeed          20.0f
@@ -226,11 +242,11 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     float MinVel = ShipMinVel;
     if (Entity->Flags & EntityFlag_IsPlayer)
     {
-        //MinVel = PlayerMinVel;
+        MinVel = PlayerMinVel;
     }
     if (Entity->Transform.Velocity.y < MinVel)
     {
-        //MoveV = 0.1f;
+        MoveV = 0.1f;
     }
 
     float MaxVel = ShipMaxVel;
@@ -246,6 +262,7 @@ void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float DeltaTime)
     }
 
     float SteerTarget = MoveH * ShipSteerSpeed;
+    Entity->Transform.Velocity.y = std::min(Entity->Transform.Velocity.y, PlayerMaxVel);
     Entity->Transform.Velocity.x = Interp(Entity->Transform.Velocity.x,
                                           SteerTarget,
                                           ShipSteerAcceleration,
