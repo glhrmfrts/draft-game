@@ -259,7 +259,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
         if (ShipEntity && ShipEntity != TrailPieceEntity->TrailPiece->Owner)
         {
             auto Ship = ShipEntity->Ship;
-            if (Ship && Ship->NumTrailCollisions == 0)
+            if (Ship && Ship->NumTrailCollisions == 0 && !Ship->DraftActive)
             {
                 Ship->CurrentDraftTime += DeltaTime;
                 Ship->NumTrailCollisions++;
@@ -283,7 +283,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
             EntityToExplode = Second;
             OtherEntity = First;
         }
-        if (OtherEntity->Ship->DraftActive)
+        if (OtherEntity->Ship->DraftActive && OtherEntity->Ship->DraftTarget == EntityToExplode)
         {
             OtherEntity->Ship->DraftActive = false;
             if (EntityToExplode->Ship->EnemyType == EnemyType_Explosive)
@@ -370,20 +370,37 @@ static void UpdateFreeCam(camera &Camera, game_input &Input, float DeltaTime)
     Camera.Position += vec3(sin(StrafeYaw), cos(StrafeYaw), 0) * hAxisValue * Speed * DeltaTime;
 }
 
-static int GetNextSpawnLane(game_state &Game)
+static int GetNextSpawnLane(game_state &Game, bool IsShip = false)
 {
     static int LastLane = 0;
+    static int LastShipLane = 0;
     int Lane = LastLane;
-    while (Lane == LastLane)
+    while (Lane == LastLane || (IsShip && Lane == LastShipLane))
     {
         Lane = RandomBetween(Game.LevelEntropy, -2, 2);
     }
     LastLane = Lane;
+    if (IsShip)
+    {
+        LastShipLane = Lane;
+    }
     return Lane;
 }
 
+static int GetNextShipColor(game_state &Game)
+{
+    static int LastColor = 0;
+    int Color = LastColor;
+    while (Color == LastColor)
+    {
+        Color = RandomBetween(Game.LevelEntropy, 0, 1);
+    }
+    LastColor = Color;
+    return Color;
+}
+
 #define INITIAL_SHIP_INTERVAL 4.0f
-#define CHANGE_SHIP_TIMER     5.0f
+#define CHANGE_SHIP_TIMER     8.0f
 static void GenerateEnemyShips(game_state &Game, float DeltaTime)
 {
     static float NextShipInterval = INITIAL_SHIP_INTERVAL;
@@ -398,16 +415,19 @@ static void GenerateEnemyShips(game_state &Game, float DeltaTime)
             ChangeShipTimer = CHANGE_SHIP_TIMER;
             NextShipInterval -= 0.2f;
             NextShipInterval = std::max(1.0f, NextShipInterval);
-            NextShipInterval -= 0.05f * Game.PlayerEntity->Vel().y;
+            NextShipInterval -= 0.0015f * Game.PlayerEntity->Vel().y;
+            NextShipInterval = std::max(0.05f, NextShipInterval);
         }
         NextShipTimer = NextShipInterval;
 
-        color Color = IntColor(SecondPalette.Colors[3]);
+        int ColorIndex = GetNextShipColor(Game);
+        color Color = IntColor(ShipPalette.Colors[ColorIndex]);
         auto Entity = CreateShipEntity(Game, Color, Color, false);
-        int Lane = GetNextSpawnLane(Game);
+        int Lane = GetNextSpawnLane(Game, true);
         Entity->Pos().x = Lane * ROAD_LANE_WIDTH;
         Entity->Pos().y = Game.PlayerEntity->Pos().y + 200;
         Entity->Pos().z = SHIP_Z;
+        Entity->Ship->ColorIndex = ColorIndex;
         AddEntity(Game, Entity);
     }
 
@@ -461,6 +481,7 @@ static void KeepEntityInsideOfRoad(entity *Entity)
     Entity->Pos().x = glm::clamp(Entity->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
+#define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
 static void RenderLevel(game_state &Game, float DeltaTime)
 {
     auto &UpdateTime = Game.UpdateTime;
@@ -472,6 +493,8 @@ static void RenderLevel(game_state &Game, float DeltaTime)
     auto *PlayerEntity = Game.PlayerEntity;
     auto *PlayerShip = PlayerEntity->Ship;
     DeltaTime *= Global_Game_TimeSpeed;
+
+    Game.PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * DeltaTime;
 
     static bool Paused = false;
     if (IsJustPressed(Game, Action_debugPause))
@@ -509,7 +532,7 @@ static void RenderLevel(game_state &Game, float DeltaTime)
     bool DraftThisFrame = PlayerShip->DraftCharge == 1.0f && IsJustPressed(Game, Action_boost);
     {
         float MoveX = GetAxisValue(Input, Action_horizontal);
-        MoveShipEntity(PlayerEntity, MoveX, 0, DeltaTime);
+        MoveShipEntity(PlayerEntity, MoveX, 0, Game.PlayerMaxVel, DeltaTime);
         KeepEntityInsideOfRoad(PlayerEntity);
 
         float &PlayerX = PlayerEntity->Pos().x;
@@ -575,12 +598,12 @@ static void RenderLevel(game_state &Game, float DeltaTime)
             float MoveX = PlayerPosition.x - Entity->Pos().x;
             MoveX = std::min(MoveX, 1.0f);
 
-            float MoveY = 0.75f;
+            float MoveY = 0.1f + (0.0055f * PlayerEntity->Vel().y);
             if (Entity->Vel().y > PlayerEntity->Vel().y)
             {
                 MoveY = 0.0f;
             }
-            MoveShipEntity(Entity, MoveX, MoveY, DeltaTime);
+            MoveShipEntity(Entity, MoveX, MoveY, Game.PlayerMaxVel, DeltaTime);
 
             if (Entity->Ship->DraftCharge == 1.0f)
             {

@@ -151,6 +151,8 @@ struct profile_time
 
 struct audio_source;
 
+#define PLAYER_INITIAL_MAX_VEL 70.0f
+
 enum game_mode
 {
 	GameMode_LoadingScreen,
@@ -179,6 +181,7 @@ struct game_state
     vec3 Gravity;
 
     entity *PlayerEntity;
+    float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;
     std::vector<entity *> TrailEntities;

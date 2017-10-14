@@ -11,6 +11,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
     ImGui::Text("Update time: %dms", UpdateTime.End - UpdateTime.Begin);
     ImGui::Text("Render time: %dms", RenderTime.End - RenderTime.Begin);
+    ImGui::Text("Player max vel: %.2f", Game.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(PlayerEntity->Vel()).c_str());
 
     if (ImGui::CollapsingHeader("Camera"))

@@ -21,6 +21,7 @@ struct ship
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
+    int ColorIndex = 0;
     enemy_type EnemyType;
     entity *DraftTarget;
     bool DraftActive = false;
