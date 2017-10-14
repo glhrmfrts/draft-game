@@ -20,7 +20,7 @@
 #include "meshes.cpp"
 #include "entity.cpp"
 #include "init.cpp"
-
+ 
 struct audio_source
 {
     ALuint Source;
@@ -100,6 +100,10 @@ void AddEntity(game_state &Game, entity *Entity)
     {
         AddEntityToList(Game.RepeatingEntities, Entity);
     }
+    if (Entity->Flags & EntityFlag_RemoveOffscreen)
+    {
+        AddEntityToList(Game.RemoveOffscreenEntities, Entity);
+    }
     Game.NumEntities++;
 }
 
@@ -147,6 +151,10 @@ RemoveEntity(game_state &Game, entity *Entity)
     {
         RemoveEntityFromList(Game.RepeatingEntities, Entity);
     }
+    if (Entity->Flags & EntityFlag_RemoveOffscreen)
+    {
+        RemoveEntityFromList(Game.RemoveOffscreenEntities, Entity);
+    }
     Game.NumEntities = std::max(0, Game.NumEntities - 1);
 }
 
@@ -158,6 +166,9 @@ InitLevel(game_state &Game)
 {
     Game.Mode = GameMode_Level;
     FreeArena(Game.Arena);
+
+    Game.LevelEntropy = RandomSeed(Game.Platform.GetMilliseconds());
+
     Game.RenderState.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
     Game.RenderState.FogColor.a = 1.0f;
     ApplyExplosionLight(Game.RenderState, IntColor(FirstPalette.Colors[3]));
@@ -247,7 +258,7 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
         auto TrailPieceEntity = FindEntityOfType(First, Second, ColliderType_TrailPiece).Found;
         if (ShipEntity && ShipEntity != TrailPieceEntity->TrailPiece->Owner)
         {
-            auto *Ship = ShipEntity->Ship;
+            auto Ship = ShipEntity->Ship;
             if (Ship && Ship->NumTrailCollisions == 0)
             {
                 Ship->CurrentDraftTime += DeltaTime;
@@ -260,35 +271,37 @@ HandleCollision(game_state &Game, entity *First, entity *Second, float DeltaTime
     if (First->Collider->Type == ColliderType_Ship && Second->Collider->Type == ColliderType_Ship)
     {
         vec3 rv = First->Transform.Velocity - Second->Transform.Velocity;
-        if (std::abs(rv.y) > 20.0f)
+        entity *EntityToExplode = NULL;
+        entity *OtherEntity = NULL;
+        if (rv.y < 0.0f)
         {
-            entity *EntityToExplode = NULL;
-            entity *OtherEntity = NULL;
-            if (rv.y < 0.0f)
-            {
-                EntityToExplode = First;
-                OtherEntity = Second;
-            }
-            else
-            {
-                EntityToExplode = Second;
-                OtherEntity = First;
-            }
-
+            EntityToExplode = First;
+            OtherEntity = Second;
+        }
+        else
+        {
+            EntityToExplode = Second;
+            OtherEntity = First;
+        }
+        if (OtherEntity->Ship->DraftActive)
+        {
+            OtherEntity->Ship->DraftActive = false;
             if (EntityToExplode->Ship->EnemyType == EnemyType_Explosive)
             {
                 EntityToExplode = OtherEntity;
             }
 
-            auto Explosion = CreateExplosionEntity(Game,
-                                                    *EntityToExplode->Model->Mesh,
-                                                    EntityToExplode->Model->Mesh->Parts[0],
-                                                    EntityToExplode->Transform.Position,
-                                                    OtherEntity->Transform.Velocity,
-                                                    EntityToExplode->Transform.Scale,
-                                                    EntityToExplode->Ship->Color,
-                                                    EntityToExplode->Ship->OutlineColor,
-                                                    vec3{0,1,1});
+            auto Explosion = CreateExplosionEntity(
+                Game,
+                *EntityToExplode->Model->Mesh,
+                EntityToExplode->Model->Mesh->Parts[0],
+                EntityToExplode->Transform.Position,
+                OtherEntity->Transform.Velocity,
+                EntityToExplode->Transform.Scale,
+                EntityToExplode->Ship->Color,
+                EntityToExplode->Ship->OutlineColor,
+                vec3{ 0, 1, 1 }
+            );
             AddEntity(Game, Explosion);
             RemoveEntity(Game, EntityToExplode);
             return false;
@@ -384,7 +397,8 @@ static void GenerateEnemyShips(game_state &Game, float DeltaTime)
         {
             ChangeShipTimer = CHANGE_SHIP_TIMER;
             NextShipInterval -= 0.2f;
-            NextShipInterval = std::max(0.5f, NextShipInterval);
+            NextShipInterval = std::max(1.0f, NextShipInterval);
+            NextShipInterval -= 0.05f * Game.PlayerEntity->Vel().y;
         }
         NextShipTimer = NextShipInterval;
 
@@ -392,7 +406,7 @@ static void GenerateEnemyShips(game_state &Game, float DeltaTime)
         auto Entity = CreateShipEntity(Game, Color, Color, false);
         int Lane = GetNextSpawnLane(Game);
         Entity->Pos().x = Lane * ROAD_LANE_WIDTH;
-        Entity->Pos().y = Game.PlayerEntity->Pos().y + 100;
+        Entity->Pos().y = Game.PlayerEntity->Pos().y + 200;
         Entity->Pos().z = SHIP_Z;
         AddEntity(Game, Entity);
     }
@@ -411,7 +425,7 @@ static void GenerateCrystals(game_state &Game, float DeltaTime)
 
         auto Entity = CreateCrystalEntity(Game);
         Entity->Pos().x = GetNextSpawnLane(Game) * ROAD_LANE_WIDTH;
-        Entity->Pos().y = Game.PlayerEntity->Pos().y + 100;
+        Entity->Pos().y = Game.PlayerEntity->Pos().y + 200;
         Entity->Pos().z = SHIP_Z + 0.4f;
         Entity->Scl().x = 0.3f;
         Entity->Scl().y = 0.3f;
@@ -421,6 +435,30 @@ static void GenerateCrystals(game_state &Game, float DeltaTime)
     }
 
     NextCrystalTimer -= DeltaTime;
+}
+
+static void UpdateShipDraftCharge(ship *Ship, float DeltaTime)
+{
+    if (Ship->NumTrailCollisions == 0)
+    {
+        Ship->CurrentDraftTime -= DeltaTime;
+    }
+    Ship->CurrentDraftTime = std::max(0.0f, std::min(Ship->CurrentDraftTime, Global_Game_DraftChargeTime));
+    Ship->DraftCharge = Ship->CurrentDraftTime / Global_Game_DraftChargeTime;
+    Ship->NumTrailCollisions = 0;
+}
+
+static void ShipEntityPerformDraft(entity *Entity)
+{
+    Entity->Ship->CurrentDraftTime = 0.0f;
+    Entity->Ship->DraftActive = true;
+    ApplyBoostToShip(Entity, DraftBoost, 0);
+}
+
+static void KeepEntityInsideOfRoad(entity *Entity)
+{
+    const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
+    Entity->Pos().x = glm::clamp(Entity->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
 static void RenderLevel(game_state &Game, float DeltaTime)
@@ -453,7 +491,7 @@ static void RenderLevel(game_state &Game, float DeltaTime)
 
     if (Game.Input.Keys[SDL_SCANCODE_E])
     {
-        auto *Explosion = CreateExplosionEntity(Game,
+        auto Explosion = CreateExplosionEntity(Game,
                                                 *Game.PlayerEntity->Model->Mesh,
                                                 Game.PlayerEntity->Model->Mesh->Parts[0],
                                                 Game.PlayerEntity->Transform.Position,
@@ -470,12 +508,11 @@ static void RenderLevel(game_state &Game, float DeltaTime)
 
     bool DraftThisFrame = PlayerShip->DraftCharge == 1.0f && IsJustPressed(Game, Action_boost);
     {
-        const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
         float MoveX = GetAxisValue(Input, Action_horizontal);
         MoveShipEntity(PlayerEntity, MoveX, 0, DeltaTime);
+        KeepEntityInsideOfRoad(PlayerEntity);
 
-        float &PlayerX = PlayerEntity->Transform.Position.x;
-        PlayerX = glm::clamp(PlayerX, -limit + 0.5f, limit - 0.5f);
+        float &PlayerX = PlayerEntity->Pos().x;
         float NearestLane = std::floor(std::ceil(PlayerX)/ROAD_LANE_WIDTH);
         float TargetX = NearestLane * ROAD_LANE_WIDTH;
         if (MoveX == 0.0f)
@@ -489,12 +526,11 @@ static void RenderLevel(game_state &Game, float DeltaTime)
 
         if (DraftThisFrame)
         {
-            ApplyBoostToShip(PlayerEntity, DraftBoost, 0);
+            ShipEntityPerformDraft(PlayerEntity);
         }
     }
 
     size_t FrameCollisionCount = 0;
-    PlayerShip->NumTrailCollisions = 0;
     DetectCollisions(Game.CollisionEntities, Game.CollisionCache, FrameCollisionCount);
     for (size_t i = 0; i < FrameCollisionCount; i++)
     {
@@ -508,12 +544,7 @@ static void RenderLevel(game_state &Game, float DeltaTime)
         }
     }
     Integrate(Game.CollisionEntities, Game.Gravity, DeltaTime);
-    if (PlayerShip->NumTrailCollisions == 0)
-    {
-        PlayerShip->CurrentDraftTime -= DeltaTime;
-    }
-    PlayerShip->CurrentDraftTime = std::max(0.0f, std::min(PlayerShip->CurrentDraftTime, Global_Game_DraftChargeTime));
-    PlayerShip->DraftCharge = PlayerShip->CurrentDraftTime / Global_Game_DraftChargeTime;
+    UpdateShipDraftCharge(PlayerShip, DeltaTime);
 
     auto PlayerPosition = Game.PlayerEntity->Transform.Position;
     if (!Global_Camera_FreeCam)
@@ -524,36 +555,44 @@ static void RenderLevel(game_state &Game, float DeltaTime)
         Camera.LookAt = Camera.Position + vec3{0, -Global_Camera_OffsetY, -Global_Camera_OffsetZ};
     }
 
-    alSourcefv(Game.DraftBoostAudio->Source, AL_POSITION, &PlayerPosition[0]);
-    UpdateListener(Game.Camera, PlayerPosition);
-    UpdateProjectionView(Game.Camera);
+    for (auto Entity : Game.RemoveOffscreenEntities)
+    {
+        if (!Entity) continue;
 
-    UpdateTime.End = Game.Platform.GetMilliseconds();
-    RenderTime.Begin = Game.Platform.GetMilliseconds();
-
-    RenderBegin(Game.RenderState, DeltaTime);
+        if (Entity->Pos().y < Camera.Position.y)
+        {
+            RemoveEntity(Game, Entity);
+        }
+    }
 
     for (auto Entity : Game.ShipEntities)
     {
         if (!Entity) continue;
 
+        UpdateShipDraftCharge(Entity->Ship, DeltaTime);
         if (Entity->Pos().y < PlayerPosition.y)
         {
             float MoveX = PlayerPosition.x - Entity->Pos().x;
-            float MoveY = 0.5f;
             MoveX = std::min(MoveX, 1.0f);
 
+            float MoveY = 0.75f;
+            if (Entity->Vel().y > PlayerEntity->Vel().y)
+            {
+                MoveY = 0.0f;
+            }
             MoveShipEntity(Entity, MoveX, MoveY, DeltaTime);
+
+            if (Entity->Ship->DraftCharge == 1.0f)
+            {
+                ShipEntityPerformDraft(Entity);
+            }
         }
         else if (PlayerShip->DraftTarget != Entity)
         {
             Entity->Vel().y = PlayerEntity->Vel().y * 0.8f;
         }
 
-        if (Entity->Pos().y < Camera.Position.y)
-        {
-            RemoveEntity(Game, Entity);
-        }
+        KeepEntityInsideOfRoad(Entity);
     }
 
     for (auto Entity : Game.RepeatingEntities)
@@ -565,11 +604,20 @@ static void RenderLevel(game_state &Game, float DeltaTime)
         }
     }
 
+    alSourcefv(Game.DraftBoostAudio->Source, AL_POSITION, &PlayerPosition[0]);
+    UpdateListener(Game.Camera, PlayerPosition);
+    UpdateProjectionView(Game.Camera);
+
+    UpdateTime.End = Game.Platform.GetMilliseconds();
+    RenderTime.Begin = Game.Platform.GetMilliseconds();
+
+    RenderBegin(Game.RenderState, DeltaTime);
+
     for (auto Entity : Game.TrailEntities)
     {
         if (!Entity) continue;
 
-        auto *Trail = Entity->Trail;
+        auto Trail = Entity->Trail;
         if (Trail->FirstFrame)
         {
             Trail->FirstFrame = false;
@@ -647,11 +695,11 @@ static void RenderLevel(game_state &Game, float DeltaTime)
         DrawModel(Game.RenderState, Trail->Model, transform{});
     }
 
-    for (auto *Entity : Game.ExplosionEntities)
+    for (auto Entity : Game.ExplosionEntities)
     {
         if (!Entity) continue;
 
-        auto *Explosion = Entity->Explosion;
+        auto Explosion = Entity->Explosion;
         Explosion->LifeTime -= DeltaTime;
         if (Explosion->LifeTime <= 0)
         {
@@ -679,7 +727,7 @@ static void RenderLevel(game_state &Game, float DeltaTime)
         DrawMeshPart(Game.RenderState, Explosion->Mesh, Explosion->Mesh.Parts[1], transform{});
     }
 
-    for (auto *Entity : Game.ModelEntities)
+    for (auto Entity : Game.ModelEntities)
     {
         if (!Entity) continue;
 
@@ -731,8 +779,6 @@ extern "C"
 
         ImGui_ImplSdlGL3_Init(Game->Window);
 
-        Game->LevelEntropy = RandomSeed(Game->Platform.GetMilliseconds());
-
         RegisterInputActions(Game->Input);
         InitGUI(Game->GUI, Game->Input);
         MakeCameraOrthographic(Game->GUICamera, 0, Width, 0, Height, -1, 1);
@@ -745,7 +791,7 @@ extern "C"
                 AssetType_Texture,
                 "data/textures/grid1.png",
                 "grid",
-                (void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
+                (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
             )
         );
         Game->Assets.push_back(

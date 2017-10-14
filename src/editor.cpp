@@ -473,7 +473,7 @@ extern "C"
                 AssetType_Texture,
                 "data/textures/grid1.png",
                 "grid",
-                (void *)(Texture_Mipmap | Texture_Anisotropic | Texture_WrapRepeat)
+                (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
             )
         );
         Game->Assets.push_back(

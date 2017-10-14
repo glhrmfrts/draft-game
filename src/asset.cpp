@@ -212,11 +212,11 @@ LoadAssetThreadSafePart(void *Arg)
         Result->Filters = {DefaultTextureFilter, DefaultTextureFilter};
         Result->Wrap = {DefaultTextureWrap, DefaultTextureWrap};
         Result->Flags = Flags;
-        if (Flags & Texture_WrapRepeat)
+        if (Flags & TextureFlag_WrapRepeat)
         {
             Result->Wrap = {GL_REPEAT, GL_REPEAT};
         }
-        if (Flags & Texture_Mipmap)
+        if (Flags & TextureFlag_Mipmap)
         {
             Result->Filters.Min = GL_LINEAR_MIPMAP_LINEAR;
             Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;

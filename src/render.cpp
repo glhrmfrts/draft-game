@@ -254,13 +254,13 @@ void ApplyTextureParameters(texture &Texture, int TextureUnit)
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_S, Texture.Wrap.WrapS);
     glTexParameteri(Texture.Target, GL_TEXTURE_WRAP_T, Texture.Wrap.WrapT);
 
-    if (Texture.Flags & Texture_Anisotropic)
+    if (Texture.Flags & TextureFlag_Anisotropic)
     {
         GLfloat fLargest;
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &fLargest);
         glTexParameterf(Texture.Target, GL_TEXTURE_MAX_ANISOTROPY_EXT, fLargest);
     }
-    if (Texture.Flags & Texture_Mipmap)
+    if (Texture.Flags & TextureFlag_Mipmap)
     {
         glGenerateMipmap(Texture.Target);
     }
@@ -433,10 +433,10 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
     glGenFramebuffers(1, &Framebuffer.ID);
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
 
-    bool Multisampled = Flags & Framebuffer_Multisampled;
+    bool Multisampled = Flags & FramebufferFlag_Multisampled;
     GLuint Target = Multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
-    GLint Filter = (Flags & Framebuffer_Filtered) ? GL_LINEAR : GL_NEAREST;
-    GLuint Format = (Flags & Framebuffer_IsFloat) ? GL_RGBA16F : GL_RGBA8;
+    GLint Filter = (Flags & FramebufferFlag_Filtered) ? GL_LINEAR : GL_NEAREST;
+    GLuint Format = (Flags & FramebufferFlag_IsFloat) ? GL_RGBA16F : GL_RGBA8;
     for (size_t i = 0; i < ColorTextureCount; i++)
     {
         CreateFramebufferTexture(RenderState, Framebuffer.ColorTextures[i], Target, Width, Height, Filter, Format);
@@ -444,7 +444,7 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
     }
     glDrawBuffers(ColorTextureCount, FramebufferColorAttachments);
 
-    if (Flags & Framebuffer_HasDepth)
+    if (Flags & FramebufferFlag_HasDepth)
     {
         CreateFramebufferTexture(RenderState, Framebuffer.DepthTexture, Target, Width, Height, Filter, OPENGL_DEPTH_COMPONENT_TYPE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, Target, Framebuffer.DepthTexture.ID, 0);
@@ -700,16 +700,16 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
     PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
     UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
 
-    InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, Framebuffer_HasDepth | Framebuffer_Multisampled, ColorTexture_Count);
-    InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, Framebuffer_HasDepth, ColorTexture_Count);
+    InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, FramebufferFlag_HasDepth | FramebufferFlag_Multisampled, ColorTextureFlag_Count);
+    InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, FramebufferFlag_HasDepth, ColorTextureFlag_Count);
     for (int i = 0; i < BloomBlurPassCount-1; i++)
     {
         // @TODO: maybe it is not necessary to scale down
         size_t BlurWidth = Width >> i;
         size_t BlurHeight = Height >> i;
 
-        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
-        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, Framebuffer_Filtered, 1);
+        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
+        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
     }
 
 #ifdef DRAFT_DEBUG
@@ -780,7 +780,7 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
     {
         Bind(*r.Material->Texture, 0);
     }
-    if (r.Material->Flags & Material_PolygonLines)
+    if (r.Material->Flags & MaterialFlag_PolygonLines)
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
@@ -792,7 +792,7 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
     SetUniform(Program.ExplosionLightColor, RenderState.ExplosionLightColor);
     SetUniform(Program.ExplosionLightTimer, RenderState.ExplosionLightTimer);
     glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
-    if (r.Material->Flags & Material_PolygonLines)
+    if (r.Material->Flags & MaterialFlag_PolygonLines)
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
@@ -898,7 +898,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 
         Bind(RenderState.ResolveMultisampleProgram);
         SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
-        for (size_t i = 0; i < ColorTexture_Count; i++)
+        for (size_t i = 0; i < ColorTextureFlag_Count; i++)
         {
             Bind(RenderState.MultisampledSceneFramebuffer.ColorTextures[i], i);
         }
@@ -910,7 +910,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 
             // downsample scene for blur
             Bind(RenderState.BlitProgram);
-            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_Emit], 0);
+            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTextureFlag_Emit], 0);
             for (int i = 0; i < BloomBlurPassCount; i++)
             {
                 BindFramebuffer(RenderState.BlurHorizontalFramebuffers[i]);
@@ -929,7 +929,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
             {
                 Bind(BlurOutput[i].ColorTextures[0], i);
             }
-            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTexture_SurfaceReflect], BloomBlurPassCount);
+            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTextureFlag_SurfaceReflect], BloomBlurPassCount);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             UnbindShaderProgram();
         }
@@ -940,7 +940,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 inline static void
 AddRenderable(render_state &RenderState, size_t Index, material *Material)
 {
-    if (Material->DiffuseColor.a < 1.0f || (Material->Flags & Material_ForceTransparent))
+    if (Material->DiffuseColor.a < 1.0f || (Material->Flags & MaterialFlag_ForceTransparent))
     {
         RenderState.FrameTransparentRenderables.push_back(Index);
     }

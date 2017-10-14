@@ -1,12 +1,12 @@
 #ifndef DRAFT_RENDER_H
 #define DRAFT_RENDER_H
 
-#define Color_white color(1, 1, 1, 1)
-#define Color_black color(0, 0, 0, 1)
-#define Color_blue  color(0, 0, 0.5, 1)
-#define Color_green  color(0, 1, 0, 1)
-#define Color_red  color(1, 0, 0, 1)
-#define Color_gray  color(0.5, 0.5, 0.5, 1)
+#define Color_white   color(1, 1, 1, 1)
+#define Color_black   color(0, 0, 0, 1)
+#define Color_blue    color(0, 0, 0.5, 1)
+#define Color_green   color(0, 1, 0, 1)
+#define Color_red     color(1, 0, 0, 1)
+#define Color_gray    color(0.5, 0.5, 0.5, 1)
 #define Color_yellow  color(1, 1, 0, 1)
 
 struct color_palette
@@ -65,9 +65,9 @@ struct texture_wrap
     GLint WrapS, WrapT;
 };
 
-#define Texture_Mipmap 0x1
-#define Texture_Anisotropic 0x2
-#define Texture_WrapRepeat 0x4
+#define TextureFlag_Mipmap 0x1
+#define TextureFlag_Anisotropic 0x2
+#define TextureFlag_WrapRepeat 0x4
 struct texture
 {
     string Filename;
@@ -147,8 +147,8 @@ struct camera
     };
 };
 
-#define Material_PolygonLines 0x1
-#define Material_ForceTransparent 0x2
+#define MaterialFlag_PolygonLines 0x1
+#define MaterialFlag_ForceTransparent 0x2
 struct material
 {
     color DiffuseColor = Color_white;
@@ -239,15 +239,15 @@ struct resolve_multisample_program : shader_program
 
 enum color_texture_type
 {
-    ColorTexture_SurfaceReflect,
-    ColorTexture_Emit,
-    ColorTexture_Count,
+    ColorTextureFlag_SurfaceReflect,
+    ColorTextureFlag_Emit,
+    ColorTextureFlag_Count,
 };
 
-#define Framebuffer_HasDepth 0x1
-#define Framebuffer_IsFloat  0x2
-#define Framebuffer_Filtered 0x4
-#define Framebuffer_Multisampled 0x8
+#define FramebufferFlag_HasDepth 0x1
+#define FramebufferFlag_IsFloat  0x2
+#define FramebufferFlag_Filtered 0x4
+#define FramebufferFlag_Multisampled 0x8
 struct framebuffer
 {
     uint32 Flags;
@@ -255,7 +255,7 @@ struct framebuffer
     size_t ColorTextureCount;
     GLuint ID;
     texture DepthTexture;
-    texture ColorTextures[ColorTexture_Count];
+    texture ColorTextures[ColorTextureFlag_Count];
 };
 
 struct transform

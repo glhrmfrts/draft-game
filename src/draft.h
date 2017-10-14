@@ -185,6 +185,7 @@ struct game_state
     std::vector<entity *> ShipEntities;
     std::vector<entity *> ExplosionEntities;
     std::vector<entity *> RepeatingEntities;
+    std::vector<entity *> RemoveOffscreenEntities;
     std::vector<collision_result> CollisionCache;
     int NumEntities;
 

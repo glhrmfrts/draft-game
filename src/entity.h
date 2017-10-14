@@ -23,6 +23,7 @@ struct ship
     int NumTrailCollisions = 0;
     enemy_type EnemyType;
     entity *DraftTarget;
+    bool DraftActive = false;
 };
 
 struct player_state
@@ -50,8 +51,9 @@ struct entity_repeat
 struct trail;
 struct trail_piece;
 
-#define EntityFlag_Kinematic 0x1
-#define EntityFlag_IsPlayer  0x2
+#define EntityFlag_Kinematic        0x1
+#define EntityFlag_IsPlayer         0x2
+#define EntityFlag_RemoveOffscreen  0x4
 enum collider_type
 {
     ColliderType_Crystal,

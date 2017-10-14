@@ -206,7 +206,7 @@ mesh *GetShipMesh(game_state &Game)
     AddTriangle(ShipMesh->Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
 
     material ShipMaterial = {Color_white, 0, 0, NULL};
-    material ShipOutlineMaterial = {Color_white, 1, 0, NULL, Material_PolygonLines};
+    material ShipOutlineMaterial = {Color_white, 1, 0, NULL, MaterialFlag_PolygonLines};
     AddPart(ShipMesh, {ShipMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
     AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
 

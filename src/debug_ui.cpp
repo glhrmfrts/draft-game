@@ -9,9 +9,9 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     auto PlayerEntity = Game.PlayerEntity;
     ImGui::Text("ms: %.2f", DeltaTime * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
-    ImGui::Text("Update time: %d", UpdateTime.End - UpdateTime.Begin);
-    ImGui::Text("Render time: %d", RenderTime.End - RenderTime.Begin);
-    ImGui::Text("Player vel: %s", ToString(PlayerEntity->Transform.Velocity));
+    ImGui::Text("Update time: %dms", UpdateTime.End - UpdateTime.Begin);
+    ImGui::Text("Render time: %dms", RenderTime.End - RenderTime.Begin);
+    ImGui::Text("Player vel: %s", ToString(PlayerEntity->Vel()).c_str());
 
     if (ImGui::CollapsingHeader("Camera"))
     {

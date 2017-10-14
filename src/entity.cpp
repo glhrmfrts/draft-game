@@ -47,8 +47,8 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     const float emission = 4.0f;
 
     // Plane parts
-    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 0, 6, GL_TRIANGLES});
-    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, Material_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
+    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, 6, GL_TRIANGLES});
+    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
 
     // Left line parts
     AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
@@ -78,7 +78,7 @@ entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool
     auto *Entity = PushStruct<entity>(Game.Arena);
     Entity->Model = CreateModel(Game.Arena, GetShipMesh(Game));
     Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, Material_PolygonLines));
+    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
     Entity->Transform.Scale.y = 3;
     Entity->Transform.Scale *= 0.75f;
     Entity->Collider = PushStruct<collider>(Game.Arena);
@@ -121,6 +121,7 @@ entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, en
 entity *CreateCrystalEntity(game_state &Game)
 {
     auto Result = PushStruct<entity>(Game.Arena);
+    Result->Flags |= EntityFlag_RemoveOffscreen;
     Result->Model = CreateModel(Game.Arena, GetCrystalMesh(Game));
     Result->Collider = CreateCollider(Game.Arena, ColliderType_Crystal);
     return Result;
@@ -191,13 +192,13 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
 
     AddPart(&Explosion->Mesh,
             mesh_part{
-                material{Color, 0, 0, NULL, Material_ForceTransparent},
+                material{Color, 0, 0, NULL, MaterialFlag_ForceTransparent},
                 0,
                 Explosion->Triangles.size(),
                 GL_TRIANGLES});
     AddPart(&Explosion->Mesh,
             mesh_part{
-                material{OutlineColor, 2.0f, 0, NULL, Material_ForceTransparent | Material_PolygonLines},
+                material{OutlineColor, 2.0f, 0, NULL, MaterialFlag_ForceTransparent | MaterialFlag_PolygonLines},
                 0,
                 Explosion->Triangles.size(),
                 GL_TRIANGLES});
