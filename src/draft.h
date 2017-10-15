@@ -150,8 +150,6 @@ struct profile_time
     uint64 End;
 };
 
-struct audio_source;
-
 enum game_mode
 {
 	GameMode_LoadingScreen,

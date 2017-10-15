@@ -351,7 +351,6 @@ static void RenderLevel(game_state &g, float dt)
     auto &l = g.LevelMode;
     auto &updateTime = g.UpdateTime;
     auto &renderTime = g.RenderTime;
-    updateTime.Begin = g.Platform.GetMilliseconds();
 
     auto &world = g.World;
     auto &input = g.Input;
@@ -361,6 +360,7 @@ static void RenderLevel(game_state &g, float dt)
     dt *= Global_Game_TimeSpeed;
 
     l.PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+    updateTime.Begin = g.Platform.GetMilliseconds();
 
     static bool Paused = false;
     if (IsJustPressed(g, Action_debugPause))
@@ -451,15 +451,15 @@ static void RenderLevel(game_state &g, float dt)
         UpdateShipDraftCharge(ent->Ship, dt);
         if (ent->Pos().y + 1.0f < playerEntity->Pos().y)
         {
-            float MoveX = playerEntity->Pos().x - ent->Pos().x;
-            MoveX = std::min(MoveX, 1.0f);
+            float moveX = playerEntity->Pos().x - ent->Pos().x;
+            moveX = std::min(moveX, 1.0f);
 
-            float MoveY = 0.05f + (0.004f * playerEntity->Vel().y);
+            float moveY = 0.05f + (0.004f * playerEntity->Vel().y);
             if (ent->Vel().y > playerEntity->Vel().y)
             {
-                MoveY = 0.0f;
+                moveY = 0.0f;
             }
-            MoveShipEntity(ent, MoveX, MoveY, l.PlayerMaxVel, dt);
+            MoveShipEntity(ent, moveX, moveY, l.PlayerMaxVel, dt);
 
             if (ent->Ship->DraftCharge == 1.0f)
             {
@@ -488,7 +488,7 @@ static void RenderLevel(game_state &g, float dt)
 #ifdef DRAFT_DEBUG
     if (Global_Collision_DrawCollider)
     {
-        for (auto *ent : world.CollisionEntities)
+        for (auto ent : world.CollisionEntities)
         {
             if (!ent) continue;
 
