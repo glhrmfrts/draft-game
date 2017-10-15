@@ -16,6 +16,7 @@
 #include "gui.h"
 #include "random.h"
 #include "entity.h"
+#include "level_mode.h"
 
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
@@ -151,8 +152,6 @@ struct profile_time
 
 struct audio_source;
 
-#define PLAYER_INITIAL_MAX_VEL 70.0f
-
 enum game_mode
 {
 	GameMode_LoadingScreen,
@@ -176,18 +175,15 @@ struct game_state
     tween_state TweenState;
 
     memory_arena Arena;
-    memory_arena TransientArena;
     camera Camera;
     game_meshes Meshes;
     vec3 Gravity;
     entity_world World;
     entity *PlayerEntity;
-    float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
+    level_mode LevelMode;
 
-    random_series LevelEntropy;
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
-    audio_source *DraftBoostAudio;
 
     platform_api Platform;
 	SDL_Window *Window;

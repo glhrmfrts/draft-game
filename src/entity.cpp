@@ -1,13 +1,11 @@
 // Copyright
 
-inline static void
-AddFlags(entity *Entity, uint32 Flags)
+inline static void AddFlags(entity *Entity, uint32 Flags)
 {
     Entity->Flags |= Flags;
 }
 
-static material *
-CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
+static material *CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
 {
     material *Result = PushStruct<material>(Arena);
     Result->DiffuseColor = Color;
@@ -18,24 +16,21 @@ CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight
     return Result;
 }
 
-static model *
-CreateModel(memory_arena &Arena, mesh *Mesh)
+static model *CreateModel(memory_arena &Arena, mesh *Mesh)
 {
     model *Result = PushStruct<model>(Arena);
     Result->Mesh = Mesh;
     return Result;
 }
 
-static collider *
-CreateCollider(memory_arena &Arena, collider_type Type)
+static collider *CreateCollider(memory_arena &Arena, collider_type Type)
 {
     collider *Result = PushStruct<collider>(Arena);
     Result->Type = Type;
     return Result;
 }
 
-static trail *
-CreateTrail(memory_arena &Arena, entity *Owner, color Color)
+static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color)
 {
     trail *Result = PushStruct<trail>(Arena);
 
@@ -73,31 +68,31 @@ CreateTrail(memory_arena &Arena, entity *Owner, color Color)
     return Result;
 }
 
-entity *CreateShipEntity(game_state &Game, color Color, color OutlineColor, bool IsPlayer = false)
+entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
 {
-    auto *Entity = PushStruct<entity>(Game.Arena);
-    Entity->Model = CreateModel(Game.Arena, GetShipMesh(Game));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, vec4(Color.r, Color.g, Color.b, 1), 0, 0, NULL));
-    Entity->Model->Materials.push_back(CreateMaterial(Game.Arena, OutlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
-    Entity->Transform.Scale.y = 3;
-    Entity->Transform.Scale *= 0.75f;
-    Entity->Collider = PushStruct<collider>(Game.Arena);
-    Entity->Collider->Type = ColliderType_Ship;
-    Entity->Ship = PushStruct<ship>(Game.Arena);
-    Entity->Ship->Color = Color;
-    Entity->Ship->OutlineColor = OutlineColor;
-    Entity->Trail = CreateTrail(Game.Arena, Entity, OutlineColor);
-    if (IsPlayer)
+    auto ent = PushStruct<entity>(arena);
+    ent->Model = CreateModel(arena, shipMesh);
+    ent->Model->Materials.push_back(CreateMaterial(arena, vec4(c.r, c.g, c.b, 1), 0, 0, NULL));
+    ent->Model->Materials.push_back(CreateMaterial(arena, outlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
+    ent->Transform.Scale.y = 3;
+    ent->Transform.Scale *= 0.75f;
+    ent->Collider = PushStruct<collider>(arena);
+    ent->Collider->Type = ColliderType_Ship;
+    ent->Ship = PushStruct<ship>(arena);
+    ent->Ship->Color = c;
+    ent->Ship->OutlineColor = outlineColor;
+    ent->Trail = CreateTrail(arena, ent, outlineColor);
+    if (isPlayer)
     {
-        Entity->PlayerState = PushStruct<player_state>(Game.Arena);
-        AddFlags(Entity, EntityFlag_IsPlayer);
+        ent->PlayerState = PushStruct<player_state>(arena);
+        AddFlags(ent, EntityFlag_IsPlayer);
     }
-    return Entity;
+    return ent;
 }
 
 #define DefaultEnemyColor   IntColor(SecondPalette.Colors[3])
 #define ExplosiveEnemyColor Color_red
-entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, enemy_type Type)
+entity *CreateEnemyShipEntity(memory_arena &arena, mesh *shipMesh, vec3 Position, vec3 Velocity, enemy_type Type)
 {
     color Color;
     switch (Type)
@@ -111,20 +106,20 @@ entity *CreateEnemyShipEntity(game_state &Game, vec3 Position, vec3 Velocity, en
         break;
     }
 
-    auto *Result = CreateShipEntity(Game, Color, Color);
+    auto *Result = CreateShipEntity(arena, shipMesh, Color, Color);
     Result->Transform.Position = Position;
     Result->Transform.Velocity = Velocity;
     Result->Ship->EnemyType = Type;
     return Result;
 }
 
-entity *CreateCrystalEntity(game_state &Game)
+entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh)
 {
-    auto Result = PushStruct<entity>(Game.Arena);
-    Result->Flags |= EntityFlag_RemoveOffscreen;
-    Result->Model = CreateModel(Game.Arena, GetCrystalMesh(Game));
-    Result->Collider = CreateCollider(Game.Arena, ColliderType_Crystal);
-    return Result;
+    auto ent = PushStruct<entity>(arena);
+    ent->Flags |= EntityFlag_RemoveOffscreen;
+    ent->Model = CreateModel(arena, crystalMesh);
+    ent->Collider = CreateCollider(arena, ColliderType_Crystal);
+    return ent;
 }
 
 #define MinExplosionRot 1.0f
@@ -133,8 +128,7 @@ entity *CreateCrystalEntity(game_state &Game)
 #define MaxExplosionVel 4.0f
 #define RandomRotation(Series)  RandomBetween(Series, MinExplosionRot, MaxExplosionRot)
 #define RandomVel(Series, Sign) (Sign * RandomBetween(Series, MinExplosionVel, MaxExplosionVel))
-inline static float
-RandomExplosionVel(random_series &Series, vec3 Sign, int i)
+inline static float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
 {
     if (Sign[i] == 0)
     {
@@ -152,13 +146,13 @@ RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
+entity *CreateExplosionEntity(memory_arena &arena, mesh &Mesh, mesh_part &Part,
                               vec3 Position, vec3 Velocity, vec3 Scale,
                               color Color, color OutlineColor, vec3 Sign)
 {
     assert(Part.PrimitiveType == GL_TRIANGLES);
 
-    auto *Explosion = PushStruct<explosion>(Game.Arena);
+    auto *Explosion = PushStruct<explosion>(arena);
     Explosion->LifeTime = Global_Game_ExplosionLifeTime;
     Explosion->Color = Color;
     InitMeshBuffer(Explosion->Mesh.Buffer);
@@ -211,14 +205,13 @@ entity *CreateExplosionEntity(game_state &Game, mesh &Mesh, mesh_part &Part,
         Piece.Velocity = Velocity * 1.1f + Normals[i];
     }
 
-    auto *Result = PushStruct<entity>(Game.Arena);
+    auto *Result = PushStruct<entity>(arena);
     Result->Transform.Position = Position;
     Result->Explosion = Explosion;
     return Result;
 }
 
-static float
-Interp(float c, float t, float a, float dt)
+static float Interp(float c, float t, float a, float dt)
 {
     if (c == t)
     {
@@ -314,11 +307,12 @@ void AddEntity(entity_world &world, entity *ent)
         AddEntityToList(world.TrailEntities, ent);
         for (int i = 0; i < TrailCount; i++)
         {
-            AddEntity(g, ent->Trail->Entities + i);
+            AddEntity(world, ent->Trail->Entities + i);
         }
     }
     if (ent->Explosion)
     {
+        world.LastExplosion = ent->Explosion;
         AddEntityToList(world.ExplosionEntities, ent);
     }
     if (ent->Ship && !(ent->Flags & EntityFlag_IsPlayer))
@@ -363,7 +357,7 @@ void RemoveEntity(entity_world &world, entity *ent)
         RemoveEntityFromList(world.TrailEntities, ent);
         for (int i = 0; i < TrailCount; i++)
         {
-            RemoveEntity(g, ent->Trail->Entities + i);
+            RemoveEntity(world, ent->Trail->Entities + i);
         }
     }
     if (ent->Explosion)
@@ -383,4 +377,156 @@ void RemoveEntity(entity_world &world, entity *ent)
         RemoveEntityFromList(world.RemoveOffscreenEntities, ent);
     }
     world.NumEntities = std::max(0, world.NumEntities - 1);
+}
+
+void UpdateLogiclessEntities(entity_world &world, float dt)
+{
+    for (auto ent : world.RemoveOffscreenEntities)
+    {
+        if (!ent) continue;
+
+        if (ent->Pos().y < world.Camera->Position.y)
+        {
+            RemoveEntity(world, ent);
+        }
+    }
+
+    for (auto ent : world.RepeatingEntities)
+    {
+        auto repeat = ent->Repeat;
+        if (world.Camera->Position.y - ent->Transform.Position.y > repeat->DistanceFromCamera)
+        {
+            ent->Transform.Position.y += repeat->Size * repeat->Count;
+        }
+    }
+}
+
+void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
+{
+    static vec3 PointCache[TrailCount*4];
+    for (auto ent : world.TrailEntities)
+    {
+        if (!ent) continue;
+
+        auto tr = ent->Trail;
+        if (tr->FirstFrame)
+        {
+            tr->FirstFrame = false;
+            for (int i = 0; i < TrailCount; i++)
+            {
+                tr->Entities[i].Transform.Position = ent->Transform.Position;
+            }
+        }
+
+        tr->Timer -= dt;
+        if (tr->Timer <= 0)
+        {
+            tr->Timer = Global_Game_TrailRecordTimer;
+            PushPosition(tr, ent->Transform.Position);
+        }
+
+        auto &m = tr->Mesh;
+        ResetBuffer(m.Buffer);
+
+        // First store the quads, then the lines
+        for (int i = 0; i < TrailCount; i++)
+        {
+            auto *pieceEntity = tr->Entities + i;
+            vec3 c1 = pieceEntity->Transform.Position;
+            vec3 c2;
+            if (i == TrailCount - 1)
+            {
+                c2 = ent->Transform.Position;
+            }
+            else
+            {
+                c2 = tr->Entities[i + 1].Transform.Position;
+            }
+
+            float CurrentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
+            if (i == 0)
+            {
+                c1 -= (c2 - c1) * CurrentTrailTime;
+            }
+
+            const float r = 0.5f;
+            float min2 =  0.4f * ((TrailCount - i) / (float)TrailCount);
+            float min1 =  0.4f * ((TrailCount - i+1) / (float)TrailCount);
+            vec3 p1 = c2 - vec3(r - min2, 0, 0);
+            vec3 p2 = c2 + vec3(r - min2, 0, 0);
+            vec3 p3 = c1 - vec3(r - min1, 0, 0);
+            vec3 p4 = c1 + vec3(r - min1, 0, 0);
+            color cl2 = color{ 1, 1, 1, 1.0f - min2 * 2 };
+            color cl1 = color{ 1, 1, 1, 1.0f - min1 * 2 };
+            AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
+
+            const float lo = 0.05f;
+            PointCache[i*4] = p1 - vec3(lo, 0, 0);
+            PointCache[i*4 + 1] = p3 - vec3(lo, 0, 0);
+            PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
+            PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
+
+            auto &box = pieceEntity->Collider->Box;
+            box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
+            box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
+        }
+        for (int i = 0; i < TrailCount; i++)
+        {
+            vec3 *p = PointCache + i*4;
+            AddLine(m.Buffer, *p++, *p++);
+        }
+        for (int i = 0; i < TrailCount; i++)
+        {
+            vec3 *p = PointCache + i*4 + 2;
+            AddLine(m.Buffer, *p++, *p++);
+        }
+        UploadVertices(m.Buffer, 0, m.Buffer.VertexCount);
+
+        DrawModel(rs, tr->Model, transform{});
+    }
+
+    for (auto ent : world.ExplosionEntities)
+    {
+        if (!ent) continue;
+
+        auto exp = ent->Explosion;
+        exp->LifeTime -= dt;
+        if (exp->LifeTime <= 0)
+        {
+            RemoveEntity(world, ent);
+            continue;
+        }
+
+        float alpha = exp->LifeTime / Global_Game_ExplosionLifeTime;
+        ResetBuffer(exp->Mesh.Buffer);
+        for (size_t i = 0; i < exp->Pieces.size(); i++)
+        {
+            auto &Piece = exp->Pieces[i];
+            Piece.Position += Piece.Velocity * dt;
+            mat4 Transform = GetTransformMatrix(Piece);
+
+            size_t TriangleIndex = i * 3;
+            vec3 p1 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex], 1.0f });
+            vec3 p2 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex + 1], 1.0f });
+            vec3 p3 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex + 2], 1.0f });
+            AddTriangle(exp->Mesh.Buffer, p1, p2, p3, vec3{ 1, 1, 1 }, color{1, 1, 1, alpha});
+        }
+        UploadVertices(exp->Mesh.Buffer, GL_DYNAMIC_DRAW);
+
+        DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[0], transform{});
+        DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[1], transform{});
+    }
+
+    for (auto ent : world.ModelEntities)
+    {
+        if (!ent) continue;
+
+        DrawModel(rs, *ent->Model, ent->Transform);
+    }
+
+    if (world.LastExplosion)
+    {
+        ApplyExplosionLight(rs, world.LastExplosion->Color);
+    }
+    world.LastExplosion = NULL;
 }

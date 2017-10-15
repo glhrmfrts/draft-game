@@ -1,18 +1,18 @@
 #include "config.h"
 
-void DrawDebugUI(game_state &Game, float DeltaTime)
+void DrawDebugUI(game_state &g, float dt)
 {
     if (!Global_DebugUI) return;
 
-    auto &UpdateTime = Game.UpdateTime;
-    auto &RenderTime = Game.RenderTime;
-    auto PlayerEntity = Game.PlayerEntity;
-    ImGui::Text("ms: %.2f", DeltaTime * 1000.0f);
-    ImGui::Text("FPS: %.5f", 1.0f/DeltaTime);
-    ImGui::Text("Update time: %dms", UpdateTime.End - UpdateTime.Begin);
-    ImGui::Text("Render time: %dms", RenderTime.End - RenderTime.Begin);
-    ImGui::Text("Player max vel: %.2f", Game.PlayerMaxVel);
-    ImGui::Text("Player vel: %s", ToString(PlayerEntity->Vel()).c_str());
+    auto &updateTime = g.UpdateTime;
+    auto &renderTime = g.RenderTime;
+    auto playerEntity = g.PlayerEntity;
+    ImGui::Text("ms: %.2f", dt * 1000.0f);
+    ImGui::Text("FPS: %.5f", 1.0f/dt);
+    ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);
+    ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
+    ImGui::Text("Player max vel: %.2f", g.LevelMode.PlayerMaxVel);
+    ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
 
     if (ImGui::CollapsingHeader("Camera"))
     {
@@ -32,7 +32,7 @@ void DrawDebugUI(game_state &Game, float DeltaTime)
     }
     if (ImGui::CollapsingHeader("Renderer"))
     {
-		ImGui::Text("Renderables: %lu", Game.RenderState.FrameSolidRenderables.size() + Game.RenderState.FrameTransparentRenderables.size());
+		ImGui::Text("Renderables: %lu", g.RenderState.FrameSolidRenderables.size() + g.RenderState.FrameTransparentRenderables.size());
 		ImGui::Spacing();
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);
 

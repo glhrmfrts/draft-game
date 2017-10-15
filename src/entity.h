@@ -106,6 +106,8 @@ struct trail_piece
 
 struct entity_world
 {
+    memory_arena Arena;
+
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;
     std::vector<entity *> TrailEntities;
@@ -113,7 +115,8 @@ struct entity_world
     std::vector<entity *> ExplosionEntities;
     std::vector<entity *> RepeatingEntities;
     std::vector<entity *> RemoveOffscreenEntities;
-    std::vector<collision_result> CollisionCache;
+    camera *Camera = NULL;
+    explosion *LastExplosion = NULL;
     int NumEntities = 0;
 };
 
