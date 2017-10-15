@@ -435,50 +435,50 @@ static void GenerateEnemyShips(game_state &Game, float DeltaTime)
     ChangeShipTimer -= DeltaTime;
 }
 
-static void GenerateCrystals(game_state &Game, float DeltaTime)
+static void GenerateCrystals(game_state &g, float dt)
 {
-    const float BaseCrystalInterval = 2.0f;
-    static float NextCrystalTimer = BaseCrystalInterval;
-    if (NextCrystalTimer <= 0)
+    const float baseCrystalInterval = 2.0f;
+    static float nextCrystalTimer = baseCrystalInterval;
+    if (nextCrystalTimer <= 0)
     {
-        NextCrystalTimer = BaseCrystalInterval + RandomBetween(Game.LevelEntropy, -1.5f, 1.5f);
+        nextCrystalTimer = baseCrystalInterval + RandomBetween(g.LevelEntropy, -1.5f, 1.5f);
 
-        auto Entity = CreateCrystalEntity(Game);
-        Entity->Pos().x = GetNextSpawnLane(Game) * ROAD_LANE_WIDTH;
-        Entity->Pos().y = Game.PlayerEntity->Pos().y + 200;
-        Entity->Pos().z = SHIP_Z + 0.4f;
-        Entity->Scl().x = 0.3f;
-        Entity->Scl().y = 0.3f;
-        Entity->Scl().z = 0.5f;
-        Entity->Vel().y = Game.PlayerEntity->Vel().y * 0.5f;
-        AddEntity(Game, Entity);
+        auto ent = CreateCrystalEntity(g);
+        ent->Pos().x = GetNextSpawnLane(g) * ROAD_LANE_WIDTH;
+        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+        ent->Pos().z = SHIP_Z + 0.4f;
+        ent->Scl().x = 0.3f;
+        ent->Scl().y = 0.3f;
+        ent->Scl().z = 0.5f;
+        ent->Vel().y = g.PlayerEntity->Vel().y * 0.5f;
+        AddEntity(g, ent);
     }
 
-    NextCrystalTimer -= DeltaTime;
+    nextCrystalTimer -= dt;
 }
 
-static void UpdateShipDraftCharge(ship *Ship, float DeltaTime)
+static void UpdateShipDraftCharge(ship *s, float dt)
 {
-    if (Ship->NumTrailCollisions == 0)
+    if (s->NumTrailCollisions == 0)
     {
-        Ship->CurrentDraftTime -= DeltaTime;
+        s->CurrentDraftTime -= dt;
     }
-    Ship->CurrentDraftTime = std::max(0.0f, std::min(Ship->CurrentDraftTime, Global_Game_DraftChargeTime));
-    Ship->DraftCharge = Ship->CurrentDraftTime / Global_Game_DraftChargeTime;
-    Ship->NumTrailCollisions = 0;
+    s->CurrentDraftTime = std::max(0.0f, std::min(s->CurrentDraftTime, Global_Game_DraftChargeTime));
+    s->DraftCharge = s->CurrentDraftTime / Global_Game_DraftChargeTime;
+    s->NumTrailCollisions = 0;
 }
 
-static void ShipEntityPerformDraft(entity *Entity)
+static void ShipEntityPerformDraft(entity *ent)
 {
-    Entity->Ship->CurrentDraftTime = 0.0f;
-    Entity->Ship->DraftActive = true;
-    ApplyBoostToShip(Entity, DraftBoost, 0);
+    ent->Ship->CurrentDraftTime = 0.0f;
+    ent->Ship->DraftActive = true;
+    ApplyBoostToShip(ent, DraftBoost, 0);
 }
 
-static void KeepEntityInsideOfRoad(entity *Entity)
+static void KeepEntityInsideOfRoad(entity *ent)
 {
     const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
-    Entity->Pos().x = glm::clamp(Entity->Pos().x, -limit + 0.5f, limit - 0.5f);
+    ent->Pos().x = glm::clamp(ent->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
