@@ -176,21 +176,13 @@ struct game_state
     tween_state TweenState;
 
     memory_arena Arena;
+    memory_arena TransientArena;
     camera Camera;
     game_meshes Meshes;
     vec3 Gravity;
-
+    entity_world World;
     entity *PlayerEntity;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
-    std::vector<entity *> ModelEntities;
-    std::vector<entity *> CollisionEntities;
-    std::vector<entity *> TrailEntities;
-    std::vector<entity *> ShipEntities;
-    std::vector<entity *> ExplosionEntities;
-    std::vector<entity *> RepeatingEntities;
-    std::vector<entity *> RemoveOffscreenEntities;
-    std::vector<collision_result> CollisionCache;
-    int NumEntities;
 
     random_series LevelEntropy;
     random_series ExplosionEntropy;

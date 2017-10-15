@@ -283,3 +283,104 @@ void PushPosition(trail *Trail, vec3 Pos)
     }
     Trail->Entities[Trail->PositionStackIndex++].Transform.Position = Pos;
 }
+
+// Finds the first free slot on the list and insert the entity
+void AddEntityToList(std::vector<entity *> &list, entity *ent)
+{
+    for (auto it = list.begin(), end = list.end(); it != end; it++)
+    {        if (!(*it))
+        {
+            *it = ent;
+            return;
+        }
+    }
+
+    // no free slot, insert at the end
+    list.push_back(ent);
+}
+
+void AddEntity(entity_world &world, entity *ent)
+{
+    if (ent->Model)
+    {
+        AddEntityToList(world.ModelEntities, ent);
+    }
+    if (ent->Collider)
+    {
+        AddEntityToList(world.CollisionEntities, ent);
+    }
+    if (ent->Trail)
+    {
+        AddEntityToList(world.TrailEntities, ent);
+        for (int i = 0; i < TrailCount; i++)
+        {
+            AddEntity(g, ent->Trail->Entities + i);
+        }
+    }
+    if (ent->Explosion)
+    {
+        AddEntityToList(world.ExplosionEntities, ent);
+    }
+    if (ent->Ship && !(ent->Flags & EntityFlag_IsPlayer))
+    {
+        AddEntityToList(world.ShipEntities, ent);
+    }
+    if (ent->Repeat)
+    {
+        AddEntityToList(world.RepeatingEntities, ent);
+    }
+    if (ent->Flags & EntityFlag_RemoveOffscreen)
+    {
+        AddEntityToList(world.RemoveOffscreenEntities, ent);
+    }
+    world.NumEntities++;
+}
+
+void RemoveEntityFromList(std::vector<entity *> &list, entity *ent)
+{
+    for (auto it = list.begin(), end = list.end(); it != end; it++)
+    {
+        if (*it == ent)
+        {
+            *it = NULL;
+            return;
+        }
+    }
+}
+
+void RemoveEntity(entity_world &world, entity *ent)
+{
+    if (ent->Model)
+    {
+        RemoveEntityFromList(world.ModelEntities, ent);
+    }
+    if (ent->Collider)
+    {
+        RemoveEntityFromList(world.CollisionEntities, ent);
+    }
+    if (ent->Trail)
+    {
+        RemoveEntityFromList(world.TrailEntities, ent);
+        for (int i = 0; i < TrailCount; i++)
+        {
+            RemoveEntity(g, ent->Trail->Entities + i);
+        }
+    }
+    if (ent->Explosion)
+    {
+        RemoveEntityFromList(world.ExplosionEntities, ent);
+    }
+    if (ent->Ship)
+    {
+        RemoveEntityFromList(world.ShipEntities, ent);
+    }
+    if (ent->Repeat)
+    {
+        RemoveEntityFromList(world.RepeatingEntities, ent);
+    }
+    if (ent->Flags & EntityFlag_RemoveOffscreen)
+    {
+        RemoveEntityFromList(world.RemoveOffscreenEntities, ent);
+    }
+    world.NumEntities = std::max(0, world.NumEntities - 1);
+}

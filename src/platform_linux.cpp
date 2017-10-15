@@ -7,6 +7,7 @@
 #include <unistd.h>        // close
 #include <sys/stat.h>      // fstat
 #include <sys/types.h>     // fstat
+#include <sys/time.h>
 
 #define GameLibraryPath       "./draft.so"
 #define GameLibraryReloadTime 1.0f
@@ -33,6 +34,13 @@ PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
 PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
 {
     return (int32)std::ceil((int32)difftime((time_t)t1, (time_t)t2));
+}
+
+PLATFORM_GET_MILLISECONDS(PlatformGetMilliseconds)
+{
+    timeval time;
+    gettimeofday(&time, 0);
+    return time.tv_sec*1000;
 }
 
 void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)

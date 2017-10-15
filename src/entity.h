@@ -104,4 +104,17 @@ struct trail_piece
     entity *Owner;
 };
 
+struct entity_world
+{
+    std::vector<entity *> ModelEntities;
+    std::vector<entity *> CollisionEntities;
+    std::vector<entity *> TrailEntities;
+    std::vector<entity *> ShipEntities;
+    std::vector<entity *> ExplosionEntities;
+    std::vector<entity *> RepeatingEntities;
+    std::vector<entity *> RemoveOffscreenEntities;
+    std::vector<collision_result> CollisionCache;
+    int NumEntities = 0;
+};
+
 #endif
