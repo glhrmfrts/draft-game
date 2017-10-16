@@ -585,7 +585,7 @@ BlendProgramCallback(shader_asset_param *Param)
         for (int i = 0; i < BloomBlurPassCount; i++)
         {
             char Name[] = "u_Pass#";
-            Name[7] = (char)('0' + i);
+            Name[6] = (char)('0' + i);
             SetUniform(glGetUniformLocation(Program->ID, Name), 0);
         }
         SetUniform(glGetUniformLocation(Program->ID, "u_Scene"), BloomBlurPassCount);
@@ -702,7 +702,7 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 
     InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, FramebufferFlag_HasDepth | FramebufferFlag_Multisampled, ColorTextureFlag_Count);
     InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, FramebufferFlag_HasDepth, ColorTextureFlag_Count);
-    for (int i = 0; i < BloomBlurPassCount-1; i++)
+    for (int i = 0; i < BloomBlurPassCount; i++)
     {
         // @TODO: maybe it is not necessary to scale down
         size_t BlurWidth = Width >> i;
