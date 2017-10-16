@@ -30,42 +30,47 @@ static collider *CreateCollider(memory_arena &Arena, collider_type Type)
     return Result;
 }
 
-static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color)
+static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color, float radius = 0.5f, bool renderOnly = false)
 {
-    trail *Result = PushStruct<trail>(Arena);
+    trail *result = PushStruct<trail>(Arena);
+    result->RenderOnly = renderOnly;
+    result->Radius = radius;
 
-    InitMeshBuffer(Result->Mesh.Buffer);
-    Result->Model.Mesh = &Result->Mesh;
+    InitMeshBuffer(result->Mesh.Buffer);
+    result->Model.Mesh = &result->Mesh;
 
     const size_t LineCount = TrailCount*2;
     const size_t PlaneCount = TrailCount*6;
     const float emission = 4.0f;
 
     // Plane parts
-    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, 6, GL_TRIANGLES});
-    AddPart(&Result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
+    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, 6, GL_TRIANGLES});
+    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 6, TrailCount*6 - 6, GL_TRIANGLES});
 
     // Left line parts
-    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
-    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + 2, LineCount - 2, GL_LINES});
+    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
+    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + 2, LineCount - 2, GL_LINES});
 
     // Right line parts
-    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
-    AddPart(&Result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
+    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
+    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
 
-    ReserveVertices(Result->Mesh.Buffer, PlaneCount + LineCount*2, GL_DYNAMIC_DRAW);
+    ReserveVertices(result->Mesh.Buffer, PlaneCount + LineCount*2, GL_DYNAMIC_DRAW);
 
     for (int i = 0; i < TrailCount; i++)
     {
-        auto Entity = Result->Entities + i;
-        Entity->TrailPiece = PushStruct<trail_piece>(Arena);
-        Entity->TrailPiece->Owner = Owner;
+        auto Entity = result->Entities + i;
         Entity->Transform.Position = vec3(0.0f);
-        Entity->Collider = PushStruct<collider>(Arena);
-        Entity->Collider->Type = ColliderType_TrailPiece;
-        AddFlags(Entity, EntityFlag_Kinematic);
+        if (!renderOnly)
+        {
+            Entity->TrailPiece = PushStruct<trail_piece>(Arena);
+            Entity->TrailPiece->Owner = Owner;
+            Entity->Collider = PushStruct<collider>(Arena);
+            Entity->Collider->Type = ColliderType_TrailPiece;
+            AddFlags(Entity, EntityFlag_Kinematic);
+        }
     }
-    return Result;
+    return result;
 }
 
 entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
@@ -146,27 +151,39 @@ inline static float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreateExplosionEntity(memory_arena &arena, mesh &Mesh, mesh_part &Part,
-                              vec3 Position, vec3 Velocity, vec3 Scale,
-                              color Color, color OutlineColor, vec3 Sign)
+entity *CreateExplosionEntity(memory_arena &arena, mesh &baseMesh, mesh_part &part, vec3 pos, vec3 vel, vec3 scale, color c, color outlineColor, vec3 sign)
 {
-    assert(Part.PrimitiveType == GL_TRIANGLES);
+    assert(part.PrimitiveType == GL_TRIANGLES);
 
-    auto *Explosion = PushStruct<explosion>(arena);
-    Explosion->LifeTime = Global_Game_ExplosionLifeTime;
-    Explosion->Color = Color;
-    InitMeshBuffer(Explosion->Mesh.Buffer);
+    auto exp = PushStruct<explosion>(arena);
+    exp->LifeTime = Global_Game_ExplosionLifeTime;
+    exp->Color = c;
+    InitMeshBuffer(exp->Mesh.Buffer);
 
-    size_t PieceCount = Part.Count / 3;
-    static vector<vec3> Normals;
-    if (Normals.size() < PieceCount)
+    const float count = EXPLOSION_PARTS_COUNT;
+    const float theta = M_PI*2 / count;
+    float angle = 0;
+    for (int i = 0; i < count; i++)
     {
-        Normals.resize(PieceCount);
+        angle += theta;
+
+        auto ent = exp->Entities + i;
+        ent->Trail = CreateTrail(arena, ent, outlineColor, 0.2f, true);
+        ent->SetPos(pos);
+        ent->Vel().x = std::cos(angle)*10.0f;
+        ent->Vel().y = vel.y + std::sin(angle)*10.0f;
+    }
+    /*
+    size_t pieceCount = part.Count / 3;
+    static vector<vec3> normals;
+    if (normals.size() < PieceCount)
+    {
+        normals.resize(PieceCount);
     }
 
-    Explosion->Pieces.resize(PieceCount);
-    Explosion->Triangles.resize(Part.Count);
-    auto &Vertices = Mesh.Buffer.Vertices;
+    exp->Pieces.resize(pieceCount);
+    exp->Triangles.resize(part.Count);
+    auto &Vertices = baseMesh.Buffer.Vertices;
     for (size_t i = 0; i < PieceCount; i++)
     {
         size_t Index = i * 3;
@@ -202,13 +219,14 @@ entity *CreateExplosionEntity(memory_arena &arena, mesh &Mesh, mesh_part &Part,
         auto &Piece = Explosion->Pieces[i];
         Piece.Position = Position;
         Piece.Scale = Scale;
-        Piece.Velocity = Velocity * 1.1f + Normals[i];
+        Piece.Velocity = Velocity*1.1f + Normals[i]*1.5f;
     }
+    */
 
-    auto *Result = PushStruct<entity>(arena);
-    Result->Transform.Position = Position;
-    Result->Explosion = Explosion;
-    return Result;
+    auto result = PushStruct<entity>(arena);
+    result->Transform.Position = pos;
+    result->Explosion = exp;
+    return result;
 }
 
 static float Interp(float c, float t, float a, float dt)
@@ -228,53 +246,53 @@ static float Interp(float c, float t, float a, float dt)
 #define ShipBreakAcceleration   30.0f
 #define ShipSteerSpeed          20.0f
 #define ShipSteerAcceleration   80.0f
-#define ShipFriction            5.0f
-void MoveShipEntity(entity *Entity, float MoveH, float MoveV, float MaxVel, float DeltaTime)
+#define ShipFriction            10.0f
+void MoveShipEntity(entity *ent, float moveH, float moveV, float maxVel, float dt)
 {
     float MinVel = ShipMinVel;
-    if (Entity->Flags & EntityFlag_IsPlayer)
+    if (ent->Flags & EntityFlag_IsPlayer)
     {
         MinVel = PlayerMinVel;
     }
-    if (Entity->Transform.Velocity.y < MinVel)
+    if (ent->Transform.Velocity.y < MinVel)
     {
-        MoveV = 0.1f;
+        moveV = 0.1f;
     }
 
-    Entity->Transform.Velocity.y += MoveV * ShipAcceleration * DeltaTime;
-    if ((MoveV <= 0.0f && Entity->Transform.Velocity.y > 0) || Entity->Transform.Velocity.y > MaxVel)
+    ent->Transform.Velocity.y += moveV * ShipAcceleration * dt;
+    if ((moveV <= 0.0f && ent->Transform.Velocity.y > 0) || ent->Transform.Velocity.y > maxVel)
     {
-        Entity->Transform.Velocity.y -= ShipFriction * DeltaTime;
+        ent->Transform.Velocity.y -= ShipFriction * dt;
     }
 
-    float SteerTarget = MoveH * ShipSteerSpeed;
-    Entity->Transform.Velocity.y = std::min(Entity->Transform.Velocity.y, MaxVel);
-    Entity->Transform.Velocity.x = Interp(Entity->Transform.Velocity.x,
-                                          SteerTarget,
+    float steerTarget = moveH * ShipSteerSpeed;
+    ent->Transform.Velocity.y = std::min(ent->Transform.Velocity.y, maxVel);
+    ent->Transform.Velocity.x = Interp(ent->Transform.Velocity.x,
+                                          steerTarget,
                                           ShipSteerAcceleration,
-                                          DeltaTime);
+                                          dt);
 
-    Entity->Transform.Rotation.y = 20.0f * (MoveH / 1.0f);
-    Entity->Transform.Rotation.x = Interp(Entity->Transform.Rotation.x,
-                                          5.0f * MoveV,
+    ent->Transform.Rotation.y = 20.0f * (moveH / 1.0f);
+    ent->Transform.Rotation.x = Interp(ent->Transform.Rotation.x,
+                                          5.0f * moveV,
                                           20.0f,
-                                          DeltaTime);
+                                          dt);
 }
 
-void PushPosition(trail *Trail, vec3 Pos)
+void PushPosition(trail *t, vec3 pos)
 {
-    if (Trail->PositionStackIndex >= TrailCount)
+    if (t->PositionStackIndex >= TrailCount)
     {
-        vec3 PosSave = Trail->Entities[TrailCount - 1].Transform.Position;
+        vec3 posSave = t->Entities[TrailCount - 1].Transform.Position;
         for (int i = TrailCount - 1; i > 0; i--)
         {
-            vec3 NewPos = PosSave;
-            PosSave = Trail->Entities[i - 1].Transform.Position;
-            Trail->Entities[i - 1].Transform.Position = NewPos;
+            vec3 newPos = posSave;
+            posSave = t->Entities[i - 1].Transform.Position;
+            t->Entities[i - 1].Transform.Position = newPos;
         }
-        Trail->PositionStackIndex -= 1;
+        t->PositionStackIndex -= 1;
     }
-    Trail->Entities[Trail->PositionStackIndex++].Transform.Position = Pos;
+    t->Entities[t->PositionStackIndex++].Transform.Position = pos;
 }
 
 // Finds the first free slot on the list and insert the entity
@@ -305,15 +323,22 @@ void AddEntity(entity_world &world, entity *ent)
     if (ent->Trail)
     {
         AddEntityToList(world.TrailEntities, ent);
-        for (int i = 0; i < TrailCount; i++)
+        if (!ent->Trail->RenderOnly)
         {
-            AddEntity(world, ent->Trail->Entities + i);
+            for (int i = 0; i < TrailCount; i++)
+            {
+                AddEntity(world, ent->Trail->Entities + i);
+            }
         }
     }
     if (ent->Explosion)
     {
         world.LastExplosion = ent->Explosion;
         AddEntityToList(world.ExplosionEntities, ent);
+        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
+        {
+            AddEntity(world, ent->Explosion->Entities + i);
+        }
     }
     if (ent->Ship && !(ent->Flags & EntityFlag_IsPlayer))
     {
@@ -355,14 +380,21 @@ void RemoveEntity(entity_world &world, entity *ent)
     if (ent->Trail)
     {
         RemoveEntityFromList(world.TrailEntities, ent);
-        for (int i = 0; i < TrailCount; i++)
+        if (!ent->Trail->RenderOnly)
         {
-            RemoveEntity(world, ent->Trail->Entities + i);
+            for (int i = 0; i < TrailCount; i++)
+            {
+                RemoveEntity(world, ent->Trail->Entities + i);
+            }
         }
     }
     if (ent->Explosion)
     {
         RemoveEntityFromList(world.ExplosionEntities, ent);
+        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
+        {
+            RemoveEntity(world, ent->Explosion->Entities + i);
+        }
     }
     if (ent->Ship)
     {
@@ -449,9 +481,10 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
                 c1 -= (c2 - c1) * CurrentTrailTime;
             }
 
-            const float r = 0.5f;
-            float min2 =  0.4f * ((TrailCount - i) / (float)TrailCount);
-            float min1 =  0.4f * ((TrailCount - i+1) / (float)TrailCount);
+            float r = tr->Radius;
+            float rm = tr->Radius * 0.8f;
+            float min2 =  rm * ((TrailCount - i) / (float)TrailCount);
+            float min1 =  rm * ((TrailCount - i+1) / (float)TrailCount);
             vec3 p1 = c2 - vec3(r - min2, 0, 0);
             vec3 p2 = c2 + vec3(r - min2, 0, 0);
             vec3 p3 = c1 - vec3(r - min1, 0, 0);
@@ -465,10 +498,12 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
             PointCache[i*4 + 1] = p3 - vec3(lo, 0, 0);
             PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
             PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
-
-            auto &box = pieceEntity->Collider->Box;
-            box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
-            box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
+            if (pieceEntity->Collider)
+            {
+                auto &box = pieceEntity->Collider->Box;
+                box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
+                box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
+            }
         }
         for (int i = 0; i < TrailCount; i++)
         {
@@ -498,6 +533,17 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
         }
 
         float alpha = exp->LifeTime / Global_Game_ExplosionLifeTime;
+        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
+        {
+            auto partEnt = exp->Entities + i;
+            partEnt->Transform.Position += partEnt->Transform.Velocity * dt;
+
+            for (auto &meshPart : partEnt->Trail->Mesh.Parts)
+            {
+                meshPart.Material.DiffuseColor.a = alpha;
+            }
+        }
+/*
         ResetBuffer(exp->Mesh.Buffer);
         for (size_t i = 0; i < exp->Pieces.size(); i++)
         {
@@ -515,6 +561,7 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
 
         DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[0], transform{});
         DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[1], transform{});
+*/
     }
 
     for (auto ent : world.ModelEntities)

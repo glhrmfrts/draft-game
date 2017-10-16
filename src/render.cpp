@@ -953,7 +953,7 @@ AddRenderable(render_state &RenderState, size_t Index, material *Material)
 void ApplyExplosionLight(render_state &rs, color c)
 {
     rs.ExplosionLightColor = c;
-    rs.ExplosionLightTimer = Global_Game_ExplosionLightTime;
+    rs.ExplosionLightTimer = Global_Game_ExplosionLightTime*0.5f;
 }
 
 void DrawMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const transform &Transform)

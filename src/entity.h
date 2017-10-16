@@ -32,16 +32,6 @@ struct player_state
     int Score = 0;
 };
 
-struct explosion
-{
-    mesh Mesh;
-    color Color;
-    float LifeTime;
-    std::vector<vec3> Triangles;
-    std::vector<vec3> Normals;
-    std::vector<transform> Pieces;
-};
-
 struct entity_repeat
 {
     int Count = 0;
@@ -49,6 +39,7 @@ struct entity_repeat
     float DistanceFromCamera = 0;
 };
 
+struct explosion;
 struct trail;
 struct trail_piece;
 
@@ -86,6 +77,20 @@ struct entity
     inline vec3 &Vel() { return Transform.Velocity; }
     inline vec3 &Scl() { return Transform.Scale; }
     inline vec3 &Rot() { return Transform.Rotation; }
+
+    inline void SetPos(vec3 p) { Transform.Position = p; }
+    inline void SetVel(vec3 v) { Transform.Velocity = v; }
+    inline void SetScl(vec3 s) { Transform.Scale = s; }
+    inline void SetRot(vec3 r) { Transform.Rotation = r; }
+};
+
+#define EXPLOSION_PARTS_COUNT 12
+struct explosion
+{
+    mesh Mesh;
+    color Color;
+    float LifeTime;
+    entity Entities[EXPLOSION_PARTS_COUNT];
 };
 
 #define TrailCount 16
@@ -95,8 +100,10 @@ struct trail
     mesh Mesh;
     model Model;
     float Timer = 0;
+    float Radius = 0;
     int PositionStackIndex = 0;
     bool FirstFrame = true;
+    bool RenderOnly = false;
 };
 
 struct trail_piece

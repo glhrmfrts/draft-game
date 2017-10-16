@@ -412,7 +412,7 @@ static void RenderLevel(game_state &g, float dt)
             }
         }
 
-        if (playerShip->DraftCharge == 1.0f && IsJustPressed(g, Action_boost))
+        if (playerShip->DraftCharge == 1.0f && IsPressed(g, Action_boost))
         {
             ShipEntityPerformDraft(playerEntity);
         }

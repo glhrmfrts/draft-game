@@ -201,6 +201,12 @@ GetAxisValue(game_input &Input, action_type Type)
 }
 
 inline static bool
+IsPressed(game_state &game, action_type type)
+{
+    return game.Input.Actions[type].Pressed > 0;
+}
+
+inline static bool
 IsJustPressed(game_state &Game, action_type Type)
 {
     return Game.Input.Actions[Type].Pressed > 0 &&

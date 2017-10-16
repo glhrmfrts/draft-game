@@ -96,11 +96,6 @@ void DetectCollisions(const std::vector<entity *> Entities, std::vector<collisio
                 Col.Normal.x = std::copysign(1, Dif.x);
                 Col.Depth = dx;
             }
-            else if (dz < dy && dy > ClimbHeight)
-            {
-                Col.Normal.z = std::copysign(1, Dif.z);
-                Col.Depth = dz;
-            }
             else
             {
                 Col.Normal.y = std::copysign(1, Dif.y);
