@@ -1,5 +1,16 @@
 #include "config.h"
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0')
+
 void DrawDebugUI(game_state &g, float dt)
 {
     if (!Global_DebugUI) return;
@@ -7,12 +18,16 @@ void DrawDebugUI(game_state &g, float dt)
     auto &updateTime = g.UpdateTime;
     auto &renderTime = g.RenderTime;
     auto playerEntity = g.PlayerEntity;
+    auto lanes = g.LevelMode.LaneSlots;
     ImGui::Text("ms: %.2f", dt * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/dt);
     ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);
     ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
     ImGui::Text("Player max vel: %.2f", g.LevelMode.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
+    ImGui::Text("State: %d", int(std::floor(g.LevelMode.TimeElapsed/15.0f)));
+    ImGui::Text("Gen flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.GenFlags));
+    ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 
     if (ImGui::CollapsingHeader("Camera"))
     {

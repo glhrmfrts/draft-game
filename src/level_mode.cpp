@@ -112,6 +112,7 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
     ent->Transform.Velocity.y += Boost;
 }
 
+#define SHIP_IS_RED(s) (s->ColorIndex == 2)
 static bool HandleCollision(game_state &g, entity *first, entity *second, float dt)
 {
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
@@ -146,7 +147,8 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             entityToExplode = second;
             otherEntity = first;
         }
-        if (otherEntity->Ship->DraftActive && otherEntity->Ship->DraftTarget == entityToExplode)
+        if ((otherEntity->Ship->DraftActive && otherEntity->Ship->DraftTarget == entityToExplode) ||
+            (SHIP_IS_RED(otherEntity->Ship) || SHIP_IS_RED(entityToExplode->Ship)))
         {
             otherEntity->Ship->DraftActive = false;
             if (entityToExplode->Flags & EntityFlag_IsPlayer)
@@ -169,28 +171,19 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             RemoveEntity(g.World, entityToExplode);
             return false;
         }
+        return true;
     }
     if (shipEntity != NULL && crystalEntity != NULL)
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
-            auto exp = CreateExplosionEntity(
-                g.World.Arena,
-                *crystalEntity->Model->Mesh,
-                crystalEntity->Model->Mesh->Parts[0],
-                crystalEntity->Pos(),
-                shipEntity->Vel(),
-                crystalEntity->Scl(),
-                CRYSTAL_COLOR,
-                CRYSTAL_COLOR,
-                vec3{ 0, 1, 1 }
-            );
-            AddEntity(g.World, exp);
+            auto pup = CreatePowerupEntity(g.World.Arena, g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
+            AddEntity(g.World, pup);
             RemoveEntity(g.World, crystalEntity);
         }
         return false;
     }
-    return true;
+    return false;
 }
 
 static void UpdateListener(camera &cam, vec3 PlayerPosition)
@@ -234,81 +227,44 @@ static void UpdateFreeCam(camera &cam, game_input &input, float dt)
     cam.Position += vec3(sin(strafeYaw), cos(strafeYaw), 0) * hAxisValue * speed * dt;
 }
 
-static int GetNextSpawnLane(level_mode &l, bool IsShip = false)
+static int GetNextSpawnLane(level_mode &l, bool isShip = false)
 {
-    static int LastLane = 0;
-    static int LastShipLane = 0;
-    int Lane = LastLane;
-    while (Lane == LastLane || (IsShip && Lane == LastShipLane))
+    static int lastLane = 0;
+    static int lastShipLane = 0;
+    int lane = lastLane;
+    while (lane == lastLane || (isShip && lane == lastShipLane) || (lane == l.RedShipReservedLane))
     {
-        Lane = RandomBetween(l.Entropy, -2, 2);
+        lane = RandomBetween(l.Entropy, -2, 2);
     }
-    LastLane = Lane;
-    if (IsShip)
+    lastLane = lane;
+    if (isShip)
     {
-        LastShipLane = Lane;
+        lastShipLane = lane;
     }
-    return Lane;
+    return lane;
 }
 
 static int GetNextShipColor(level_mode &l)
 {
-    static int LastColor = 0;
-    int Color = LastColor;
-    while (Color == LastColor)
+    static int lastColor = 0;
+    int color = lastColor;
+    while (color == lastColor)
     {
-        Color = RandomBetween(l.Entropy, 0, 1);
+        color = RandomBetween(l.Entropy, 0, 1);
     }
-    LastColor = Color;
-    return Color;
-}
-
-#define INITIAL_SHIP_INTERVAL 4.0f
-#define CHANGE_SHIP_TIMER     8.0f
-static void GenerateEnemyShips(game_state &g, level_mode &l, float dt)
-{
-    static float NextShipInterval = INITIAL_SHIP_INTERVAL;
-    static float NextShipTimer = INITIAL_SHIP_INTERVAL;
-    static float ChangeShipTimer = CHANGE_SHIP_TIMER;
-
-    // @TODO: remove debug key
-    if (NextShipTimer <= 0 || g.Input.Keys[SDL_SCANCODE_S])
-    {
-        if (ChangeShipTimer <= 0)
-        {
-            ChangeShipTimer = CHANGE_SHIP_TIMER;
-            NextShipInterval -= 0.15f;
-            NextShipInterval = std::max(1.0f, NextShipInterval);
-            NextShipInterval -= 0.0025f * g.PlayerEntity->Vel().y;
-            NextShipInterval = std::max(0.05f, NextShipInterval);
-        }
-        NextShipTimer = NextShipInterval;
-
-        int ColorIndex = GetNextShipColor(l);
-        color Color = IntColor(ShipPalette.Colors[ColorIndex]);
-        auto ent = CreateShipEntity(g.World.Arena, GetShipMesh(g), Color, Color, false);
-        int Lane = GetNextSpawnLane(l, true);
-        ent->Pos().x = Lane * ROAD_LANE_WIDTH;
-        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
-        ent->Pos().z = SHIP_Z;
-        ent->Ship->ColorIndex = ColorIndex;
-        AddEntity(g.World, ent);
-    }
-
-    NextShipTimer -= dt;
-    ChangeShipTimer -= dt;
+    lastColor = color;
+    return color;
 }
 
 static void GenerateCrystals(game_state &g, level_mode &l, float dt)
 {
-    const float baseCrystalInterval = 2.0f;
-    static float nextCrystalTimer = baseCrystalInterval;
-    if (nextCrystalTimer <= 0)
+    if (l.NextCrystalTimer <= 0)
     {
-        nextCrystalTimer = baseCrystalInterval + RandomBetween(l.Entropy, -1.5f, 1.5f);
+        l.NextCrystalTimer = BASE_CRYSTAL_INTERVAL + RandomBetween(l.Entropy, -1.5f, 1.5f);
 
-        auto ent = CreateCrystalEntity(g.World.Arena, GetCrystalMesh(g));
-        ent->Pos().x = GetNextSpawnLane(l) * ROAD_LANE_WIDTH;
+        int lane = GetNextSpawnLane(l);
+        auto ent = CreateCrystalEntity(g.World.Arena, GetCrystalMesh(g), lane);
+        ent->Pos().x = lane * ROAD_LANE_WIDTH;
         ent->Pos().y = g.PlayerEntity->Pos().y + 200;
         ent->Pos().z = SHIP_Z + 0.4f;
         ent->Scl().x = 0.3f;
@@ -318,7 +274,62 @@ static void GenerateCrystals(game_state &g, level_mode &l, float dt)
         AddEntity(g.World, ent);
     }
 
-    nextCrystalTimer -= dt;
+    l.NextCrystalTimer -= dt;
+}
+
+static void GenerateShips(game_state &g, level_mode &l, float dt)
+{
+    // @TODO: remove debug key
+    if (l.NextShipTimer <= 0 || g.Input.Keys[SDL_SCANCODE_S])
+    {
+        if (l.ChangeShipTimer <= 0)
+        {
+            l.ChangeShipTimer = CHANGE_SHIP_TIMER;
+            l.NextShipInterval -= 0.15f;
+            l.NextShipInterval = std::max(1.0f, l.NextShipInterval);
+            l.NextShipInterval -= 0.0025f * g.PlayerEntity->Vel().y;
+            l.NextShipInterval = std::max(0.05f, l.NextShipInterval);
+        }
+        l.NextShipTimer = l.NextShipInterval;
+
+        int colorIndex = GetNextShipColor(l);
+        color c = IntColor(ShipPalette.Colors[colorIndex]);
+        int lane = GetNextSpawnLane(l, true);
+        auto ent = CreateShipEntity(g.World.Arena, GetShipMesh(g), c, c, lane, false);
+        ent->Pos().x = lane * ROAD_LANE_WIDTH;
+        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+        ent->Pos().z = SHIP_Z;
+        ent->Ship->ColorIndex = colorIndex;
+        AddEntity(g.World, ent);
+    }
+
+    l.NextShipTimer -= dt;
+    l.ChangeShipTimer -= dt;
+}
+
+static void GenerateRedShips(game_state &g, level_mode &l, float dt)
+{
+    if (l.NextRedShipTimer <= 0)
+    {
+        color c = IntColor(ShipPalette.Colors[2]);
+        auto ent = CreateShipEntity(g.World.Arena, GetShipMesh(g), c, c, false);
+        int lane = l.RedShipReservedLane;
+        ent->Pos().x = lane * ROAD_LANE_WIDTH;
+        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+        ent->Pos().z = SHIP_Z;
+        ent->Ship->ColorIndex = 2;
+        AddFlags(ent, EntityFlag_RemoveOffscreen);
+        AddEntity(g.World, ent);
+
+        l.RedShipReservedLane = NO_RESERVED_LANE;
+        l.NextRedShipTimer = l.NextRedShipInterval;
+    }
+    if (l.NextRedShipTimer <= l.NextRedShipInterval*0.5f)
+    {
+        l.RedShipReservedLane = RandomBetween(l.Entropy, -2, 2);
+    }
+
+    l.NextRedShipTimer -= dt;
 }
 
 static void UpdateShipDraftCharge(ship *s, float dt)
@@ -345,8 +356,33 @@ static void KeepEntityInsideOfRoad(entity *ent)
     ent->Pos().x = glm::clamp(ent->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
+inline static void AddFlags(level_mode &l, uint64 flags)
+{
+    l.GenFlags |= flags;
+}
+
+inline static void RemoveFlags(level_mode &l, uint64 flags)
+{
+    l.GenFlags = l.GenFlags &~ flags;
+}
+
+static void ResetShipsGen(level_mode &l)
+{
+    l.NextShipInterval = INITIAL_SHIP_INTERVAL;
+    l.NextShipTimer = INITIAL_SHIP_INTERVAL;
+    l.ChangeShipTimer = CHANGE_SHIP_TIMER;
+}
+
+static void ResetRedShipsGen(level_mode &l)
+{
+    l.RedShipReservedLane = NO_RESERVED_LANE;
+    l.NextRedShipTimer = INITIAL_SHIP_INTERVAL;
+    l.NextRedShipInterval = INITIAL_SHIP_INTERVAL;
+    l.ChangeRedShipTimer = CHANGE_SHIP_TIMER;
+}
+
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
-static void RenderLevel(game_state &g, float dt)
+void RenderLevel(game_state &g, float dt)
 {
     auto &l = g.LevelMode;
     auto &updateTime = g.UpdateTime;
@@ -360,6 +396,7 @@ static void RenderLevel(game_state &g, float dt)
     dt *= Global_Game_TimeSpeed;
 
     l.PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+    l.TimeElapsed += dt;
     updateTime.Begin = g.Platform.GetMilliseconds();
 
     static bool Paused = false;
@@ -392,8 +429,39 @@ static void RenderLevel(game_state &g, float dt)
         AddEntity(world, exp);
     }
 
-    GenerateEnemyShips(g, l, dt);
-    GenerateCrystals(g, l, dt);
+    // we have a different state each 15 seconds elapsed
+    int state = int(std::floor(l.TimeElapsed / 15.0f));
+    switch (state)
+    {
+    case 0:
+        AddFlags(l, LevelGenFlag_Crystals | LevelGenFlag_RedShips);
+        break;
+
+    case 1:
+        AddFlags(l, LevelGenFlag_Ships);
+        break;
+
+    case 2:
+        RemoveFlags(l, LevelGenFlag_Ships);
+        ResetShipsGen(l);
+        break;
+
+    case 3:
+        AddFlags(l, LevelGenFlag_Ships | LevelGenFlag_RedShips);
+        break;
+    }
+    if (l.GenFlags & LevelGenFlag_Crystals)
+    {
+        GenerateCrystals(g, l, dt);
+    }
+    if (l.GenFlags & LevelGenFlag_Ships)
+    {
+        GenerateShips(g, l, dt);
+    }
+    if (l.GenFlags & LevelGenFlag_RedShips)
+    {
+        GenerateRedShips(g, l, dt);
+    }
 
     {
         float moveX = GetAxisValue(input, Action_horizontal);
@@ -444,34 +512,68 @@ static void RenderLevel(game_state &g, float dt)
 
     UpdateLogiclessEntities(world, dt);
 
+    for (int i = 0; i < ROAD_LANE_COUNT; i++)
+    {
+        l.LaneSlots[i] = 0;
+    }
+    for (auto ent : world.LaneSlotEntities)
+    {
+        if (!ent) continue;
+
+        l.LaneSlots[ent->LaneSlot->Index]++;
+    }
     for (auto ent : world.ShipEntities)
     {
         if (!ent) continue;
 
-        UpdateShipDraftCharge(ent->Ship, dt);
-        if (ent->Pos().y + 1.0f < playerEntity->Pos().y)
+        // red ship goes backwards
+        if (SHIP_IS_RED(ent->Ship))
         {
-            float moveX = playerEntity->Pos().x - ent->Pos().x;
-            moveX = std::min(moveX, 1.0f);
-
-            float moveY = 0.05f + (0.004f * playerEntity->Vel().y);
-            if (ent->Vel().y > playerEntity->Vel().y)
-            {
-                moveY = 0.0f;
-            }
-            MoveShipEntity(ent, moveX, moveY, l.PlayerMaxVel, dt);
-
-            if (ent->Ship->DraftCharge == 1.0f)
-            {
-                ShipEntityPerformDraft(ent);
-            }
+            ent->Rot().z = 180.0f;
+            ent->Vel().y = playerEntity->Vel().y * -0.8f;
         }
-        else if (playerShip->DraftTarget != ent)
+        else
         {
-            ent->Vel().y = playerEntity->Vel().y * 0.8f;
-        }
+            UpdateShipDraftCharge(ent->Ship, dt);
+            if (ent->Pos().y + 1.0f < playerEntity->Pos().y)
+            {
+                float moveX = playerEntity->Pos().x - ent->Pos().x;
+                moveX = std::min(moveX, 1.0f);
 
-        KeepEntityInsideOfRoad(ent);
+                float moveY = 0.05f + (0.004f * playerEntity->Vel().y);
+                if (ent->Vel().y > playerEntity->Vel().y)
+                {
+                    moveY = 0.0f;
+                }
+                MoveShipEntity(ent, moveX, moveY, l.PlayerMaxVel, dt);
+
+                if (ent->Ship->DraftCharge == 1.0f)
+                {
+                    ShipEntityPerformDraft(ent);
+                }
+            }
+            else if (playerShip->DraftTarget != ent)
+            {
+                ent->Vel().y = playerEntity->Vel().y * 0.8f;
+            }
+
+            KeepEntityInsideOfRoad(ent);
+        }
+    }
+    for (auto ent : world.PowerupEntities)
+    {
+        if (!ent) continue;
+
+        vec3 distToPlayer = (playerEntity->Pos() + playerEntity->Vel()*dt) - ent->Pos();
+        vec3 dirToPlayer = glm::normalize(distToPlayer);
+        ent->SetVel(ent->Vel() + dirToPlayer);
+        ent->SetPos(ent->Pos() + ent->Vel() * dt);
+
+        // @TODO: temporary i hope
+        if (ent->Pos().z < 0.0f)
+        {
+            RemoveEntity(g.World, ent);
+        }
     }
 
     auto playerPosition = playerEntity->Pos();

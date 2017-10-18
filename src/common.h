@@ -87,4 +87,16 @@ Lerp(float A, float t, float B)
     return (1.0f - t)*A + t*B;
 }
 
+inline float
+Square(float f)
+{
+    return f*f;
+}
+
+inline float
+Length2(const vec3 &v)
+{
+    return Square(v.x) + Square(v.y) + Square(v.z);
+}
+
 #endif

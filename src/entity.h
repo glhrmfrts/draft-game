@@ -39,6 +39,17 @@ struct entity_repeat
     float DistanceFromCamera = 0;
 };
 
+struct powerup
+{
+    color Color;
+    float TimeSpawn;
+};
+
+struct lane_slot
+{
+    int Index;
+};
+
 struct explosion;
 struct trail;
 struct trail_piece;
@@ -65,6 +76,7 @@ struct entity
     int NumCollisions = 0;
 
     player_state *PlayerState = NULL;
+    powerup *Powerup = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
     trail *Trail = NULL;
@@ -72,6 +84,7 @@ struct entity
     entity_repeat *Repeat = NULL;
     collider *Collider = NULL;
     model *Model = NULL;
+    lane_slot *LaneSlot = NULL;
 
     inline vec3 &Pos() { return Transform.Position; }
     inline vec3 &Vel() { return Transform.Velocity; }
@@ -115,6 +128,7 @@ struct entity_world
 {
     memory_arena Arena;
 
+    std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;
     std::vector<entity *> TrailEntities;
@@ -122,6 +136,7 @@ struct entity_world
     std::vector<entity *> ExplosionEntities;
     std::vector<entity *> RepeatingEntities;
     std::vector<entity *> RemoveOffscreenEntities;
+    std::vector<entity *> LaneSlotEntities;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
     int NumEntities = 0;

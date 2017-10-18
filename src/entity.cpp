@@ -73,7 +73,16 @@ static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color, float
     return result;
 }
 
-entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
+static lane_slot *CreateLaneSlot(memory_arena &arena, int lane)
+{
+    assert(lane >= -2 && lane <= 2);
+
+    auto result = PushStruct<lane_slot>(arena);
+    result->Index = lane+2;
+    return result;
+}
+
+entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, int lane, bool isPlayer = false)
 {
     auto ent = PushStruct<entity>(arena);
     ent->Model = CreateModel(arena, shipMesh);
@@ -87,6 +96,7 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
     ent->Trail = CreateTrail(arena, ent, outlineColor);
+    ent->LaneSlot = CreateLaneSlot(arena, lane);
     if (isPlayer)
     {
         ent->PlayerState = PushStruct<player_state>(arena);
@@ -95,35 +105,13 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     return ent;
 }
 
-#define DefaultEnemyColor   IntColor(SecondPalette.Colors[3])
-#define ExplosiveEnemyColor Color_red
-entity *CreateEnemyShipEntity(memory_arena &arena, mesh *shipMesh, vec3 Position, vec3 Velocity, enemy_type Type)
-{
-    color Color;
-    switch (Type)
-    {
-    case EnemyType_Default:
-        Color = DefaultEnemyColor;
-        break;
-
-    case EnemyType_Explosive:
-        Color = ExplosiveEnemyColor;
-        break;
-    }
-
-    auto *Result = CreateShipEntity(arena, shipMesh, Color, Color);
-    Result->Transform.Position = Position;
-    Result->Transform.Velocity = Velocity;
-    Result->Ship->EnemyType = Type;
-    return Result;
-}
-
-entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh)
+entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh, int lane)
 {
     auto ent = PushStruct<entity>(arena);
     ent->Flags |= EntityFlag_RemoveOffscreen;
     ent->Model = CreateModel(arena, crystalMesh);
     ent->Collider = CreateCollider(arena, ColliderType_Crystal);
+    ent->LaneSlot = CreateLaneSlot(arena, lane);
     return ent;
 }
 
@@ -149,6 +137,20 @@ inline static float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     {
         return RandomVel(Series, Sign[i]);
     }
+}
+
+entity *CreatePowerupEntity(memory_arena &arena, random_series &series, float timeSpawn, vec3 pos, vec3 vel, color c)
+{
+    auto result = PushStruct<entity>(arena);
+    result->Powerup = PushStruct<powerup>(arena);
+    result->Powerup->Color = c;
+    result->Powerup->TimeSpawn = timeSpawn;
+    result->Trail = CreateTrail(arena, result, c, 0.1f, true);
+    result->SetPos(pos);
+    result->Vel().x = RandomBetween(series, -20.0f, 20.0f);
+    result->Vel().y = vel.y + (vel.y * 0.3f);
+    result->Vel().z = vel.z + 20.0f;
+    return result;
 }
 
 entity *CreateExplosionEntity(memory_arena &arena, mesh &baseMesh, mesh_part &part, vec3 pos, vec3 vel, vec3 scale, color c, color outlineColor, vec3 sign)
@@ -352,6 +354,14 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.RemoveOffscreenEntities, ent);
     }
+    if (ent->Powerup)
+    {
+        AddEntityToList(world.PowerupEntities, ent);
+    }
+    if (ent->LaneSlot)
+    {
+        AddEntityToList(world.LaneSlotEntities, ent);
+    }
     world.NumEntities++;
 }
 
@@ -407,6 +417,14 @@ void RemoveEntity(entity_world &world, entity *ent)
     if (ent->Flags & EntityFlag_RemoveOffscreen)
     {
         RemoveEntityFromList(world.RemoveOffscreenEntities, ent);
+    }
+    if (ent->Powerup)
+    {
+        RemoveEntityFromList(world.PowerupEntities, ent);
+    }
+    if (ent->LaneSlot)
+    {
+        RemoveEntityFromList(world.LaneSlotEntities, ent);
     }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
