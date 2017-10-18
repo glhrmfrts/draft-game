@@ -50,6 +50,7 @@ struct level_mode
     std::vector<collision_result> CollisionCache;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
     float TimeElapsed = 0.0f;
+    int PlayerLaneIndex = 0;
 };
 
 #endif

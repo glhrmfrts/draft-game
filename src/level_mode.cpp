@@ -43,7 +43,7 @@ static void InitLevel(game_state &g)
 
     g.PlayerEntity = CreateShipEntity(g.World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
     g.PlayerEntity->Transform.Position.z = SHIP_Z;
-    g.PlayerEntity->Transform.Velocity.y = PlayerMinVel;
+    g.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
     AddEntity(g.World, g.PlayerEntity);
 
     for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
@@ -128,6 +128,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
                 s->CurrentDraftTime += dt;
                 s->NumTrailCollisions++;
                 s->DraftTarget = trailPieceEntity->TrailPiece->Owner;
+                s->DraftActive = false;
             }
         }
         return false;
@@ -288,7 +289,7 @@ static void GenerateCrystals(game_state &g, level_mode &l, float dt)
         ent->Scl().x = 0.3f;
         ent->Scl().y = 0.3f;
         ent->Scl().z = 0.5f;
-        ent->Vel().y = g.PlayerEntity->Vel().y * 0.5f;
+        ent->Vel().y = PLAYER_MIN_VEL * 0.5f;
         AddEntity(g.World, ent);
 
         l.NextCrystalTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_Crystals, BASE_CRYSTAL_INTERVAL, CRYSTAL_INTERVAL_OFFSET);
@@ -357,7 +358,7 @@ static void GenerateRedShips(game_state &g, level_mode &l, float dt)
     {
         const int maxTries = 5;
         int i = 0;
-        int laneIndex = RandomBetween(l.Entropy, 0, 4);
+        int laneIndex = l.PlayerLaneIndex;
 
         // get the first non-occupied lane, or give up for this frame
         while (l.LaneSlots[laneIndex] > 0 && i < maxTries)
@@ -373,8 +374,6 @@ static void GenerateRedShips(game_state &g, level_mode &l, float dt)
         {
             l.RedShipReservedLane = laneIndex - 2;
         }
-
-        Println(i == maxTries);
     }
 
     l.NextRedShipTimer -= dt;
@@ -543,6 +542,8 @@ void RenderLevel(game_state &g, float dt)
         {
             ShipEntityPerformDraft(playerEntity);
         }
+
+        l.PlayerLaneIndex = int(nearestLane)+2;
     }
 
     size_t FrameCollisionCount = 0;
@@ -611,7 +612,7 @@ void RenderLevel(game_state &g, float dt)
             }
             else if (playerShip->DraftTarget != ent)
             {
-                if (ent->Pos().y - playerEntity->Pos().y >= 20.0f)
+                if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
                 {
                     ent->Vel().y = playerEntity->Vel().y * 0.2f;
                 }

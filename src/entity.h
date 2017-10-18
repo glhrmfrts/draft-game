@@ -27,11 +27,6 @@ struct ship
     bool DraftActive = false;
 };
 
-struct player_state
-{
-    int Score = 0;
-};
-
 struct entity_repeat
 {
     int Count = 0;
@@ -48,6 +43,11 @@ struct powerup
 struct lane_slot
 {
     int Index;
+};
+
+struct frame_rotation
+{
+    vec3 Rotation;
 };
 
 struct explosion;
@@ -75,7 +75,6 @@ struct entity
     uint32 Flags = 0;
     int NumCollisions = 0;
 
-    player_state *PlayerState = NULL;
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
@@ -85,6 +84,7 @@ struct entity
     collider *Collider = NULL;
     model *Model = NULL;
     lane_slot *LaneSlot = NULL;
+    frame_rotation *FrameRotation = NULL;
 
     inline vec3 &Pos() { return Transform.Position; }
     inline vec3 &Vel() { return Transform.Velocity; }
@@ -137,6 +137,7 @@ struct entity_world
     std::vector<entity *> RepeatingEntities;
     std::vector<entity *> RemoveOffscreenEntities;
     std::vector<entity *> LaneSlotEntities;
+    std::vector<entity *> RotatingEntities;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
     int NumEntities = 0;

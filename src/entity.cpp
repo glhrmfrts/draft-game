@@ -98,7 +98,6 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     ent->Trail = CreateTrail(arena, ent, outlineColor);
     if (isPlayer)
     {
-        ent->PlayerState = PushStruct<player_state>(arena);
         AddFlags(ent, EntityFlag_IsPlayer);
     }
     return ent;
@@ -110,6 +109,8 @@ entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh)
     ent->Flags |= EntityFlag_RemoveOffscreen;
     ent->Model = CreateModel(arena, crystalMesh);
     ent->Collider = CreateCollider(arena, ColliderType_Crystal);
+    ent->FrameRotation = PushStruct<frame_rotation>(arena);
+    ent->FrameRotation->Rotation.z = 90.0f;
     return ent;
 }
 
@@ -241,7 +242,7 @@ static float Interp(float c, float t, float a, float dt)
 }
 
 #define ShipMinVel              40.0f
-#define PlayerMinVel            50.0f
+#define PLAYER_MIN_VEL          50.0f
 #define ShipAcceleration        20.0f
 #define ShipBreakAcceleration   30.0f
 #define ShipSteerSpeed          20.0f
@@ -252,7 +253,7 @@ void MoveShipEntity(entity *ent, float moveH, float moveV, float maxVel, float d
     float MinVel = ShipMinVel;
     if (ent->Flags & EntityFlag_IsPlayer)
     {
-        MinVel = PlayerMinVel;
+        MinVel = PLAYER_MIN_VEL;
     }
     if (ent->Transform.Velocity.y < MinVel)
     {
@@ -360,6 +361,10 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.LaneSlotEntities, ent);
     }
+    if (ent->FrameRotation)
+    {
+        AddEntityToList(world.RotatingEntities, ent);
+    }
     world.NumEntities++;
 }
 
@@ -424,6 +429,10 @@ void RemoveEntity(entity_world &world, entity *ent)
     {
         RemoveEntityFromList(world.LaneSlotEntities, ent);
     }
+    if (ent->FrameRotation)
+    {
+        RemoveEntityFromList(world.RotatingEntities, ent);
+    }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
 
@@ -438,7 +447,6 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
             RemoveEntity(world, ent);
         }
     }
-
     for (auto ent : world.RepeatingEntities)
     {
         auto repeat = ent->Repeat;
@@ -446,6 +454,12 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         {
             ent->Transform.Position.y += repeat->Size * repeat->Count;
         }
+    }
+    for (auto ent : world.RotatingEntities)
+    {
+        if (!ent) continue;
+
+        ent->Transform.Rotation += ent->FrameRotation->Rotation * dt;
     }
 }
 
