@@ -82,7 +82,7 @@ static lane_slot *CreateLaneSlot(memory_arena &arena, int lane)
     return result;
 }
 
-entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, int lane, bool isPlayer = false)
+entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
 {
     auto ent = PushStruct<entity>(arena);
     ent->Model = CreateModel(arena, shipMesh);
@@ -96,7 +96,6 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
     ent->Trail = CreateTrail(arena, ent, outlineColor);
-    ent->LaneSlot = CreateLaneSlot(arena, lane);
     if (isPlayer)
     {
         ent->PlayerState = PushStruct<player_state>(arena);
@@ -105,13 +104,12 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     return ent;
 }
 
-entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh, int lane)
+entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh)
 {
     auto ent = PushStruct<entity>(arena);
     ent->Flags |= EntityFlag_RemoveOffscreen;
     ent->Model = CreateModel(arena, crystalMesh);
     ent->Collider = CreateCollider(arena, ColliderType_Crystal);
-    ent->LaneSlot = CreateLaneSlot(arena, lane);
     return ent;
 }
 

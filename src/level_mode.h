@@ -1,9 +1,9 @@
 #ifndef DRAFT_LEVEL_MODE_H
 #define DRAFT_LEVEL_MODE_H
 
-#define LevelGenFlag_Crystals (1 << 0)
-#define LevelGenFlag_Ships    (1 << 1)
-#define LevelGenFlag_RedShips (1 << 2)
+#define LevelFlag_Crystals (1 << 0)
+#define LevelFlag_Ships    (1 << 1)
+#define LevelFlag_RedShips (1 << 2)
 
 struct audio_source;
 
@@ -15,12 +15,25 @@ struct audio_source;
 #define CHANGE_SHIP_TIMER     8.0f
 
 #define NO_RESERVED_LANE 500
+
+/*
+struct level_gen_params
+{
+    uint32 Flags;
+    float NextInterval;
+    float NextTimer;
+    float ChangeTimer;
+};
+*/
+
 struct level_mode
 {
     memory_arena Arena;
     random_series Entropy;
     audio_source *DraftBoostAudio;
-    uint64 GenFlags = 0;
+    uint64 GenFlags = 0; // entity generation flags
+    uint64 IncFlags = 0; // timer increment flags
+    uint64 RandFlags = 0; // random timer flags
     int LaneSlots[5];
 
     float NextCrystalTimer = BASE_CRYSTAL_INTERVAL;

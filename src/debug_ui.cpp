@@ -25,8 +25,10 @@ void DrawDebugUI(game_state &g, float dt)
     ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
     ImGui::Text("Player max vel: %.2f", g.LevelMode.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
-    ImGui::Text("State: %d", int(std::floor(g.LevelMode.TimeElapsed/15.0f)));
+    ImGui::Text("State: %d (%.2f)", int(std::floor(g.LevelMode.TimeElapsed/10.0f)), g.LevelMode.TimeElapsed);
     ImGui::Text("Gen flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.GenFlags));
+    ImGui::Text("Inc flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.IncFlags));
+    ImGui::Text("Rand flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.RandFlags));
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 
     if (ImGui::CollapsingHeader("Camera"))
