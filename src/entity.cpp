@@ -5,9 +5,9 @@ inline static void AddFlags(entity *Entity, uint32 Flags)
     Entity->Flags |= Flags;
 }
 
-static material *CreateMaterial(memory_arena &Arena, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
+static material *CreateMaterial(allocator *alloc, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
 {
-    material *Result = PushStruct<material>(Arena);
+    material *Result = PushStruct<material>(alloc);
     Result->DiffuseColor = Color;
     Result->Emission = Emission;
     Result->TexWeight = TexWeight;
@@ -16,23 +16,24 @@ static material *CreateMaterial(memory_arena &Arena, color Color, float Emission
     return Result;
 }
 
-static model *CreateModel(memory_arena &Arena, mesh *Mesh)
+static model *CreateModel(allocator *alloc, mesh *Mesh)
 {
-    model *Result = PushStruct<model>(Arena);
+    model *Result = PushStruct<model>(alloc);
     Result->Mesh = Mesh;
     return Result;
 }
 
-static collider *CreateCollider(memory_arena &Arena, collider_type Type)
+static collider *CreateCollider(allocator *alloc, collider_type Type)
 {
-    collider *Result = PushStruct<collider>(Arena);
+    collider *Result = PushStruct<collider>(alloc);
     Result->Type = Type;
     return Result;
 }
 
-static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color, float radius = 0.5f, bool renderOnly = false)
+#define TRAIL_SIZE (sizeof(trail) + (sizeof(trail_piece)+sizeof(collider))*TrailCount)
+static trail *CreateTrail(allocator *alloc, entity *Owner, color Color, float radius = 0.5f, bool renderOnly = false)
 {
-    trail *result = PushStruct<trail>(Arena);
+    trail *result = PushStruct<trail>(alloc);
     result->RenderOnly = renderOnly;
     result->Radius = radius;
 
@@ -59,43 +60,51 @@ static trail *CreateTrail(memory_arena &Arena, entity *Owner, color Color, float
 
     for (int i = 0; i < TrailCount; i++)
     {
-        auto Entity = result->Entities + i;
-        Entity->Transform.Position = vec3(0.0f);
+        auto ent = result->Entities + i;
+        ent->Transform.Position = vec3(0.0f);
         if (!renderOnly)
         {
-            Entity->TrailPiece = PushStruct<trail_piece>(Arena);
-            Entity->TrailPiece->Owner = Owner;
-            Entity->Collider = PushStruct<collider>(Arena);
-            Entity->Collider->Type = ColliderType_TrailPiece;
-            AddFlags(Entity, EntityFlag_Kinematic);
+            ent->TrailPiece = PushStruct<trail_piece>(alloc);
+            ent->TrailPiece->Owner = Owner;
+            ent->Collider = PushStruct<collider>(alloc);
+            ent->Collider->Type = ColliderType_TrailPiece;
+            AddFlags(ent, EntityFlag_Kinematic);
         }
     }
     return result;
 }
 
-static lane_slot *CreateLaneSlot(memory_arena &arena, int lane)
+static lane_slot *CreateLaneSlot(allocator *alloc, int lane)
 {
     assert(lane >= -2 && lane <= 2);
 
-    auto result = PushStruct<lane_slot>(arena);
+    auto result = PushStruct<lane_slot>(alloc);
     result->Index = lane+2;
     return result;
 }
 
-entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
+entity *CreateEntity(allocator *alloc)
 {
-    auto ent = PushStruct<entity>(arena);
-    ent->Model = CreateModel(arena, shipMesh);
-    ent->Model->Materials.push_back(CreateMaterial(arena, vec4(c.r, c.g, c.b, 1), 0, 0, NULL));
-    ent->Model->Materials.push_back(CreateMaterial(arena, outlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
+    auto result = PushStruct<entity>(alloc);
+    result->PoolEntry = dynamic_cast<memory_pool_entry *>(alloc);
+    return result;
+}
+
+#define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + TRAIL_SIZE + sizeof(lane_slot) + (sizeof(material)*2))
+entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false)
+{
+    auto ent = CreateEntity(alloc);
+    ent->Model = CreateModel(alloc, shipMesh);
+    ent->Model->Materials.push_back(CreateMaterial(alloc, vec4(c.r, c.g, c.b, 1), 0, 0, NULL));
+    ent->Model->Materials.push_back(CreateMaterial(alloc, outlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
     ent->Transform.Scale.y = 3;
     ent->Transform.Scale *= 0.75f;
-    ent->Collider = PushStruct<collider>(arena);
+    ent->Collider = PushStruct<collider>(alloc);
     ent->Collider->Type = ColliderType_Ship;
-    ent->Ship = PushStruct<ship>(arena);
+    ent->Ship = PushStruct<ship>(alloc);
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
-    ent->Trail = CreateTrail(arena, ent, outlineColor);
+    ent->Trail = CreateTrail(alloc, ent, outlineColor);
     if (isPlayer)
     {
         AddFlags(ent, EntityFlag_IsPlayer);
@@ -103,13 +112,14 @@ entity *CreateShipEntity(memory_arena &arena, mesh *shipMesh, color c, color out
     return ent;
 }
 
-entity *CreateCrystalEntity(memory_arena &arena, mesh *crystalMesh)
+#define CRYSTAL_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(frame_rotation))
+entity *CreateCrystalEntity(allocator *alloc, mesh *crystalMesh)
 {
-    auto ent = PushStruct<entity>(arena);
+    auto ent = CreateEntity(alloc);
     ent->Flags |= EntityFlag_RemoveOffscreen;
-    ent->Model = CreateModel(arena, crystalMesh);
-    ent->Collider = CreateCollider(arena, ColliderType_Crystal);
-    ent->FrameRotation = PushStruct<frame_rotation>(arena);
+    ent->Model = CreateModel(alloc, crystalMesh);
+    ent->Collider = CreateCollider(alloc, ColliderType_Crystal);
+    ent->FrameRotation = PushStruct<frame_rotation>(alloc);
     ent->FrameRotation->Rotation.z = 90.0f;
     return ent;
 }
@@ -138,13 +148,14 @@ inline static float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-entity *CreatePowerupEntity(memory_arena &arena, random_series &series, float timeSpawn, vec3 pos, vec3 vel, color c)
+#define POWERUP_ENTITY_SIZE (sizeof(entity) + sizeof(powerup) + TRAIL_SIZE)
+entity *CreatePowerupEntity(allocator *alloc, random_series &series, float timeSpawn, vec3 pos, vec3 vel, color c)
 {
-    auto result = PushStruct<entity>(arena);
-    result->Powerup = PushStruct<powerup>(arena);
+    auto result = CreateEntity(alloc);
+    result->Powerup = PushStruct<powerup>(alloc);
     result->Powerup->Color = c;
     result->Powerup->TimeSpawn = timeSpawn;
-    result->Trail = CreateTrail(arena, result, c, 0.1f, true);
+    result->Trail = CreateTrail(alloc, result, c, 0.1f, true);
     result->SetPos(pos);
     result->Vel().x = RandomBetween(series, -20.0f, 20.0f);
     result->Vel().y = vel.y + (vel.y * 0.3f);
@@ -152,11 +163,12 @@ entity *CreatePowerupEntity(memory_arena &arena, random_series &series, float ti
     return result;
 }
 
-entity *CreateExplosionEntity(memory_arena &arena, mesh &baseMesh, mesh_part &part, vec3 pos, vec3 vel, vec3 scale, color c, color outlineColor, vec3 sign)
+#define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(explosion) + (TRAIL_SIZE*EXPLOSION_PARTS_COUNT))
+entity *CreateExplosionEntity(allocator *alloc, mesh &baseMesh, mesh_part &part, vec3 pos, vec3 vel, vec3 scale, color c, color outlineColor, vec3 sign)
 {
     assert(part.PrimitiveType == GL_TRIANGLES);
 
-    auto exp = PushStruct<explosion>(arena);
+    auto exp = PushStruct<explosion>(alloc);
     exp->LifeTime = Global_Game_ExplosionLifeTime;
     exp->Color = c;
     InitMeshBuffer(exp->Mesh.Buffer);
@@ -169,7 +181,7 @@ entity *CreateExplosionEntity(memory_arena &arena, mesh &baseMesh, mesh_part &pa
         angle += theta;
 
         auto ent = exp->Entities + i;
-        ent->Trail = CreateTrail(arena, ent, outlineColor, 0.2f, true);
+        ent->Trail = CreateTrail(alloc, ent, outlineColor, 0.2f, true);
         ent->SetPos(pos);
         ent->Vel().x = std::cos(angle)*10.0f;
         ent->Vel().y = vel.y + std::sin(angle)*10.0f;
@@ -224,7 +236,7 @@ entity *CreateExplosionEntity(memory_arena &arena, mesh &baseMesh, mesh_part &pa
     }
     */
 
-    auto result = PushStruct<entity>(arena);
+    auto result = CreateEntity(alloc);
     result->Transform.Position = pos;
     result->Explosion = exp;
     return result;
@@ -294,6 +306,21 @@ void PushPosition(trail *t, vec3 pos)
         t->PositionStackIndex -= 1;
     }
     t->Entities[t->PositionStackIndex++].Transform.Position = pos;
+}
+
+void InitEntityWorld(entity_world &world)
+{
+    world.ShipPool.ElemSize = SHIP_ENTITY_SIZE;
+    world.CrystalPool.ElemSize = CRYSTAL_ENTITY_SIZE;
+    world.PowerupPool.ElemSize = POWERUP_ENTITY_SIZE;
+    world.ExplosionPool.ElemSize = EXPLOSION_ENTITY_SIZE;
+
+#ifdef DRAFT_DEBUG
+    world.ShipPool.DEBUGName = "ShipPool";
+    world.CrystalPool.DEBUGName = "CrystalPool";
+    world.PowerupPool.DEBUGName = "PowerupPool";
+    world.ExplosionPool.DEBUGName = "ExplosionPool";
+#endif
 }
 
 // Finds the first free slot on the list and insert the entity
@@ -408,10 +435,12 @@ void RemoveEntity(entity_world &world, entity *ent)
         {
             RemoveEntity(world, ent->Explosion->Entities + i);
         }
+        FreeEntry(world.ExplosionPool, ent->PoolEntry);
     }
     if (ent->Ship)
     {
         RemoveEntityFromList(world.ShipEntities, ent);
+        FreeEntry(world.ShipPool, ent->PoolEntry);
     }
     if (ent->Repeat)
     {
@@ -424,6 +453,7 @@ void RemoveEntity(entity_world &world, entity *ent)
     if (ent->Powerup)
     {
         RemoveEntityFromList(world.PowerupEntities, ent);
+        FreeEntry(world.PowerupPool, ent->PoolEntry);
     }
     if (ent->LaneSlot)
     {
@@ -432,6 +462,10 @@ void RemoveEntity(entity_world &world, entity *ent)
     if (ent->FrameRotation)
     {
         RemoveEntityFromList(world.RotatingEntities, ent);
+    }
+    if (ent->Collider && ent->Collider->Type == ColliderType_Crystal)
+    {
+        FreeEntry(world.CrystalPool, ent->PoolEntry);
     }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }

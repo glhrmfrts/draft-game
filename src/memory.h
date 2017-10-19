@@ -10,9 +10,32 @@ struct memory_block
     const char *Name;
 };
 
-struct memory_arena
+struct allocator
+{
+    virtual ~allocator() {}
+};
+
+struct memory_arena : allocator
 {
     memory_block *CurrentBlock = NULL;
+};
+
+struct memory_pool_entry : allocator
+{
+    void *Base;
+    memory_pool_entry *Next = NULL;
+    size_t Used = 0;
+};
+
+struct memory_pool
+{
+    memory_pool_entry *First = NULL;
+    memory_pool_entry *FirstFree = NULL;
+    size_t ElemSize = 0;
+
+#ifdef DRAFT_DEBUG
+    char *DEBUGName;
+#endif
 };
 
 #endif

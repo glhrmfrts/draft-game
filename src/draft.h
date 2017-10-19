@@ -169,7 +169,7 @@ struct game_state
     gui GUI;
     camera GUICamera;
     render_state RenderState;
-    vector<asset_entry> Assets;
+    std::vector<asset_entry> Assets;
     tween_state TweenState;
 
     memory_arena Arena;

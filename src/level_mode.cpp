@@ -41,7 +41,7 @@ static void InitLevel(game_state &g)
     g.Gravity = vec3(0, 0, 0);
     g.World.Camera = &g.Camera;
 
-    g.PlayerEntity = CreateShipEntity(g.World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
+    g.PlayerEntity = CreateShipEntity(&g.World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
     g.PlayerEntity->Transform.Position.z = SHIP_Z;
     g.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
     AddEntity(g.World, g.PlayerEntity);
@@ -52,7 +52,7 @@ static void InitLevel(game_state &g)
         ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
         ent->Transform.Position.z = -0.25f;
         ent->Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 0};
-        ent->Model = CreateModel(g.World.Arena, GetFloorMesh(g));
+        ent->Model = CreateModel(&g.World.Arena, GetFloorMesh(g));
         ent->Repeat = PushStruct<entity_repeat>(g.World.Arena);
         ent->Repeat->Count = LEVEL_PLANE_COUNT;
         ent->Repeat->Size = LEVEL_PLANE_SIZE;
@@ -65,7 +65,7 @@ static void InitLevel(game_state &g)
         ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
         ent->Transform.Position.z = 0.0f;
         ent->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
-        ent->Model = CreateModel(g.World.Arena, GetRoadMesh(g));
+        ent->Model = CreateModel(&g.World.Arena, GetRoadMesh(g));
         ent->Repeat = PushStruct<entity_repeat>(g.World.Arena);
         ent->Repeat->Count = LEVEL_PLANE_COUNT;
         ent->Repeat->Size = LEVEL_PLANE_SIZE;
@@ -158,7 +158,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             }
 
             auto exp = CreateExplosionEntity(
-                g.World.Arena,
+                GetEntry(g.World.ExplosionPool),
                 *entityToExplode->Model->Mesh,
                 entityToExplode->Model->Mesh->Parts[0],
                 entityToExplode->Transform.Position,
@@ -178,7 +178,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
-            auto pup = CreatePowerupEntity(g.World.Arena, g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
+            auto pup = CreatePowerupEntity(GetEntry(g.World.PowerupPool), g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
             AddEntity(g.World, pup);
             RemoveEntity(g.World, crystalEntity);
         }
@@ -282,7 +282,7 @@ static void GenerateCrystals(game_state &g, level_mode &l, float dt)
     if (l.NextCrystalTimer <= 0)
     {
         int lane = GetNextSpawnLane(l);
-        auto ent = CreateCrystalEntity(g.World.Arena, GetCrystalMesh(g));
+        auto ent = CreateCrystalEntity(GetEntry(g.World.CrystalPool), GetCrystalMesh(g));
         ent->Pos().x = lane * ROAD_LANE_WIDTH;
         ent->Pos().y = g.PlayerEntity->Pos().y + 200;
         ent->Pos().z = SHIP_Z + 0.4f;
@@ -312,8 +312,8 @@ static void GenerateShips(game_state &g, level_mode &l, float dt)
         int colorIndex = GetNextShipColor(l);
         color c = IntColor(ShipPalette.Colors[colorIndex]);
         int lane = GetNextSpawnLane(l, true);
-        auto ent = CreateShipEntity(g.World.Arena, GetShipMesh(g), c, c, false);
-        ent->LaneSlot = CreateLaneSlot(g.World.Arena, lane);
+        auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
+        ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
         ent->Pos().x = lane * ROAD_LANE_WIDTH;
         ent->Pos().y = g.PlayerEntity->Pos().y + 200;
         ent->Pos().z = SHIP_Z;
@@ -342,7 +342,7 @@ static void GenerateRedShips(game_state &g, level_mode &l, float dt)
         }
 
         color c = IntColor(ShipPalette.Colors[2]);
-        auto ent = CreateShipEntity(g.World.Arena, GetShipMesh(g), c, c, false);
+        auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
         int lane = l.RedShipReservedLane;
         ent->Pos().x = lane * ROAD_LANE_WIDTH;
         ent->Pos().y = g.PlayerEntity->Pos().y + 200;
@@ -468,7 +468,7 @@ void RenderLevel(game_state &g, float dt)
 
     if (g.Input.Keys[SDL_SCANCODE_E])
     {
-        auto exp = CreateExplosionEntity(g.World.Arena,
+        auto exp = CreateExplosionEntity(GetEntry(g.World.ExplosionPool),
                                          *g.PlayerEntity->Model->Mesh,
                                          g.PlayerEntity->Model->Mesh->Parts[0],
                                          g.PlayerEntity->Transform.Position,

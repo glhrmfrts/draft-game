@@ -74,7 +74,9 @@ struct entity
     transform Transform;
     uint32 Flags = 0;
     int NumCollisions = 0;
+    memory_pool_entry *PoolEntry = NULL;
 
+    // entity components
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
@@ -127,6 +129,11 @@ struct trail_piece
 struct entity_world
 {
     memory_arena Arena;
+
+    memory_pool ShipPool;
+    memory_pool CrystalPool;
+    memory_pool ExplosionPool;
+    memory_pool PowerupPool;
 
     std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;

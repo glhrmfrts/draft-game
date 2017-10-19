@@ -44,6 +44,7 @@ extern "C"
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 70.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height);
         InitTweenState(g->TweenState);
+        InitEntityWorld(g->World);
 
         g->Assets.push_back(
             CreateAssetEntry(

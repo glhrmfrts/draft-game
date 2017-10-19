@@ -4,21 +4,21 @@
 #define Alignment 4
 #define InitialBlockSize 1024*1024
 
-static size_t GetAlignmentOffset(memory_arena &Arena)
+static size_t GetAlignmentOffset(size_t base, size_t used)
 {
-    size_t ResultPointer = (size_t)Arena.CurrentBlock->Base + Arena.CurrentBlock->Used;
-    size_t AlignMask = Alignment - 1;
+    size_t resultPointer = base + used;
+    size_t alignMask = Alignment - 1;
 
-    if (ResultPointer & AlignMask)
+    if (resultPointer & alignMask)
     {
-        return Alignment - (ResultPointer & AlignMask);
+        return Alignment - (resultPointer & alignMask);
     }
     return 0;
 }
 
 static size_t GetEffectiveSizeFor(memory_arena &Arena, size_t SizeInit)
 {
-    return SizeInit + GetAlignmentOffset(Arena);
+    return SizeInit + GetAlignmentOffset((size_t)Arena.CurrentBlock->Base, Arena.CurrentBlock->Used);
 }
 
 void *PushSize(memory_arena &Arena, size_t SizeInit, const char *Name)
@@ -53,22 +53,12 @@ void *PushSize(memory_arena &Arena, size_t SizeInit, const char *Name)
 
     assert((Arena.CurrentBlock->Used + Size) <= Arena.CurrentBlock->Size);
 
-    size_t AlignmentOffset = GetAlignmentOffset(Arena);
+    size_t AlignmentOffset = GetAlignmentOffset((size_t)Arena.CurrentBlock->Base, Arena.CurrentBlock->Used);
     Result = (void *)((uintptr_t)Arena.CurrentBlock->Base + Arena.CurrentBlock->Used + AlignmentOffset);
 
     Arena.CurrentBlock->Used += Size;
 
     assert(Size >= SizeInit);
-    return Result;
-}
-
-template<typename T>
-T *PushStruct(memory_arena &Arena)
-{
-    auto Result = (T *)PushSize(Arena, sizeof(T), typeid(T).name());
-
-    // call the constructor manually
-    new(Result) T();
     return Result;
 }
 
@@ -84,4 +74,98 @@ void FreeArena(memory_arena &Arena)
         free(Block->Base);
         free(Block);
     }
+}
+
+memory_pool_entry *GetEntry(memory_pool &pool)
+{
+    assert(pool.ElemSize > 0);
+    if (pool.FirstFree)
+    {
+        auto result = pool.FirstFree;
+        pool.FirstFree = result->Next;
+
+#ifdef DRAFT_DEBUG
+        printf("[DEBUG:%s] reuse entry %p\n", pool.DEBUGName, result->Base);
+#endif
+        return result;
+    }
+
+    auto entry = new memory_pool_entry;
+    entry->Next = pool.First;
+    pool.First = entry;
+    entry->Base = malloc(pool.ElemSize);
+#ifdef DRAFT_DEBUG
+    printf("[DEBUG:%s] alloc entry %p\n", pool.DEBUGName, entry->Base);
+#endif
+    return entry;
+}
+
+void FreeEntry(memory_pool &pool, memory_pool_entry *argEntry)
+{
+    memory_pool_entry *entry = pool.First;
+    memory_pool_entry *prev = NULL;
+
+    while (entry)
+    {
+        if (entry == argEntry)
+        {
+            auto next = entry->Next;
+            entry->Next = pool.FirstFree;
+            if (prev)
+            {
+                prev->Next = next;
+            }
+#ifdef DRAFT_DEBUG
+            printf("[DEBUG:%s] put entry %p\n", pool.DEBUGName, entry->Base);
+#endif
+            entry->Used = 0;
+            pool.FirstFree = entry;
+            break;
+        }
+
+        prev = entry;
+        entry = entry->Next;
+    }
+}
+
+template<typename T>
+T *PushStruct(memory_arena &arena)
+{
+    auto result = (T *)PushSize(arena, sizeof(T), typeid(T).name());
+
+    // call the constructor manually
+    new(result) T();
+    return result;
+}
+
+template<typename T>
+T *PushStruct(memory_pool_entry *entry)
+{
+    size_t alignOffset = GetAlignmentOffset((size_t)entry->Base, entry->Used);
+    void *addr = (void *)((uintptr_t)entry->Base + entry->Used + alignOffset);
+    auto result = static_cast<T *>(addr);
+    entry->Used += sizeof(T);
+
+    // call the constructor manually
+    new(result) T();
+    return result;
+}
+
+template<typename T>
+T *PushStruct(allocator *alloc)
+{
+    auto arena = dynamic_cast<memory_arena *>(alloc);
+    if (arena)
+    {
+        return PushStruct<T>(*arena);
+    }
+
+    auto entry = dynamic_cast<memory_pool_entry *>(alloc);
+    if (entry)
+    {
+        return PushStruct<T>(entry);
+    }
+
+    assert(false);
+    return NULL;
 }
