@@ -16,10 +16,10 @@
 #include "platform_linux.cpp"
 #endif
 
-static void OpenGameController(game_input &Input)
+static void OpenGameController(game_input &input)
 {
-    Input.Controller.Joystick = SDL_JoystickOpen(0);
-    if (Input.Controller.Joystick)
+    input.Controller.Joystick = SDL_JoystickOpen(0);
+    if (input.Controller.Joystick)
     {
         printf("Joystick name: %s\n", SDL_JoystickNameForIndex(0));
     }
@@ -30,11 +30,11 @@ static void OpenGameController(game_input &Input)
     SDL_JoystickEventState(SDL_IGNORE);
 }
 
-static void SplitExtension(const std::string &Path, std::string &Filename, std::string &Extension)
+static void SplitExtension(const std::string &path, std::string &filename, std::string &extension)
 {
-    auto Idx = Path.find_last_of('.');
-    Filename = Path.substr(0, Idx);
-    Extension = Path.substr(Idx+1);
+    auto idx = path.find_last_of('.');
+    filename = path.substr(0, idx);
+    extension = path.substr(idx+1);
 }
 
 #define GameControllerAxisDeadzone 5000
@@ -45,8 +45,8 @@ int main(int argc, char **argv)
         std::cout << "Failed to init display SDL" << std::endl;
     }
 
-    int Width = 1280;
-    int Height = 720;
+    int Width = GAME_BASE_WIDTH;
+    int Height = GAME_BASE_HEIGHT;
     int vWidth = Width/2;
     int vHeight = Height/2;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_WINDOW_OPENGL);
@@ -87,17 +87,17 @@ int main(int argc, char **argv)
     glEnable(GL_MULTISAMPLE);
     glViewport(0, 0, Width, Height);
 
-    game_state Game;
-    Game.Window = Window;
-    Game.RealWidth = Width;
-    Game.RealHeight = Height;
-    Game.Width = vWidth;
-    Game.Height = vHeight;
-    Game.Platform.CompareFileTime = PlatformCompareFileTime;
-    Game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
-    Game.Platform.GetMilliseconds = PlatformGetMilliseconds;
+    game_state game;
+    game.Window = Window;
+    game.RealWidth = Width;
+    game.RealHeight = Height;
+    game.Width = vWidth;
+    game.Height = vHeight;
+    game.Platform.CompareFileTime = PlatformCompareFileTime;
+    game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
+    game.Platform.GetMilliseconds = PlatformGetMilliseconds;
 
-    auto &Input = Game.Input;
+    auto &Input = game.Input;
     if (SDL_NumJoysticks() > 0)
     {
         OpenGameController(Input);
@@ -116,13 +116,13 @@ int main(int argc, char **argv)
     TempPath = LibFilename + "_temp." + LibExtension;
     LoadGameLibrary(Lib, LibPath.c_str(), TempPath.c_str());
 
-    Lib.GameInit(&Game);
+    Lib.GameInit(&game);
 
     float ReloadTimer = GameLibraryReloadTime;
     float DeltaTime = 0.016f;
     float DeltaTimeMS = DeltaTime * 1000.0f;
     uint32 PreviousTime = SDL_GetTicks();
-    while (Game.Running)
+    while (game.Running)
     {
         uint32 CurrentTime = SDL_GetTicks();
         float Elapsed = ((CurrentTime - PreviousTime) / 1000.0f);
@@ -200,10 +200,10 @@ int main(int argc, char **argv)
         SDL_Event Event;
         while (SDL_PollEvent(&Event))
         {
-            Lib.GameProcessEvent(&Game, &Event);
+            Lib.GameProcessEvent(&game, &Event);
             switch (Event.type) {
             case SDL_QUIT:
-                Game.Running = false;
+                game.Running = false;
                 break;
 
             case SDL_MOUSEMOTION: {
@@ -258,9 +258,9 @@ int main(int argc, char **argv)
             }
             }
         }
-        Lib.GameRender(&Game, Elapsed);
+        Lib.GameRender(&game, Elapsed);
 
-        memcpy(&Game.PrevInput, &Game.Input, sizeof(game_input));
+        memcpy(&game.PrevInput, &game.Input, sizeof(game_input));
         Input.MouseState.dX = 0;
         Input.MouseState.dY = 0;
 
@@ -274,7 +274,7 @@ int main(int argc, char **argv)
         PreviousTime = CurrentTime;
     }
 
-    Lib.GameDestroy(&Game);
+    Lib.GameDestroy(&game);
 
     alcMakeContextCurrent(NULL);
     alcDestroyContext(AudioContext);

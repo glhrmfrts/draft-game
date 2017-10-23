@@ -51,6 +51,9 @@ struct level_mode
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
     float TimeElapsed = 0.0f;
     int PlayerLaneIndex = 0;
+
+    string_format ScoreFormat;
+    int Score = 0;
 };
 
 #endif

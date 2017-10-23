@@ -73,8 +73,10 @@ static void InitLevel(game_state &g)
         AddEntity(g.World, ent);
     }
 
-    g.TestFont = FindBitmapFont(g.AssetLoader, "vcr_16");
+    g.TestFont = FindBitmapFont(g.AssetLoader, "tablaksh_16");
     l.DraftBoostAudio = CreateAudioSource(g.Arena, FindSound(g.AssetLoader, "boost")->Buffer);
+
+    InitFormat(l.ScoreFormat, "Score: %d\n", 24, &l.Arena);
 }
 
 static void
@@ -112,7 +114,9 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
     ent->Transform.Velocity.y += Boost;
 }
 
-#define SHIP_IS_RED(s) (s->ColorIndex == 2)
+#define SHIP_IS_BLUE(s)   (s->ColorIndex == 0)
+#define SHIP_IS_ORANGE(S) (s->ColorIndex == 1)
+#define SHIP_IS_RED(s)    (s->ColorIndex == 2)
 static bool HandleCollision(game_state &g, entity *first, entity *second, float dt)
 {
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
@@ -667,17 +671,15 @@ void RenderLevel(game_state &g, float dt)
     RenderEnd(g.RenderState, g.Camera);
     renderTime.End = g.Platform.GetMilliseconds();
 
-    {
-        UpdateProjectionView(g.GUICamera);
-        Begin(g.GUI, g.GUICamera);
-        DrawRect(g.GUI, rect{20,20,200,20},
-                 IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
+    UpdateProjectionView(g.GUICamera);
+    Begin(g.GUI, g.GUICamera);
+    DrawRect(g.GUI, rect{20,20,200,20},
+             IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
 
-        DrawRect(g.GUI, rect{25,25,190 * playerShip->DraftCharge,10},
-                 IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
+    DrawRect(g.GUI, rect{25,25,190 * playerShip->DraftCharge,10},
+             IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
-        //DrawText(g.GUI, g.TestFont, "Score gui", rect{50, 20, 0, 0}, Color_white);
+    DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);
 
-        End(g.GUI);
-    }
+    End(g.GUI);
 }

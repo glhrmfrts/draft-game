@@ -62,6 +62,16 @@ void *PushSize(memory_arena &Arena, size_t SizeInit, const char *Name)
     return Result;
 }
 
+template<typename T>
+T *PushStruct(memory_arena &arena)
+{
+    auto result = (T *)PushSize(arena, sizeof(T), typeid(T).name());
+
+    // call the constructor manually
+    new(result) T();
+    return result;
+}
+
 void FreeArena(memory_arena &Arena)
 {
     while (Arena.CurrentBlock)
@@ -128,27 +138,40 @@ void FreeEntry(memory_pool &pool, memory_pool_entry *argEntry)
     }
 }
 
-template<typename T>
-T *PushStruct(memory_arena &arena)
+void *PushSize(memory_pool_entry *entry, size_t size, const char *name)
 {
-    auto result = (T *)PushSize(arena, sizeof(T), typeid(T).name());
+    size_t alignOffset = GetAlignmentOffset((size_t)entry->Base, entry->Used);
+    void *addr = (void *)((uintptr_t)entry->Base + entry->Used + alignOffset);
+    entry->Used += size;
+    return addr;
+}
+
+template<typename T>
+T *PushStruct(memory_pool_entry *entry)
+{
+    auto result = static_cast<T *>(PushSize(entry, sizeof(T), ""));
 
     // call the constructor manually
     new(result) T();
     return result;
 }
 
-template<typename T>
-T *PushStruct(memory_pool_entry *entry)
+void *PushSize(allocator *alloc, size_t size, const char *name)
 {
-    size_t alignOffset = GetAlignmentOffset((size_t)entry->Base, entry->Used);
-    void *addr = (void *)((uintptr_t)entry->Base + entry->Used + alignOffset);
-    auto result = static_cast<T *>(addr);
-    entry->Used += sizeof(T);
+    auto arena = dynamic_cast<memory_arena *>(alloc);
+    if (arena)
+    {
+        return PushSize(*arena, size, name);
+    }
 
-    // call the constructor manually
-    new(result) T();
-    return result;
+    auto entry = dynamic_cast<memory_pool_entry *>(alloc);
+    if (entry)
+    {
+        return PushSize(entry, size, name);
+    }
+
+    assert(false);
+    return NULL;
 }
 
 template<typename T>
@@ -168,4 +191,21 @@ T *PushStruct(allocator *alloc)
 
     assert(false);
     return NULL;
+}
+
+void InitFormat(string_format &format, const char *str, size_t size, allocator *alloc)
+{
+    format.Format = str;
+    format.Result = static_cast<char *>(PushSize(alloc, size, str));
+}
+
+char *Format(string_format &format, ...)
+{
+    assert(format.Result);
+
+    std::va_list args;
+    va_start(args, format);
+    vsprintf(format.Result, format.Format, args);
+    va_end(args);
+    return format.Result;
 }

@@ -38,4 +38,10 @@ struct memory_pool
 #endif
 };
 
+struct string_format
+{
+    const char *Format = NULL;
+    char *Result = NULL;
+};
+
 #endif

@@ -189,21 +189,21 @@ uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-vec2 MeasureText(bitmap_font *Font, const std::string &Text)
+vec2 MeasureText(bitmap_font *Font, const char *text)
 {
     vec2 Result = {};
     int CurX = 0;
     int CurY = 0;
-    for (size_t i = 0; i < Text.size(); i++)
+    for (size_t i = 0; text[i]; i++)
     {
-        if (Text[i] == '\n')
+        if (text[i] == '\n')
         {
             CurX = 0;
             CurY -= Font->NewLine;
             continue;
         }
 
-        int Index = int(Text[i]);
+        int Index = int(text[i]);
         CurX += Font->BearingX[Index];
         CurX += Font->AdvX[Index] - Font->BearingX[Index];
         Result.x = std::max((int)Result.x, CurX);
@@ -213,22 +213,22 @@ vec2 MeasureText(bitmap_font *Font, const std::string &Text)
     return Result;
 }
 
-uint32 DrawText(gui &g, bitmap_font *Font, const string &Text, rect r, color c, bool CheckState = true)
+uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
-    for (size_t i = 0; i < Text.size(); i++)
+    for (size_t i = 0; i < text[i]; i++)
     {
-        if (Text[i] == '\n')
+        if (text[i] == '\n')
         {
             CurX = r.X;
             CurY -= Font->NewLine;
             continue;
         }
 
-        int Index = int(Text[i]);
+        int Index = int(text[i]);
         CurX += Font->BearingX[Index];
-        if (Text[i] != ' ')
+        if (text[i] != ' ')
         {
             int Diff = Font->CharHeight[Index] - Font->BearingY[Index];
             int Width = Font->CharWidth[Index];

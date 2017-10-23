@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -50,8 +51,7 @@ enum direction
 
 #include <sstream>
 
-inline string
-ToString(vec3 v3)
+inline string ToString(vec3 v3)
 {
     std::ostringstream stream;
     stream << "[";
@@ -61,8 +61,7 @@ ToString(vec3 v3)
     return stream.str();
 }
 
-inline string
-ToString(ray Ray)
+inline string ToString(ray Ray)
 {
     std::ostringstream stream;
     stream << "[";
@@ -75,26 +74,22 @@ ToString(ray Ray)
 }
 
 template<typename T>
-inline void
-Println(T Arg)
+inline void Println(T Arg)
 {
     std::cout << Arg << std::endl;
 }
 
-inline float
-Lerp(float A, float t, float B)
+inline float Lerp(float A, float t, float B)
 {
     return (1.0f - t)*A + t*B;
 }
 
-inline float
-Square(float f)
+inline float Square(float f)
 {
     return f*f;
 }
 
-inline float
-Length2(const vec3 &v)
+inline float Length2(const vec3 &v)
 {
     return Square(v.x) + Square(v.y) + Square(v.z);
 }

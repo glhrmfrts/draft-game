@@ -59,7 +59,15 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/vcr.ttf",
                 "vcr_16",
-                (void *)16
+                (void *)int(GetRealPixels(*g, 40.0f))
+            )
+        );
+        g->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Font,
+                "data/fonts/g_type.ttf",
+                "tablaksh_16",
+                (void *)int(GetRealPixels(*g, 40.0f))
             )
         );
         g->Assets.push_back(
@@ -105,11 +113,11 @@ extern "C"
 #ifdef DRAFT_DEBUG
         if (g->Mode != GameMode_LoadingScreen)
         {
-            static float ReloadTimer = 0.0f;
-            ReloadTimer += dt;
-            if (ReloadTimer >= 1.0f)
+            static float reloadTimer = 0.0f;
+            reloadTimer += dt;
+            if (reloadTimer >= 1.0f)
             {
-                ReloadTimer = 0.0f;
+                reloadTimer = 0.0f;
                 CheckAssetsChange(g->AssetLoader);
             }
         }

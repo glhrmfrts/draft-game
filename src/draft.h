@@ -18,6 +18,9 @@
 #include "entity.h"
 #include "level_mode.h"
 
+#define GAME_BASE_WIDTH  1280
+#define GAME_BASE_HEIGHT 720
+
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
 #define PLATFORM_GET_MILLISECONDS(name)         uint64 name()
@@ -194,37 +197,37 @@ struct game_state
     game_state() {}
 };
 
-inline static float
-GetAxisValue(game_input &Input, action_type Type)
+inline static float GetAxisValue(game_input &Input, action_type Type)
 {
     return Input.Actions[Type].AxisValue;
 }
 
-inline static bool
-IsPressed(game_state &game, action_type type)
+inline static bool IsPressed(game_state &game, action_type type)
 {
     return game.Input.Actions[type].Pressed > 0;
 }
 
-inline static bool
-IsJustPressed(game_state &Game, action_type Type)
+inline static bool IsJustPressed(game_state &Game, action_type Type)
 {
     return Game.Input.Actions[Type].Pressed > 0 &&
         Game.PrevInput.Actions[Type].Pressed == 0;
 }
 
-inline static bool
-IsJustPressed(game_state &Game, uint8 Button)
+inline static bool IsJustPressed(game_state &Game, uint8 Button)
 {
     return (Game.Input.MouseState.Buttons & Button) &&
         !(Game.PrevInput.MouseState.Buttons & Button);
 }
 
-inline static bool
-IsJustReleased(game_state &Game, uint8 Button)
+inline static bool IsJustReleased(game_state &Game, uint8 Button)
 {
     return !(Game.Input.MouseState.Buttons & Button) &&
         (Game.PrevInput.MouseState.Buttons & Button);
+}
+
+inline static float GetRealPixels(game_state &game, float p)
+{
+    return p * (float(game.Width)/float(GAME_BASE_WIDTH));
 }
 
 #endif
