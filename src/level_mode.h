@@ -52,6 +52,12 @@ struct level_mode
     float TimeElapsed = 0.0f;
     int PlayerLaneIndex = 0;
 
+    entity *DraftTarget;
+    float CurrentDraftTime = 0;
+    float DraftCharge = 0;
+    int NumTrailCollisions = 0;
+    bool DraftActive = false;
+
     string_format ScoreFormat;
     int Score = 0;
 };

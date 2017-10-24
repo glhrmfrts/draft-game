@@ -105,10 +105,7 @@ static find_entity_result FindEntityOfType(entity *first, entity *second, collid
     return result;
 }
 
-#define CrystalBoost      10.0f
-#define DraftBoost        40.0f
-#define CrystalBoostScore 10
-#define DraftBoostScore   100
+#define DRAFT_BOOST       40.0f
 inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
 {
     ent->Transform.Velocity.y += Boost;
@@ -119,25 +116,27 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
 #define SCORE_DRAFT             5
 #define SCORE_CRYSTAL           2
 
+#define ENTITY_IS_PLAYER(e) (e->Flags & EntityFlag_IsPlayer)
+
 #define SHIP_IS_BLUE(s)   (s->ColorIndex == 0)
 #define SHIP_IS_ORANGE(s) (s->ColorIndex == 1)
 #define SHIP_IS_RED(s)    (s->ColorIndex == 2)
 static bool HandleCollision(game_state &g, entity *first, entity *second, float dt)
 {
+    auto &l = g.LevelMode;
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
     auto crystalEntity = FindEntityOfType(first, second, ColliderType_Crystal).Found;
     if (first->Collider->Type == ColliderType_TrailPiece || second->Collider->Type == ColliderType_TrailPiece)
     {
         auto trailPieceEntity = FindEntityOfType(first, second, ColliderType_TrailPiece).Found;
-        if (shipEntity && shipEntity != trailPieceEntity->TrailPiece->Owner)
+        if (shipEntity && ENTITY_IS_PLAYER(shipEntity) && shipEntity != trailPieceEntity->TrailPiece->Owner)
         {
-            auto s = shipEntity->Ship;
-            if (s && s->NumTrailCollisions == 0 && (!s->DraftActive || s->DraftTarget != trailPieceEntity->TrailPiece->Owner))
+            if (l.NumTrailCollisions == 0 && (!l.DraftActive || l.DraftTarget != trailPieceEntity->TrailPiece->Owner))
             {
-                s->CurrentDraftTime += dt;
-                s->NumTrailCollisions++;
-                s->DraftTarget = trailPieceEntity->TrailPiece->Owner;
-                s->DraftActive = false;
+                l.CurrentDraftTime += dt;
+                l.NumTrailCollisions++;
+                l.DraftTarget = trailPieceEntity->TrailPiece->Owner;
+                l.DraftActive = false;
             }
         }
         return false;
@@ -157,17 +156,21 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             entityToExplode = second;
             otherEntity = first;
         }
-        if ((otherEntity->Ship->DraftActive && otherEntity->Ship->DraftTarget == entityToExplode) ||
+        if ((ENTITY_IS_PLAYER(otherEntity) && l.DraftActive && l.DraftTarget == entityToExplode) ||
             (SHIP_IS_RED(otherEntity->Ship) || SHIP_IS_RED(entityToExplode->Ship)))
         {
-            otherEntity->Ship->DraftActive = false;
-            if (entityToExplode->Flags & EntityFlag_IsPlayer)
+            if (ENTITY_IS_PLAYER(otherEntity))
+            {
+                l.DraftActive = false;
+            }
+            else if (ENTITY_IS_PLAYER(entityToExplode))
             {
                 entityToExplode = otherEntity;
             }
-            else if (SHIP_IS_BLUE(entityToExplode->Ship))
+
+            if (SHIP_IS_BLUE(entityToExplode->Ship))
             {
-                g.LevelMode.Score += SCORE_DESTROY_BLUE_SHIP;
+                l.Score += SCORE_DESTROY_BLUE_SHIP;
                 entityToExplode->Ship->Scored = true;
             }
 
@@ -190,7 +193,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
         {
             if (otherEntity->Flags & EntityFlag_IsPlayer)
             {
-                otherEntity->Vel().y -= 20.0f;
+                otherEntity->Vel().y = std::min(PLAYER_MIN_VEL, otherEntity->Vel().y);
             }
         }
         return false;
@@ -199,7 +202,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
-            g.LevelMode.Score += SCORE_CRYSTAL;
+            l.Score += SCORE_CRYSTAL;
 
             auto pup = CreatePowerupEntity(GetEntry(g.World.PowerupPool), g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
             AddEntity(g.World, pup);
@@ -407,24 +410,6 @@ static void GenerateRedShips(game_state &g, level_mode &l, float dt)
     }
 }
 
-static void UpdateShipDraftCharge(ship *s, float dt)
-{
-    if (s->NumTrailCollisions == 0)
-    {
-        s->CurrentDraftTime -= dt;
-    }
-    s->CurrentDraftTime = std::max(0.0f, std::min(s->CurrentDraftTime, Global_Game_DraftChargeTime));
-    s->DraftCharge = s->CurrentDraftTime / Global_Game_DraftChargeTime;
-    s->NumTrailCollisions = 0;
-}
-
-static void ShipEntityPerformDraft(entity *ent)
-{
-    ent->Ship->CurrentDraftTime = 0.0f;
-    ent->Ship->DraftActive = true;
-    ApplyBoostToShip(ent, DraftBoost, 0);
-}
-
 static void KeepEntityInsideOfRoad(entity *ent)
 {
     const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
@@ -457,6 +442,7 @@ static void ResetRedShipsGen(level_mode &l)
 }
 
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
+#define PLAYER_MAX_VEL_LIMIT           170.0f
 void RenderLevel(game_state &g, float dt)
 {
     auto &l = g.LevelMode;
@@ -471,6 +457,7 @@ void RenderLevel(game_state &g, float dt)
     dt *= Global_Game_TimeSpeed;
 
     l.PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+    l.PlayerMaxVel = std::min(l.PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
     l.TimeElapsed += dt;
     updateTime.Begin = g.Platform.GetMilliseconds();
 
@@ -553,7 +540,6 @@ void RenderLevel(game_state &g, float dt)
             moveY = 0.0f;
         }
         MoveShipEntity(playerEntity, moveX, moveY, l.PlayerMaxVel, dt);
-        //KeepEntityInsideOfRoad(playerEntity);
 
         float &playerX = playerEntity->Pos().x;
         float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);
@@ -568,12 +554,13 @@ void RenderLevel(game_state &g, float dt)
             }
         }
 
-        if (playerShip->DraftCharge == 1.0f && IsPressed(g, Action_boost))
+        if (l.DraftCharge == 1.0f && IsPressed(g, Action_boost))
         {
-            auto draftTarget = playerEntity->Ship->DraftTarget;
-            draftTarget->Ship->HasBeenDrafted = true;
             l.Score += SCORE_DRAFT;
-            ShipEntityPerformDraft(playerEntity);
+            l.CurrentDraftTime = 0.0f;
+            l.DraftActive = true;
+            l.DraftTarget->Ship->HasBeenDrafted = true;
+            ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
         }
 
         l.PlayerLaneIndex = int(nearestLane)+2;
@@ -593,7 +580,13 @@ void RenderLevel(game_state &g, float dt)
         }
     }
     Integrate(world.CollisionEntities, g.Gravity, dt);
-    UpdateShipDraftCharge(playerShip, dt);
+    if (l.NumTrailCollisions == 0)
+    {
+        l.CurrentDraftTime -= dt;
+    }
+    l.CurrentDraftTime = std::max(0.0f, std::min(l.CurrentDraftTime, Global_Game_DraftChargeTime));
+    l.DraftCharge = l.CurrentDraftTime / Global_Game_DraftChargeTime;
+    l.NumTrailCollisions = 0;
     if (!Global_Camera_FreeCam)
     {
         const float CAMERA_LERP = 10.0f;
@@ -625,9 +618,10 @@ void RenderLevel(game_state &g, float dt)
         }
         else
         {
-            UpdateShipDraftCharge(ent->Ship, dt);
-            if (playerEntity->Ship->DraftTarget != ent || ent->Pos().y < playerEntity->Pos().y)
+            if (!(l.DraftTarget == ent && l.DraftActive) ||
+                (ent->Pos().y < playerEntity->Pos().y && playerEntity->Vel().y < ent->Ship->PassedVelocity))
             {
+                ent->Ship->PassedVelocity = playerEntity->Vel().y;
                 if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
                 {
                     ent->Vel().y = playerEntity->Vel().y * 0.2f;
@@ -696,7 +690,7 @@ void RenderLevel(game_state &g, float dt)
     DrawRect(g.GUI, rect{20,20,200,20},
              IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
 
-    DrawRect(g.GUI, rect{25,25,190 * playerShip->DraftCharge,10},
+    DrawRect(g.GUI, rect{25,25,190 * l.DraftCharge,10},
              IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
     DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);

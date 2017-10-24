@@ -9,22 +9,12 @@ struct model
     mesh *Mesh;
 };
 
-enum enemy_type
-{
-    EnemyType_Default,
-    EnemyType_Explosive,
-};
 struct ship
 {
     color Color;
     color OutlineColor;
-    float CurrentDraftTime = 0;
-    float DraftCharge = 0;
-    int NumTrailCollisions = 0;
+    float PassedVelocity = 0;
     int ColorIndex = 0;
-    enemy_type EnemyType;
-    entity *DraftTarget;
-    bool DraftActive = false;
     bool Scored = false;
     bool HasBeenDrafted = false;
 };

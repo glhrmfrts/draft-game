@@ -65,7 +65,7 @@ extern "C"
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Font,
-                "data/fonts/g_type.ttf",
+                "data/fonts/unispace.ttf",
                 "g_type_16",
                 (void *)int(GetRealPixels(*g, 40.0f))
             )
