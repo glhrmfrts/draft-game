@@ -25,6 +25,8 @@ struct ship
     enemy_type EnemyType;
     entity *DraftTarget;
     bool DraftActive = false;
+    bool Scored = false;
+    bool HasBeenDrafted = false;
 };
 
 struct entity_repeat

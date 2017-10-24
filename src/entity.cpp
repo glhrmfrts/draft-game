@@ -210,7 +210,7 @@ entity *CreateExplosionEntity(allocator *alloc, mesh &baseMesh, mesh_part &part,
         Explosion->Triangles[Index + 1] = p2;
         Explosion->Triangles[Index + 2] = p3;
 
-        // @TODO: do not regenerate normals
+        // TODO: do not regenerate normals
         Normals[i] = GenerateNormal(p1, p2, p3);
     }
 
@@ -260,34 +260,38 @@ static float Interp(float c, float t, float a, float dt)
 #define ShipSteerSpeed          20.0f
 #define ShipSteerAcceleration   80.0f
 #define ShipFriction            10.0f
-void MoveShipEntity(entity *ent, float moveH, float moveV, float maxVel, float dt)
+void MoveShipEntity(entity *ent, float moveX, float moveY, float maxVel, float dt)
 {
-    float MinVel = ShipMinVel;
+    float minVel = ShipMinVel;
     if (ent->Flags & EntityFlag_IsPlayer)
     {
-        MinVel = PLAYER_MIN_VEL;
+        minVel = PLAYER_MIN_VEL;
     }
-    if (ent->Transform.Velocity.y < MinVel)
+    if (moveY < 0.0f)
     {
-        moveV = 0.1f;
+        minVel = 20.0f;
+    }
+    if (ent->Transform.Velocity.y < minVel)
+    {
+        moveY = 0.1f;
     }
 
-    ent->Transform.Velocity.y += moveV * ShipAcceleration * dt;
-    if ((moveV <= 0.0f && ent->Transform.Velocity.y > 0) || ent->Transform.Velocity.y > maxVel)
+    ent->Transform.Velocity.y += moveY * ShipAcceleration * dt;
+    if ((moveY <= 0.0f && ent->Transform.Velocity.y > 0) || ent->Transform.Velocity.y > maxVel)
     {
         ent->Transform.Velocity.y -= ShipFriction * dt;
     }
 
-    float steerTarget = moveH * ShipSteerSpeed;
+    float steerTarget = moveX * ShipSteerSpeed;
     ent->Transform.Velocity.y = std::min(ent->Transform.Velocity.y, maxVel);
     ent->Transform.Velocity.x = Interp(ent->Transform.Velocity.x,
                                           steerTarget,
                                           ShipSteerAcceleration,
                                           dt);
 
-    ent->Transform.Rotation.y = 20.0f * (moveH / 1.0f);
+    ent->Transform.Rotation.y = 20.0f * (moveX / 1.0f);
     ent->Transform.Rotation.x = Interp(ent->Transform.Rotation.x,
-                                          5.0f * moveV,
+                                          5.0f * moveY,
                                           20.0f,
                                           dt);
 }

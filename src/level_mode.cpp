@@ -73,7 +73,7 @@ static void InitLevel(game_state &g)
         AddEntity(g.World, ent);
     }
 
-    g.TestFont = FindBitmapFont(g.AssetLoader, "tablaksh_16");
+    g.TestFont = FindBitmapFont(g.AssetLoader, "g_type_16");
     l.DraftBoostAudio = CreateAudioSource(g.Arena, FindSound(g.AssetLoader, "boost")->Buffer);
 
     InitFormat(l.ScoreFormat, "Score: %d\n", 24, &l.Arena);
@@ -114,8 +114,13 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
     ent->Transform.Velocity.y += Boost;
 }
 
+#define SCORE_DESTROY_BLUE_SHIP 10
+#define SCORE_MISS_ORANGE_SHIP  10
+#define SCORE_DRAFT             5
+#define SCORE_CRYSTAL           2
+
 #define SHIP_IS_BLUE(s)   (s->ColorIndex == 0)
-#define SHIP_IS_ORANGE(S) (s->ColorIndex == 1)
+#define SHIP_IS_ORANGE(s) (s->ColorIndex == 1)
 #define SHIP_IS_RED(s)    (s->ColorIndex == 2)
 static bool HandleCollision(game_state &g, entity *first, entity *second, float dt)
 {
@@ -160,6 +165,11 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             {
                 entityToExplode = otherEntity;
             }
+            else if (SHIP_IS_BLUE(entityToExplode->Ship))
+            {
+                g.LevelMode.Score += SCORE_DESTROY_BLUE_SHIP;
+                entityToExplode->Ship->Scored = true;
+            }
 
             auto exp = CreateExplosionEntity(
                 GetEntry(g.World.ExplosionPool),
@@ -176,12 +186,21 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             RemoveEntity(g.World, entityToExplode);
             return false;
         }
-        return true;
+        else
+        {
+            if (otherEntity->Flags & EntityFlag_IsPlayer)
+            {
+                otherEntity->Vel().y -= 20.0f;
+            }
+        }
+        return false;
     }
     if (shipEntity != NULL && crystalEntity != NULL)
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
+            g.LevelMode.Score += SCORE_CRYSTAL;
+
             auto pup = CreatePowerupEntity(GetEntry(g.World.PowerupPool), g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
             AddEntity(g.World, pup);
             RemoveEntity(g.World, crystalEntity);
@@ -304,7 +323,7 @@ static void GenerateCrystals(game_state &g, level_mode &l, float dt)
 
 static void GenerateShips(game_state &g, level_mode &l, float dt)
 {
-    // @TODO: remove debug key
+    // TODO: remove debug key
     if (l.NextShipTimer <= 0 || g.Input.Keys[SDL_SCANCODE_S])
     {
         if (l.ChangeShipTimer <= 0)
@@ -322,6 +341,7 @@ static void GenerateShips(game_state &g, level_mode &l, float dt)
         ent->Pos().y = g.PlayerEntity->Pos().y + 200;
         ent->Pos().z = SHIP_Z;
         ent->Ship->ColorIndex = colorIndex;
+        AddFlags(ent, EntityFlag_RemoveOffscreen);
         AddEntity(g.World, ent);
 
         l.NextShipTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_Ships, l.NextShipInterval, 1.0f);
@@ -454,12 +474,12 @@ void RenderLevel(game_state &g, float dt)
     l.TimeElapsed += dt;
     updateTime.Begin = g.Platform.GetMilliseconds();
 
-    static bool Paused = false;
+    static bool paused = false;
     if (IsJustPressed(g, Action_debugPause))
     {
-        Paused = !Paused;
+        paused = !paused;
     }
-    if (Paused) return;
+    if (paused) return;
 
     if (g.Input.Keys[SDL_SCANCODE_R])
     {
@@ -527,11 +547,17 @@ void RenderLevel(game_state &g, float dt)
     {
         // player movement
         float moveX = GetAxisValue(input, Action_horizontal);
-        MoveShipEntity(playerEntity, moveX, 0, l.PlayerMaxVel, dt);
-        KeepEntityInsideOfRoad(playerEntity);
+        float moveY = GetAxisValue(input, Action_vertical);
+        if (moveY > 0.0f)
+        {
+            moveY = 0.0f;
+        }
+        MoveShipEntity(playerEntity, moveX, moveY, l.PlayerMaxVel, dt);
+        //KeepEntityInsideOfRoad(playerEntity);
 
         float &playerX = playerEntity->Pos().x;
         float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);
+        nearestLane = glm::clamp(nearestLane, -2.0f, 2.0f);
         float targetX = nearestLane * ROAD_LANE_WIDTH;
         if (moveX == 0.0f)
         {
@@ -544,6 +570,9 @@ void RenderLevel(game_state &g, float dt)
 
         if (playerShip->DraftCharge == 1.0f && IsPressed(g, Action_boost))
         {
+            auto draftTarget = playerEntity->Ship->DraftTarget;
+            draftTarget->Ship->HasBeenDrafted = true;
+            l.Score += SCORE_DRAFT;
             ShipEntityPerformDraft(playerEntity);
         }
 
@@ -597,24 +626,7 @@ void RenderLevel(game_state &g, float dt)
         else
         {
             UpdateShipDraftCharge(ent->Ship, dt);
-            if (ent->Pos().y + 1.0f < playerEntity->Pos().y)
-            {
-                float moveX = playerEntity->Pos().x - ent->Pos().x;
-                moveX = std::min(moveX, 1.0f);
-
-                float moveY = 0.05f + (0.004f * playerEntity->Vel().y);
-                if (ent->Vel().y > playerEntity->Vel().y)
-                {
-                    moveY = 0.0f;
-                }
-                MoveShipEntity(ent, moveX, moveY, l.PlayerMaxVel, dt);
-
-                if (ent->Ship->DraftCharge == 1.0f)
-                {
-                    ShipEntityPerformDraft(ent);
-                }
-            }
-            else if (playerShip->DraftTarget != ent)
+            if (playerEntity->Ship->DraftTarget != ent || ent->Pos().y < playerEntity->Pos().y)
             {
                 if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
                 {
@@ -624,6 +636,14 @@ void RenderLevel(game_state &g, float dt)
                 {
                     ent->Vel().y = playerEntity->Vel().y * 0.8f;
                 }
+            }
+            if (SHIP_IS_ORANGE(ent->Ship) &&
+                ent->Pos().y+1.0f < playerEntity->Pos().y &&
+                ent->Ship->HasBeenDrafted &&
+                !ent->Ship->Scored)
+            {
+                l.Score += SCORE_MISS_ORANGE_SHIP;
+                ent->Ship->Scored = true;
             }
 
             KeepEntityInsideOfRoad(ent);
@@ -638,7 +658,7 @@ void RenderLevel(game_state &g, float dt)
         ent->SetVel(ent->Vel() + dirToPlayer);
         ent->SetPos(ent->Pos() + ent->Vel() * dt);
 
-        // @TODO: temporary i hope
+        // TODO: temporary i hope
         if (ent->Pos().z < 0.0f)
         {
             RemoveEntity(g.World, ent);

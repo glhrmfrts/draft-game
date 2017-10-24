@@ -66,7 +66,7 @@ extern "C"
             CreateAssetEntry(
                 AssetType_Font,
                 "data/fonts/g_type.ttf",
-                "tablaksh_16",
+                "g_type_16",
                 (void *)int(GetRealPixels(*g, 40.0f))
             )
         );

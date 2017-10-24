@@ -261,6 +261,8 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bo
 void End(gui &g)
 {
     PushDrawCommand(g);
+
+    // TODO: reserve vertices before uploading
     UploadVertices(g.Buffer, GL_DYNAMIC_DRAW);
 
     glBindVertexArray(g.Buffer.VAO);
