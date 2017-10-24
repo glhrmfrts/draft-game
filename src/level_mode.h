@@ -57,7 +57,6 @@ struct level_mode
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
     bool DraftActive = false;
-
     string_format ScoreFormat;
     int Score = 0;
 };
