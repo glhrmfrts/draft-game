@@ -77,11 +77,32 @@ static void InitLevel(game_state &g)
     l.DraftBoostAudio = CreateAudioSource(g.Arena, FindSound(g.AssetLoader, "boost")->Buffer);
 
     InitFormat(l.ScoreFormat, "Score: %d\n", 24, &l.Arena);
+    InitFormat(l.ScoreNumberFormat, "+%d", 8, &l.Arena);
 }
 
-static void
-DebugReset(game_state &g)
+static void DebugReset(game_state &g)
 {
+}
+
+static void AddScoreText(game_state &g, level_mode &l, int score, vec3 pos, color c)
+{
+    vec4 v = g.Camera.ProjectionView * vec4{pos, 1.0f};
+    vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
+    screenPos.x = (g.Width/2) * screenPos.x + (g.Width/2);
+    screenPos.y = (g.Height/2) * screenPos.y + (g.Height/2);
+
+    auto seq = PushStruct<tween_sequence>(GetEntry(l.SequencePool));
+    auto scoreText = PushStruct<level_score_text>(GetEntry(l.ScoreTextPool));
+    scoreText->Color = c;
+    scoreText->Pos = screenPos;
+    scoreText->TargetPos = screenPos + vec2{20.0f, -100.0f};
+    scoreText->Score = score;
+    scoreText->Sequence = seq;
+
+    seq->Tweens.push_back(tween{&scoreText->TweenValue, 0.0f, 1.0f, 1, 1.0f, TweenEasing_Linear});
+    AddSequences(g.TweenState, seq, 1);
+    PlaySequence(g.TweenState, seq);
+    l.ScoreTextList.push_back(scoreText);
 }
 
 struct find_entity_result
@@ -172,6 +193,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             {
                 l.Score += SCORE_DESTROY_BLUE_SHIP;
                 entityToExplode->Ship->Scored = true;
+                AddScoreText(g, l, SCORE_DESTROY_BLUE_SHIP, entityToExplode->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
             }
 
             auto exp = CreateExplosionEntity(
@@ -203,6 +225,7 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
             l.Score += SCORE_CRYSTAL;
+            AddScoreText(g, l, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
 
             auto pup = CreatePowerupEntity(GetEntry(g.World.PowerupPool), g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
             AddEntity(g.World, pup);
@@ -561,6 +584,8 @@ void RenderLevel(game_state &g, float dt)
             l.DraftActive = true;
             l.DraftTarget->Ship->HasBeenDrafted = true;
             ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
+
+            AddScoreText(g, l, SCORE_DRAFT, playerEntity->Pos(), l.DraftTarget->Ship->Color);
         }
 
         l.PlayerLaneIndex = int(nearestLane)+2;
@@ -638,6 +663,7 @@ void RenderLevel(game_state &g, float dt)
             {
                 l.Score += SCORE_MISS_ORANGE_SHIP;
                 ent->Ship->Scored = true;
+                AddScoreText(g, l, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
             }
 
             KeepEntityInsideOfRoad(ent);
@@ -694,6 +720,22 @@ void RenderLevel(game_state &g, float dt)
              IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
     DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);
+
+    for (auto text : l.ScoreTextList)
+    {
+        vec2 p = text->Pos;
+        float t = text->TweenValue;
+        text->Color.a = 1.0f - t;
+        p += (text->TargetPos - p) * t;
+        DrawTextCentered(g.GUI, g.TestFont, Format(l.ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+    }
+    auto lastText = l.ScoreTextList.back();
+    if (lastText && lastText->TweenValue >= 1.0f)
+    {
+        l.ScoreTextList.pop_back();
+        FreeEntryFromData(l.ScoreTextPool, lastText);
+        FreeEntryFromData(l.SequencePool, lastText->Sequence);
+    }
 
     End(g.GUI);
 }

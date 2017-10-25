@@ -15,6 +15,9 @@ struct color_palette
 };
 
 #define SPECIAL_YELLOW 0
+#define SHIP_BLUE      0
+#define SHIP_ORANGE    1
+#define SHIP_RED       2
 
 static color_palette FirstPalette = {{0x21042D, 0x6F0C74, 0x25006D, 0x0E00CA, 0xEE1F97}};
 static color_palette SecondPalette = {{0x86008A, 0x4B0034, 0x2703EC, 0x00BDFF, 0xB8C9EE}};

@@ -95,12 +95,8 @@ void Begin(gui &g, camera &Camera)
 
     Bind(g.Program);
     SetUniform(g.ProjectionView, Camera.ProjectionView);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     g.CurrentDrawCommand.Texture = NULL;
     g.DrawCommandList.clear();
-
     ResetBuffer(g.Buffer);
 }
 
@@ -189,28 +185,28 @@ uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-vec2 MeasureText(bitmap_font *Font, const char *text)
+vec2 MeasureText(bitmap_font *font, const char *text)
 {
-    vec2 Result = {};
-    int CurX = 0;
-    int CurY = 0;
+    vec2 result = {};
+    int curX = 0;
+    int curY = 0;
     for (size_t i = 0; text[i]; i++)
     {
         if (text[i] == '\n')
         {
-            CurX = 0;
-            CurY -= Font->NewLine;
+            curX = 0;
+            curY -= font->NewLine;
             continue;
         }
 
         int Index = int(text[i]);
-        CurX += Font->BearingX[Index];
-        CurX += Font->AdvX[Index] - Font->BearingX[Index];
-        Result.x = std::max((int)Result.x, CurX);
+        curX += font->BearingX[Index];
+        curX += font->AdvX[Index] - font->BearingX[Index];
+        result.x = std::max((int)result.x, curX);
     }
 
-    Result.y = CurY;
-    return Result;
+    result.y = curY;
+    return result;
 }
 
 uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
@@ -258,6 +254,14 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bo
     return GUIElementState_none;
 }
 
+uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
+{
+    vec2 size = MeasureText(font, text);
+    r.X -= size.x/2;
+    r.Y -= size.y/2;
+    return DrawText(g, font, text, r, c, checkState);
+}
+
 void End(gui &g)
 {
     PushDrawCommand(g);
@@ -265,6 +269,8 @@ void End(gui &g)
     // TODO: reserve vertices before uploading
     UploadVertices(g.Buffer, GL_DYNAMIC_DRAW);
 
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindVertexArray(g.Buffer.VAO);
 
     for (const auto &Cmd : g.DrawCommandList)

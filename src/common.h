@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <list>
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -50,6 +51,16 @@ enum direction
 };
 
 #include <sstream>
+
+inline string ToString(vec2 v2)
+{
+    std::ostringstream stream;
+    stream << "[";
+    stream << v2.x << "," << v2.y;
+    stream << "]";
+
+    return stream.str();
+}
 
 inline string ToString(vec3 v3)
 {

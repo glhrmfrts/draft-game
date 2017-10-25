@@ -26,6 +26,16 @@ struct level_gen_params
 };
 */
 
+struct level_score_text
+{
+    color Color;
+    vec2 Pos;
+    vec2 TargetPos;
+    tween_sequence *Sequence;
+    float TweenValue = 0;
+    int Score = 0;
+};
+
 struct level_mode
 {
     memory_arena Arena;
@@ -35,6 +45,9 @@ struct level_mode
     uint64 IncFlags = 0; // timer increment flags
     uint64 RandFlags = 0; // random timer flags
     int LaneSlots[5];
+
+    generic_pool<tween_sequence> SequencePool;
+    generic_pool<level_score_text> ScoreTextPool;
 
     float NextCrystalTimer = BASE_CRYSTAL_INTERVAL;
 
@@ -58,7 +71,9 @@ struct level_mode
     int NumTrailCollisions = 0;
     bool DraftActive = false;
     string_format ScoreFormat;
+    string_format ScoreNumberFormat;
     int Score = 0;
+    std::list<level_score_text *> ScoreTextList;
 };
 
 #endif

@@ -5,92 +5,76 @@ TWEEN_FUNC(TweenFuncLinear)
     return t;
 }
 
-void InitTweenState(tween_state &State)
+void InitTweenState(tween_state &state)
 {
-    State.Funcs[TweenEasing_Linear] = TweenFuncLinear;
+    state.Funcs[TweenEasing_Linear] = TweenFuncLinear;
 }
 
-tween CreateTween(float_tween Float, float Duration, tween_easing Easing = TweenEasing_Linear)
+void AddSequences(tween_state &state, tween_sequence *seqs, int count)
 {
-    tween Result = {};
-    Result.Type = TweenType_Float;
-    Result.Float = Float;
-    Result.Duration = Duration;
-    Result.Easing = Easing;
-    return Result;
-}
-
-void AddSequences(tween_state &State, tween_sequence *Seqs, int Count)
-{
-    for (int i = 0; i < Count; i++)
+    for (int i = 0; i < count; i++)
     {
-        auto Seq = Seqs + i;
-        State.Sequences.push_back(Seq);
-        Seq->ID = State.Sequences.size() - 1;
+        auto seq = seqs + i;
+        state.Sequences.push_back(seq);
+        seq->ID = state.Sequences.size() - 1;
     }
 }
 
-void DestroySequences(tween_state &State, tween_sequence *Seqs, int Count)
+void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
 {
-    auto Last = Seqs + (Count - 1);
-    State.Sequences.erase(State.Sequences.begin() + Seqs->ID,
-                          State.Sequences.begin() + Last->ID);
-}
-
-inline void AddTween(tween_sequence *Seq, const tween &t)
-{
-    Seq->Tweens.push_back(t);
-}
-
-void PlaySequence(tween_state &State, tween_sequence *Seq)
-{
-    if (Seq->ActiveID == -1)
+    for (int i = 0; i < count; i++)
     {
-        State.ActiveSequences.push_back(Seq);
-        Seq->ActiveID = State.ActiveSequences.size() - 1;
-        for (auto &Tween : Seq->Tweens)
+        auto seq = seqs + i;
+        state.Sequences[seq->ID] = NULL;
+    }
+}
+
+inline void Clear(tween_state &state)
+{
+    state.Sequences.clear();
+}
+
+inline void AddTween(tween_sequence *seq, const tween &t)
+{
+    seq->Tweens.push_back(t);
+}
+
+void PlaySequence(tween_state &state, tween_sequence *seq)
+{
+    if (!seq->Active)
+    {
+        seq->Active = true;
+        for (auto &t : seq->Tweens)
         {
-            Tween.Timer = 0.0f;
+            t.Timer = 0.0f;
         }
     }
 }
 
-void StopSequence(tween_state &State, tween_sequence *Seq)
+void Update(tween_state &state, float delta)
 {
-    auto Pos = State.ActiveSequences.begin() + Seq->ActiveID;
-    State.ActiveSequences.erase(Pos);
-    Seq->ActiveID = -1;
-}
-
-void Update(tween_state &State, float Delta)
-{
-    for (auto Seq : State.ActiveSequences)
+    for (auto seq : state.Sequences)
     {
-        auto &Tween = Seq->Tweens[Seq->CurrentTween];
-        switch (Tween.Type)
+        if (seq && seq->Active)
         {
-        case TweenType_Float:
-        {
-            float Amount = State.Funcs[Tween.Easing](Tween.Timer/Tween.Duration);
-            float Dif = Tween.Float.To - Tween.Float.From;
-            *Tween.Float.Target = Tween.Float.From + Dif*Amount;
-            break;
-        }
-        }
-
-        if (Tween.Timer >= Tween.Duration)
-        {
-            Seq->CurrentTween++;
-            if (Seq->CurrentTween >= Seq->Tweens.size())
+            auto &t = seq->Tweens[seq->CurrentTween];
+            float amount = state.Funcs[t.Easing](t.Timer/t.Duration);
+            float dif = t.To - t.From;
+            *t.Value = t.From + dif*amount;
+            if (t.Timer >= t.Duration)
             {
-                Seq->CurrentTween = 0;
-                if (!Seq->Loop)
+                seq->CurrentTween++;
+                if (seq->CurrentTween >= seq->Tweens.size())
                 {
-                    StopSequence(State, Seq);
+                    seq->CurrentTween = 0;
+                    if (!seq->Loop)
+                    {
+                        seq->Active = false;
+                    }
                 }
             }
-        }
 
-        Tween.Timer += Delta;
+            t.Timer += delta;
+        }
     }
 }

@@ -98,7 +98,7 @@ extern "C"
         {
             Global_DebugUI = !Global_DebugUI;
         }
-
+        Update(g->TweenState, dt);
         switch (g->Mode)
         {
         case GameMode_LoadingScreen:

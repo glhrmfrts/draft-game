@@ -34,8 +34,20 @@ struct memory_pool
     size_t ElemSize = 0;
 
 #ifdef DRAFT_DEBUG
-    char *DEBUGName;
+    const char *DEBUGName;
 #endif
+};
+
+template<typename T>
+struct generic_pool : memory_pool
+{
+    generic_pool()
+    {
+        this->ElemSize = sizeof(T);
+#ifdef DRAFT_DEBUG
+        this->DEBUGName = typeid(T).name();
+#endif
+    }
 };
 
 struct string_format
