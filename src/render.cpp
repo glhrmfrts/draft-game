@@ -717,6 +717,108 @@ void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
 #endif
 }
 
+void PostProcessBegin(render_state &r)
+{
+    if (Global_Renderer_DoPostFX)
+    {
+        BindFramebuffer(r.MultisampledSceneFramebuffer);
+    }
+}
+
+enum blur_orientation
+{
+    Blur_Horizontal,
+    Blur_Vertical,
+};
+static framebuffer *RenderBlur(render_state &RenderState, blur_program *Program)
+{
+    Bind(*Program);
+    framebuffer *Sources = RenderState.BlurHorizontalFramebuffers;
+    framebuffer *Dests = RenderState.BlurVerticalFramebuffers;
+    if (Program == &RenderState.BlurVerticalProgram)
+    {
+        auto Tmp = Sources;
+        Sources = Dests;
+        Dests = Tmp;
+    }
+    for (int i = 0; i < BloomBlurPassCount; i++)
+    {
+        if (Program == &RenderState.BlurVerticalProgram)
+        {
+            SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Height));
+        }
+        else
+        {
+            SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
+        }
+
+        BindFramebuffer(Dests[i]);
+
+        glClear(GL_COLOR_BUFFER_BIT);
+        Bind(Sources[i].ColorTextures[0], 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        Unbind(Sources[i].ColorTextures[0], 0);
+
+        UnbindFramebuffer(RenderState);
+    }
+    UnbindShaderProgram();
+    return Dests;
+}
+
+void PostProcessEnd(render_state &r)
+{
+    if (Global_Renderer_DoPostFX)
+    {
+        UnbindFramebuffer(r);
+        glBindVertexArray(r.ScreenBuffer.VAO);
+
+        // resolve multisample
+        if (Global_Renderer_BloomEnabled)
+        {
+            BindFramebuffer(r.SceneFramebuffer);
+        }
+
+        Bind(r.ResolveMultisampleProgram);
+        SetUniform(r.ResolveMultisampleProgram.SampleCount, r.MaxMultiSampleCount);
+        for (size_t i = 0; i < ColorTextureFlag_Count; i++)
+        {
+            Bind(r.MultisampledSceneFramebuffer.ColorTextures[i], i);
+        }
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        if (Global_Renderer_BloomEnabled)
+        {
+            UnbindFramebuffer(r);
+
+            // downsample scene for blur
+            Bind(r.BlitProgram);
+            Bind(r.SceneFramebuffer.ColorTextures[ColorTextureFlag_Emit], 0);
+            for (int i = 0; i < BloomBlurPassCount; i++)
+            {
+                BindFramebuffer(r.BlurHorizontalFramebuffers[i]);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+            UnbindFramebuffer(r);
+            UnbindShaderProgram();
+
+            // perform blur
+            RenderBlur(r, &r.BlurHorizontalProgram);
+            framebuffer *BlurOutput = RenderBlur(r, &r.BlurVerticalProgram);
+
+            // blend scene with blur results
+            Bind(r.BlendProgram);
+            for (int i = 0; i < BloomBlurPassCount; i++)
+            {
+                Bind(BlurOutput[i].ColorTextures[0], i);
+            }
+            Bind(r.SceneFramebuffer.ColorTextures[ColorTextureFlag_SurfaceReflect], BloomBlurPassCount);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            UnbindShaderProgram();
+        }
+    }
+    // @TODO: cleanup textures
+}
+
 void RenderBegin(render_state &RenderState, float DeltaTime)
 {
     if (RenderState.ExplosionLightTimer > 0)
@@ -757,8 +859,7 @@ mat4 GetTransformMatrix(transform &t)
     return TransformMatrix;
 }
 
-static void
-RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
+static void RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
 {
     if (RenderState.LastVAO != r.VAO)
     {
@@ -802,47 +903,6 @@ RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
     }
 }
 
-enum blur_orientation
-{
-    Blur_Horizontal,
-    Blur_Vertical,
-};
-static framebuffer *
-RenderBlur(render_state &RenderState, blur_program *Program)
-{
-    Bind(*Program);
-    framebuffer *Sources = RenderState.BlurHorizontalFramebuffers;
-    framebuffer *Dests = RenderState.BlurVerticalFramebuffers;
-    if (Program == &RenderState.BlurVerticalProgram)
-    {
-        auto Tmp = Sources;
-        Sources = Dests;
-        Dests = Tmp;
-    }
-    for (int i = 0; i < BloomBlurPassCount; i++)
-    {
-        if (Program == &RenderState.BlurVerticalProgram)
-        {
-            SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Height));
-        }
-        else
-        {
-            SetUniform(Program->PixelSize, Global_Renderer_BloomBlurOffset / float(Sources[i].Width));
-        }
-
-        BindFramebuffer(Dests[i]);
-
-        glClear(GL_COLOR_BUFFER_BIT);
-        Bind(Sources[i].ColorTextures[0], 0);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        Unbind(Sources[i].ColorTextures[0], 0);
-
-        UnbindFramebuffer(RenderState);
-    }
-    UnbindShaderProgram();
-    return Dests;
-}
-
 void RenderEnd(render_state &RenderState, camera &Camera)
 {
     assert(Camera.Updated);
@@ -863,11 +923,6 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     }
 #endif
 
-    if (Global_Renderer_DoPostFX)
-    {
-        BindFramebuffer(RenderState.MultisampledSceneFramebuffer);
-    }
-
     Bind(RenderState.ModelProgram);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -884,61 +939,9 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     }
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
-
-    if (Global_Renderer_DoPostFX)
-    {
-        UnbindFramebuffer(RenderState);
-        glBindVertexArray(RenderState.ScreenBuffer.VAO);
-
-        // resolve multisample
-        if (Global_Renderer_BloomEnabled)
-        {
-            BindFramebuffer(RenderState.SceneFramebuffer);
-        }
-
-        Bind(RenderState.ResolveMultisampleProgram);
-        SetUniform(RenderState.ResolveMultisampleProgram.SampleCount, RenderState.MaxMultiSampleCount);
-        for (size_t i = 0; i < ColorTextureFlag_Count; i++)
-        {
-            Bind(RenderState.MultisampledSceneFramebuffer.ColorTextures[i], i);
-        }
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        if (Global_Renderer_BloomEnabled)
-        {
-            UnbindFramebuffer(RenderState);
-
-            // downsample scene for blur
-            Bind(RenderState.BlitProgram);
-            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTextureFlag_Emit], 0);
-            for (int i = 0; i < BloomBlurPassCount; i++)
-            {
-                BindFramebuffer(RenderState.BlurHorizontalFramebuffers[i]);
-                glDrawArrays(GL_TRIANGLES, 0, 6);
-            }
-            UnbindFramebuffer(RenderState);
-            UnbindShaderProgram();
-
-            // perform blur
-            RenderBlur(RenderState, &RenderState.BlurHorizontalProgram);
-            framebuffer *BlurOutput = RenderBlur(RenderState, &RenderState.BlurVerticalProgram);
-
-            // blend scene with blur results
-            Bind(RenderState.BlendProgram);
-            for (int i = 0; i < BloomBlurPassCount; i++)
-            {
-                Bind(BlurOutput[i].ColorTextures[0], i);
-            }
-            Bind(RenderState.SceneFramebuffer.ColorTextures[ColorTextureFlag_SurfaceReflect], BloomBlurPassCount);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            UnbindShaderProgram();
-        }
-    }
-    // @TODO: cleanup textures
 }
 
-inline static void
-AddRenderable(render_state &RenderState, size_t Index, material *Material)
+inline static void AddRenderable(render_state &RenderState, size_t Index, material *Material)
 {
     if (Material->DiffuseColor.a < 1.0f || (Material->Flags & MaterialFlag_ForceTransparent))
     {

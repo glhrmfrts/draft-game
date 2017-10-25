@@ -25,6 +25,7 @@ void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
     for (int i = 0; i < count; i++)
     {
         auto seq = seqs + i;
+        seq->Tweens.clear();
         state.Sequences[seq->ID] = NULL;
     }
 }

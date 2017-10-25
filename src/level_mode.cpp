@@ -1,5 +1,12 @@
 // Copyright
 
+#define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
+#define PLAYER_MAX_VEL_LIMIT           170.0f
+
+#define ROAD_LANE_WIDTH   2
+#define LEVEL_PLANE_COUNT 5
+#define SHIP_Z            0.2f
+
 struct audio_source
 {
     ALuint Source;
@@ -23,9 +30,6 @@ static void UpdateAudioParams(audio_source *audio)
     alSourcef(audio->Source, AL_GAIN, audio->Gain);
 }
 
-#define ROAD_LANE_WIDTH   2
-#define LEVEL_PLANE_COUNT 5
-#define SHIP_Z            0.2f
 static void InitLevel(game_state &g)
 {
     g.Mode = GameMode_Level;
@@ -355,7 +359,7 @@ static void GenerateShips(game_state &g, level_mode &l, float dt)
         if (l.ChangeShipTimer <= 0)
         {
             l.ChangeShipTimer = CHANGE_SHIP_TIMER;
-            l.NextShipInterval = DecreaseInterval(l.NextShipInterval, g.PlayerEntity->Vel().y);
+            //l.NextShipInterval = DecreaseInterval(l.NextShipInterval, g.PlayerEntity->Vel().y);
         }
 
         int colorIndex = GetNextShipColor(l);
@@ -371,6 +375,7 @@ static void GenerateShips(game_state &g, level_mode &l, float dt)
         AddEntity(g.World, ent);
 
         l.NextShipTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_Ships, l.NextShipInterval, 1.0f);
+        l.NextShipTimer -= (l.NextShipTimer * 0.9f) * (g.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
     }
 
     l.NextShipTimer -= dt;
@@ -464,8 +469,6 @@ static void ResetRedShipsGen(level_mode &l)
     l.ChangeRedShipTimer = CHANGE_SHIP_TIMER;
 }
 
-#define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
-#define PLAYER_MAX_VEL_LIMIT           170.0f
 void RenderLevel(game_state &g, float dt)
 {
     auto &l = g.LevelMode;
@@ -693,6 +696,7 @@ void RenderLevel(game_state &g, float dt)
     updateTime.End = g.Platform.GetMilliseconds();
     renderTime.Begin = g.Platform.GetMilliseconds();
 
+    PostProcessBegin(g.RenderState);
     RenderBegin(g.RenderState, dt);
     RenderEntityWorld(g.RenderState, g.World, dt);
 
@@ -709,18 +713,8 @@ void RenderLevel(game_state &g, float dt)
 #endif
 
     RenderEnd(g.RenderState, g.Camera);
-    renderTime.End = g.Platform.GetMilliseconds();
-
     UpdateProjectionView(g.GUICamera);
-    Begin(g.GUI, g.GUICamera);
-    DrawRect(g.GUI, rect{20,20,200,20},
-             IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
-
-    DrawRect(g.GUI, rect{25,25,190 * l.DraftCharge,10},
-             IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
-
-    DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);
-
+    Begin(g.GUI, g.GUICamera, 1.0f);
     for (auto text : l.ScoreTextList)
     {
         vec2 p = text->Pos;
@@ -729,13 +723,27 @@ void RenderLevel(game_state &g, float dt)
         p += (text->TargetPos - p) * t;
         DrawTextCentered(g.GUI, g.TestFont, Format(l.ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
+    End(g.GUI);
+    PostProcessEnd(g.RenderState);
+
     auto lastText = l.ScoreTextList.back();
     if (lastText && lastText->TweenValue >= 1.0f)
     {
         l.ScoreTextList.pop_back();
+        DestroySequences(g.TweenState, lastText->Sequence, 1);
         FreeEntryFromData(l.ScoreTextPool, lastText);
         FreeEntryFromData(l.SequencePool, lastText->Sequence);
     }
 
+    Begin(g.GUI, g.GUICamera);
+    DrawRect(g.GUI, rect{20,20,200,20},
+             IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
+
+    DrawRect(g.GUI, rect{25,25,190 * l.DraftCharge,10},
+             IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
+
+    DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);
     End(g.GUI);
+
+    renderTime.End = g.Platform.GetMilliseconds();
 }

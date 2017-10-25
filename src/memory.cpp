@@ -110,6 +110,21 @@ memory_pool_entry *GetEntry(memory_pool &pool)
     return entry;
 }
 
+static void PutEntry(memory_pool &pool, memory_pool_entry *entry, memory_pool_entry *prev)
+{
+    auto next = entry->Next;
+    entry->Next = pool.FirstFree;
+    if (prev)
+    {
+        prev->Next = next;
+    }
+#ifdef DRAFT_DEBUG
+    printf("[DEBUG:%s] put entry %p\n", pool.DEBUGName, entry->Base);
+#endif
+    entry->Used = 0;
+    pool.FirstFree = entry;
+}
+
 void FreeEntry(memory_pool &pool, memory_pool_entry *argEntry)
 {
     memory_pool_entry *entry = pool.First;
@@ -119,17 +134,25 @@ void FreeEntry(memory_pool &pool, memory_pool_entry *argEntry)
     {
         if (entry == argEntry)
         {
-            auto next = entry->Next;
-            entry->Next = pool.FirstFree;
-            if (prev)
-            {
-                prev->Next = next;
-            }
-#ifdef DRAFT_DEBUG
-            printf("[DEBUG:%s] put entry %p\n", pool.DEBUGName, entry->Base);
-#endif
-            entry->Used = 0;
-            pool.FirstFree = entry;
+            PutEntry(pool, entry, prev);
+            break;
+        }
+
+        prev = entry;
+        entry = entry->Next;
+    }
+}
+
+void FreeEntryFromData(memory_pool &pool, void *data)
+{
+    memory_pool_entry *entry = pool.First;
+    memory_pool_entry *prev = NULL;
+
+    while (entry)
+    {
+        if (entry->Base == data)
+        {
+            PutEntry(pool, entry, prev);
             break;
         }
 

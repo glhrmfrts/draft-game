@@ -27,15 +27,18 @@ static string GUIFragmentShader = R"FOO(
 uniform sampler2D u_Sampler;
 uniform float u_TexWeight;
 uniform vec4 u_DiffuseColor;
+uniform float u_Emission;
 
 smooth in vec2 v_Uv;
 smooth in vec4 v_Color;
 
-out vec4 BlendUnitColor;
+out vec4 BlendUnitColor[2];
 
 void main() {
     vec4 TexColor = texture(u_Sampler, v_Uv);
-    BlendUnitColor = mix(v_Color, TexColor, u_TexWeight) * u_DiffuseColor;
+    vec4 Color = mix(v_Color, TexColor, u_TexWeight) * u_DiffuseColor;
+    BlendUnitColor[0] = Color;
+    BlendUnitColor[1] = Color * u_Emission;
 }
 )FOO";
 
@@ -70,6 +73,7 @@ static void CompileGUIShader(gui &g)
     g.TexWeight = glGetUniformLocation(g.Program.ID, "u_TexWeight");
     g.Sampler = glGetUniformLocation(g.Program.ID, "u_Sampler");
     g.DiffuseColor = glGetUniformLocation(g.Program.ID, "u_DiffuseColor");
+    g.Emission = glGetUniformLocation(g.Program.ID, "u_Emission");
 
     Bind(g.Program);
     SetUniform(g.Sampler, 0);
@@ -88,7 +92,7 @@ void InitGUI(gui &g, game_input &Input)
                vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
 }
 
-void Begin(gui &g, camera &Camera)
+void Begin(gui &g, camera &Camera, float emission = 0.0f)
 {
     assert(g.Program.ID);
     assert(Camera.Updated);
@@ -98,6 +102,8 @@ void Begin(gui &g, camera &Camera)
     g.CurrentDrawCommand.Texture = NULL;
     g.DrawCommandList.clear();
     ResetBuffer(g.Buffer);
+
+    g.EmissionValue = emission;
 }
 
 static gui_draw_command NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
@@ -138,6 +144,7 @@ uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
     float v = TexRect.v;
     float u2 = TexRect.u2;
     float v2 = TexRect.v2;
+    float e = g.Emission;
     if (FlipV)
     {
         v2 = v;
@@ -272,6 +279,7 @@ void End(gui &g)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindVertexArray(g.Buffer.VAO);
+    SetUniform(g.Emission, g.EmissionValue);
 
     for (const auto &Cmd : g.DrawCommandList)
     {

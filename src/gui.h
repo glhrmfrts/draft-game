@@ -34,12 +34,14 @@ struct gui
     vector<gui_draw_command> DrawCommandList;
     shader_program Program;
     game_input *Input;
+    float EmissionValue;
 
     // uniforms
     int ProjectionView;
     int DiffuseColor;
     int Sampler;
     int TexWeight;
+    int Emission;
 };
 
 #endif
