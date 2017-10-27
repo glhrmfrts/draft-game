@@ -30,6 +30,82 @@ static void UpdateAudioParams(audio_source *audio)
     alSourcef(audio->Source, AL_GAIN, audio->Gain);
 }
 
+static int GetNextSpawnLane(level_mode &l, bool isShip = false)
+{
+    static int lastLane = 0;
+    static int lastShipLane = 0;
+    int lane = lastLane;
+    while (lane == lastLane || (isShip && lane == lastShipLane) || (l.ReservedLanes[lane+2] == 1))
+    {
+        lane = RandomBetween(l.Entropy, -2, 2);
+    }
+    lastLane = lane;
+    if (isShip)
+    {
+        lastShipLane = lane;
+    }
+    return lane;
+}
+
+static int GetNextShipColor(level_mode &l)
+{
+    static int lastColor = 0;
+    int color = lastColor;
+    while (color == lastColor)
+    {
+        color = RandomBetween(l.Entropy, 0, 1);
+    }
+    lastColor = color;
+    return color;
+}
+
+static void GenerateCrystal(level_gen_params *p, game_state &g, level_mode &l)
+{
+    int lane = GetNextSpawnLane(l);
+    auto ent = CreateCrystalEntity(GetEntry(g.World.CrystalPool), GetCrystalMesh(g));
+    ent->Pos().x = lane * ROAD_LANE_WIDTH;
+    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().z = SHIP_Z + 0.4f;
+    ent->Scl().x = 0.3f;
+    ent->Scl().y = 0.3f;
+    ent->Scl().z = 0.5f;
+    ent->Vel().y = PLAYER_MIN_VEL * 0.5f;
+    AddEntity(g.World, ent);
+}
+
+static void GenerateShip(level_gen_params *p, game_state &g, level_mode &l)
+{
+    int colorIndex = GetNextShipColor(l);
+    color c = IntColor(ShipPalette.Colors[colorIndex]);
+    int lane = GetNextSpawnLane(l, true);
+    auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
+    ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
+    ent->Pos().x = lane * ROAD_LANE_WIDTH;
+    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().z = SHIP_Z;
+    ent->Ship->ColorIndex = colorIndex;
+    AddFlags(ent, EntityFlag_RemoveOffscreen);
+    AddEntity(g.World, ent);
+}
+
+static void GenerateRedShip(level_gen_params *p, game_state &g, level_mode &l)
+{
+    color c = IntColor(ShipPalette.Colors[2]);
+    auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
+    int lane = l.RedShipReservedLane;
+    ent->Pos().x = lane * ROAD_LANE_WIDTH;
+    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().z = SHIP_Z;
+    ent->Ship->ColorIndex = 2;
+    AddFlags(ent, EntityFlag_RemoveOffscreen);
+    AddEntity(g.World, ent);
+}
+
+static void GenerateAsteroid(level_gen_params *p, game_state &g, level_mode &l)
+{
+    Println("I should be generating an asteroid");
+}
+
 static void InitLevel(game_state &g)
 {
     g.Mode = GameMode_Level;
@@ -82,6 +158,25 @@ static void InitLevel(game_state &g)
 
     InitFormat(l.ScoreFormat, "Score: %d\n", 24, &l.Arena);
     InitFormat(l.ScoreNumberFormat, "+%d", 8, &l.Arena);
+
+    auto gen = l.GenParams + LevelGenType_Crystal;
+    gen->Flags = LevelGenFlag_Randomize;
+    gen->Interval = BASE_CRYSTAL_INTERVAL;
+    gen->Func = GenerateCrystal;
+
+    gen = l.GenParams + LevelGenType_Ship;
+    gen->Interval = INITIAL_SHIP_INTERVAL;
+    gen->Func = GenerateShip;
+
+    gen = l.GenParams + LevelGenType_RedShip;
+    gen->Flags = LevelGenFlag_ReserveLane;
+    gen->Interval = INITIAL_SHIP_INTERVAL;
+    gen->Func = GenerateRedShip;
+
+    gen = l.GenParams + LevelGenType_Asteroid;
+    gen->Flags = LevelGenFlag_ReserveLane;
+    gen->Interval = INITIAL_SHIP_INTERVAL;
+    gen->Func = GenerateAsteroid;
 }
 
 static void DebugReset(game_state &g)
@@ -281,192 +376,69 @@ static void UpdateFreeCam(camera &cam, game_input &input, float dt)
     cam.Position += vec3(sin(strafeYaw), cos(strafeYaw), 0) * hAxisValue * speed * dt;
 }
 
-static int GetNextSpawnLane(level_mode &l, bool isShip = false)
-{
-    static int lastLane = 0;
-    static int lastShipLane = 0;
-    int lane = lastLane;
-    while (lane == lastLane || (isShip && lane == lastShipLane) || (lane == l.RedShipReservedLane))
-    {
-        lane = RandomBetween(l.Entropy, -2, 2);
-    }
-    lastLane = lane;
-    if (isShip)
-    {
-        lastShipLane = lane;
-    }
-    return lane;
-}
-
-static int GetNextShipColor(level_mode &l)
-{
-    static int lastColor = 0;
-    int color = lastColor;
-    while (color == lastColor)
-    {
-        color = RandomBetween(l.Entropy, 0, 1);
-    }
-    lastColor = color;
-    return color;
-}
-
-static float GetNextTimer(random_series series, uint64 flags, uint8 randFlag, float baseInterval, float offset)
-{
-    if (flags & randFlag)
-    {
-        return baseInterval + RandomBetween(series, -offset, offset);
-    }
-    return baseInterval;
-}
-
-static float DecreaseInterval(float interval, float playerVelY)
-{
-    float res = interval;
-    res -= 0.5f;
-    res = std::max(1.0f, res);
-    res -= 0.0025f * playerVelY;
-    res = std::max(0.05f, res);
-    return res;
-}
-
-#define CRYSTAL_INTERVAL_OFFSET 1.5f
-static void GenerateCrystals(game_state &g, level_mode &l, float dt)
-{
-    if (l.NextCrystalTimer <= 0)
-    {
-        int lane = GetNextSpawnLane(l);
-        auto ent = CreateCrystalEntity(GetEntry(g.World.CrystalPool), GetCrystalMesh(g));
-        ent->Pos().x = lane * ROAD_LANE_WIDTH;
-        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
-        ent->Pos().z = SHIP_Z + 0.4f;
-        ent->Scl().x = 0.3f;
-        ent->Scl().y = 0.3f;
-        ent->Scl().z = 0.5f;
-        ent->Vel().y = PLAYER_MIN_VEL * 0.5f;
-        AddEntity(g.World, ent);
-
-        l.NextCrystalTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_Crystals, BASE_CRYSTAL_INTERVAL, CRYSTAL_INTERVAL_OFFSET);
-    }
-
-    l.NextCrystalTimer -= dt;
-}
-
-static void GenerateShips(game_state &g, level_mode &l, float dt)
-{
-    // TODO: remove debug key
-    if (l.NextShipTimer <= 0 || g.Input.Keys[SDL_SCANCODE_S])
-    {
-        if (l.ChangeShipTimer <= 0)
-        {
-            l.ChangeShipTimer = CHANGE_SHIP_TIMER;
-            //l.NextShipInterval = DecreaseInterval(l.NextShipInterval, g.PlayerEntity->Vel().y);
-        }
-
-        int colorIndex = GetNextShipColor(l);
-        color c = IntColor(ShipPalette.Colors[colorIndex]);
-        int lane = GetNextSpawnLane(l, true);
-        auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
-        ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
-        ent->Pos().x = lane * ROAD_LANE_WIDTH;
-        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
-        ent->Pos().z = SHIP_Z;
-        ent->Ship->ColorIndex = colorIndex;
-        AddFlags(ent, EntityFlag_RemoveOffscreen);
-        AddEntity(g.World, ent);
-
-        l.NextShipTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_Ships, l.NextShipInterval, 1.0f);
-        l.NextShipTimer -= (l.NextShipTimer * 0.9f) * (g.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
-    }
-
-    l.NextShipTimer -= dt;
-    if (l.IncFlags & LevelFlag_Ships)
-    {
-        l.ChangeShipTimer -= dt;
-    }
-}
-
-#define RED_SHIP_INTERVAL_OFFSET 1.0f
-static void GenerateRedShips(game_state &g, level_mode &l, float dt)
-{
-    if (l.NextRedShipTimer <= 0)
-    {
-        if (l.ChangeRedShipTimer <= 0)
-        {
-            l.ChangeRedShipTimer = CHANGE_SHIP_TIMER;
-            l.NextRedShipInterval = DecreaseInterval(l.NextRedShipInterval, g.PlayerEntity->Vel().y);
-        }
-
-        color c = IntColor(ShipPalette.Colors[2]);
-        auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
-        int lane = l.RedShipReservedLane;
-        ent->Pos().x = lane * ROAD_LANE_WIDTH;
-        ent->Pos().y = g.PlayerEntity->Pos().y + 200;
-        ent->Pos().z = SHIP_Z;
-        ent->Ship->ColorIndex = 2;
-        AddFlags(ent, EntityFlag_RemoveOffscreen);
-        AddEntity(g.World, ent);
-
-        l.RedShipReservedLane = NO_RESERVED_LANE;
-        l.NextRedShipTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_RedShips, l.NextRedShipInterval, RED_SHIP_INTERVAL_OFFSET);
-    }
-    if (l.NextRedShipTimer <= l.NextRedShipInterval*0.5f && l.RedShipReservedLane == NO_RESERVED_LANE)
-    {
-        const int maxTries = 5;
-        int i = 0;
-        int laneIndex = l.PlayerLaneIndex;
-
-        // get the first non-occupied lane, or give up for this frame
-        while (l.LaneSlots[laneIndex] > 0 && i < maxTries)
-        {
-            laneIndex = RandomBetween(l.Entropy, 0, 4);
-            i++;
-        }
-        if (i >= maxTries)
-        {
-            l.NextRedShipTimer = GetNextTimer(l.Entropy, l.RandFlags, LevelFlag_RedShips, l.NextRedShipInterval, RED_SHIP_INTERVAL_OFFSET);
-        }
-        else
-        {
-            l.RedShipReservedLane = laneIndex - 2;
-        }
-    }
-
-    l.NextRedShipTimer -= dt;
-    if (l.IncFlags & LevelFlag_RedShips)
-    {
-        l.ChangeRedShipTimer -= dt;
-    }
-}
-
 static void KeepEntityInsideOfRoad(entity *ent)
 {
     const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
     ent->Pos().x = glm::clamp(ent->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
-inline static void AddFlags(uint64 &flags, uint64 f)
+static void ResetGen(level_gen_params *p)
 {
-    flags |= f;
+    p->Interval = INITIAL_SHIP_INTERVAL;
+    p->Timer = 0;
 }
 
-inline static void RemoveFlags(uint64 &flags, uint64 f)
+static float GetNextTimer(level_gen_params *p)
 {
-    flags = flags &~ f;
+    if (p->Flags & LevelGenFlag_Randomize)
+    {
+        const float offset = 1.5f;
+        return p->Interval + RandomBetween(series, -offset, offset);
+    }
+    return p->Interval;
 }
 
-static void ResetShipsGen(level_mode &l)
+static void UpdateGen(game_state &g, level_mode &l, level_gen_params *p, float dt)
 {
-    l.NextShipInterval = INITIAL_SHIP_INTERVAL;
-    l.NextShipTimer = INITIAL_SHIP_INTERVAL;
-    l.ChangeShipTimer = CHANGE_SHIP_TIMER;
-}
+    if (p->Timer >= p->Interval)
+    {
+        p->Func(p, g, l);
+        p->Timer = GetNextTimer(p);
+        if (p->Flags & LevelGenFlag_BasedOnVelocity)
+        {
+            p->Timer -= (p->Timer * 0.9f) * (g.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
+        }
+        p->ReservedLane = NO_RESERVED_LANE;
+        l.ReservedLanes[p->ReservedLane + 2] = 0;
+    }
 
-static void ResetRedShipsGen(level_mode &l)
-{
-    l.RedShipReservedLane = NO_RESERVED_LANE;
-    l.NextRedShipTimer = INITIAL_SHIP_INTERVAL;
-    l.NextRedShipInterval = INITIAL_SHIP_INTERVAL;
-    l.ChangeRedShipTimer = CHANGE_SHIP_TIMER;
+    if (p->Flags & LevelGenFlag_ReserveLane)
+    {
+        if (p->Timer >= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
+        {
+            const int maxTries = 5;
+            int i = 0;
+            int laneIndex = l.PlayerLaneIndex;
+
+            // get the first non-occupied lane, or give up for this frame
+            while (l.LaneSlots[laneIndex] > 0 && i < maxTries)
+            {
+                laneIndex = RandomBetween(l.Entropy, 0, 4);
+                i++;
+            }
+            if (i >= maxTries)
+            {
+                p->Timer = GetNextTimer(p);
+            }
+            else
+            {
+                p->ReservedLane = laneIndex - 2;
+                l.ReservedLanes[laneIndex] = 1;
+            }
+        }
+    }
+
+    p->Timer += dt;
 }
 
 void RenderLevel(game_state &g, float dt)
@@ -519,42 +491,32 @@ void RenderLevel(game_state &g, float dt)
 
     // we have a different state each 10 seconds elapsed
     int state = int(std::floor(l.TimeElapsed / 10.0f));
+    auto crystals = l.GenParams + LevelGenType_Crystal;
+    auto ships = l.GenParams + LevelGenType_Ship;
+    auto redShips = l.GenParams + LevelGenType_RedShip;
     switch (state)
     {
     case 0:
-        AddFlags(l.GenFlags, LevelFlag_Crystals);
-        AddFlags(l.RandFlags, LevelFlag_Crystals);
+        crystals->Flags |= LevelGenFlag_Enabled | LevelGenFlag_Randomize;
         break;
 
     case 1:
-        AddFlags(l.GenFlags, LevelFlag_Ships);
-        AddFlags(l.IncFlags, LevelFlag_Ships);
+        ships->Flags |= LevelGenFlag_Enabled;
         break;
 
     case 6:
-        RemoveFlags(l.GenFlags, LevelFlag_Ships);
-        RemoveFlags(l.IncFlags, LevelFlag_Ships);
-        ResetShipsGen(l);
-        AddFlags(l.GenFlags, LevelFlag_RedShips);
-        AddFlags(l.IncFlags, LevelFlag_RedShips);
+        ships->Flags &= ~LevelGenFlag_Enabled;
+        ResetGen(ships);
+        redShips->Flags |= LevelGenFlag_Enabled;
         break;
 
     case 8:
-        AddFlags(l.GenFlags, LevelFlag_Ships);
-        AddFlags(l.IncFlags, LevelFlag_Ships);
+        ships->Flags |= LevelGenFlag_Enabled;
         break;
     }
-    if (l.GenFlags & LevelFlag_Crystals)
+    for (int i = 0; i < LevelGenType_MAX; i++)
     {
-        GenerateCrystals(g, l, dt);
-    }
-    if (l.GenFlags & LevelFlag_Ships)
-    {
-        GenerateShips(g, l, dt);
-    }
-    if (l.GenFlags & LevelFlag_RedShips)
-    {
-        GenerateRedShips(g, l, dt);
+        UpdateGen(l.GenParams + i);
     }
 
     {

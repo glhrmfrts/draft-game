@@ -1,10 +1,6 @@
 #ifndef DRAFT_LEVEL_MODE_H
 #define DRAFT_LEVEL_MODE_H
 
-#define LevelFlag_Crystals (1 << 0)
-#define LevelFlag_Ships    (1 << 1)
-#define LevelFlag_RedShips (1 << 2)
-
 struct audio_source;
 
 #define PLAYER_INITIAL_MAX_VEL 70.0f
@@ -16,15 +12,31 @@ struct audio_source;
 
 #define NO_RESERVED_LANE 500
 
-/*
+// entity generation flags
+#define LevelGenFlag_Enabled         (1 << 0)
+#define LevelGenFlag_Randomize       (1 << 1)
+#define LevelGenFlag_BasedOnVelocity (1 << 2)
+#define LevelGenFlag_ReserveLane     (1 << 3)
+
+enum level_gen_type
+{
+    LevelGenType_Crystal,
+    LevelGenType_Ship,
+    LevelGenType_RedShip,
+    LevelGenType_Asteroid,
+    LevelGenType_MAX,
+};
+
+typedef void level_gen_func();
+
 struct level_gen_params
 {
     uint32 Flags;
-    float NextInterval;
-    float NextTimer;
-    float ChangeTimer;
+    level_gen_func *Func;
+    float Interval;
+    float Timer = 0;
+    int ReservedLane = NO_RESERVED_LANE;
 };
-*/
 
 struct level_score_text
 {
@@ -45,20 +57,12 @@ struct level_mode
     uint64 IncFlags = 0; // timer increment flags
     uint64 RandFlags = 0; // random timer flags
     int LaneSlots[5];
+    int ReservedLanes[5];
 
     generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;
 
-    float NextCrystalTimer = BASE_CRYSTAL_INTERVAL;
-
-    float NextShipInterval = INITIAL_SHIP_INTERVAL;
-    float NextShipTimer = INITIAL_SHIP_INTERVAL;
-    float ChangeShipTimer = CHANGE_SHIP_TIMER;
-
-    int RedShipReservedLane = NO_RESERVED_LANE;
-    float NextRedShipTimer = INITIAL_SHIP_INTERVAL;
-    float NextRedShipInterval = INITIAL_SHIP_INTERVAL;
-    float ChangeRedShipTimer = CHANGE_SHIP_TIMER;
+    level_gen_params GenParams[LevelGenType_MAX];
 
     std::vector<collision_result> CollisionCache;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;

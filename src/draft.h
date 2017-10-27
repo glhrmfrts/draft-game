@@ -145,6 +145,7 @@ struct game_meshes
     mesh *ShipMesh = NULL;
     mesh *CrystalMesh = NULL;
     mesh *RoadMesh = NULL;
+    mesh *AsteroidMesh = NULL;
 };
 
 struct profile_time

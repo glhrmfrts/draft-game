@@ -242,6 +242,42 @@ mesh *GetCrystalMesh(game_state &Game)
     return m.CrystalMesh = CrystalMesh;
 }
 
+mesh *GetAsteroidMesh(game_state &game)
+{
+    auto &m = game.Meshes;
+    if (m.AsteroidMesh)
+    {
+        return m.AsteroidMesh;
+    }
+
+    auto astMesh = PushStruct<mesh>(game.Arena);
+    InitMeshBuffer(astMesh->Buffer);
+
+    const int p = 8;
+    for (int i = 0; i < p/2; i++)
+    {
+        float theta1 = i * (M_PI*2) / p - M_PI_2;
+        float theta2 = (i+1) * (M_PI*2) / p - M_PI_2;
+        for (int j = 0; j <= p; j++)
+        {
+            float theta3 = j * (M_PI*2) / p;
+            float x = std::cos(theta2) * std::cos(theta3);
+            float y = std::sin(theta2);
+            float z = std::cos(theta2) * std::sin(theta3);
+            PushVertex(astMesh->Buffer, mesh_vertex{vec3{x, y, z}, vec2{0,0}, Color_white, vec3{x, y, z}});
+
+            x = std::cos(theta1) * std::cos(theta3);
+            y = std::sin(theta1);
+            z = std::cos(theta1) * std::sin(theta3);
+            PushVertex(astMesh->Buffer, mesh_vertex{vec3{x, y, z}, vec2{0,0}, Color_white, vec3{x, y, z}});
+        }
+    }
+
+    AddPart(astMesh, mesh_part{material{Color_green, 1.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
+    EndMesh(astMesh, GL_STATIC_DRAW);
+    return m.AsteroidMesh = astMesh;
+}
+
 #define WALL_HEIGHT 2.0f
 #define WALL_WIDTH  0.5f
 mesh *GenerateWallMesh(memory_arena &Arena, const std::vector<vec2> &Points)
