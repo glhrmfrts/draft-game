@@ -11,24 +11,24 @@
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0')
 
-void DrawDebugUI(game_state &g, float dt)
+void DrawDebugUI(game_state *g, float dt)
 {
     if (!Global_DebugUI) return;
 
-    auto &updateTime = g.UpdateTime;
-    auto &renderTime = g.RenderTime;
-    auto playerEntity = g.PlayerEntity;
-    auto lanes = g.LevelMode.LaneSlots;
+    auto &updateTime = g->UpdateTime;
+    auto &renderTime = g->RenderTime;
+    auto playerEntity = g->PlayerEntity;
+    auto lanes = g->LevelMode.LaneSlots;
     ImGui::Text("ms: %.2f", dt * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/dt);
     ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);
     ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
-    ImGui::Text("Player max vel: %.2f", g.LevelMode.PlayerMaxVel);
+    ImGui::Text("Player max vel: %.2f", g->LevelMode.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
-    ImGui::Text("State: %d (%.2f)", int(std::floor(g.LevelMode.TimeElapsed/10.0f)), g.LevelMode.TimeElapsed);
-    ImGui::Text("Gen flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.GenFlags));
-    ImGui::Text("Inc flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.IncFlags));
-    ImGui::Text("Rand flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g.LevelMode.RandFlags));
+    ImGui::Text("State: %d (%.2f)", int(std::floor(g->LevelMode.TimeElapsed/10.0f)), g->LevelMode.TimeElapsed);
+    ImGui::Text("Gen flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g->LevelMode.GenFlags));
+    ImGui::Text("Inc flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g->LevelMode.IncFlags));
+    ImGui::Text("Rand flags: " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(g->LevelMode.RandFlags));
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 
     if (ImGui::CollapsingHeader("Camera"))
@@ -49,7 +49,7 @@ void DrawDebugUI(game_state &g, float dt)
     }
     if (ImGui::CollapsingHeader("Renderer"))
     {
-		ImGui::Text("Renderables: %lu", g.RenderState.FrameSolidRenderables.size() + g.RenderState.FrameTransparentRenderables.size());
+		ImGui::Text("Renderables: %lu", g->RenderState.FrameSolidRenderables.size() + g->RenderState.FrameTransparentRenderables.size());
 		ImGui::Spacing();
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);
 

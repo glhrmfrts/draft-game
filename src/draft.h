@@ -203,32 +203,32 @@ inline static float GetAxisValue(game_input &Input, action_type Type)
     return Input.Actions[Type].AxisValue;
 }
 
-inline static bool IsPressed(game_state &game, action_type type)
+inline static bool IsPressed(game_state *game, action_type type)
 {
-    return game.Input.Actions[type].Pressed > 0;
+    return game->Input.Actions[type].Pressed > 0;
 }
 
-inline static bool IsJustPressed(game_state &Game, action_type Type)
+inline static bool IsJustPressed(game_state *Game, action_type Type)
 {
-    return Game.Input.Actions[Type].Pressed > 0 &&
-        Game.PrevInput.Actions[Type].Pressed == 0;
+    return Game->Input.Actions[Type].Pressed > 0 &&
+        Game->PrevInput.Actions[Type].Pressed == 0;
 }
 
-inline static bool IsJustPressed(game_state &Game, uint8 Button)
+inline static bool IsJustPressed(game_state *Game, uint8 Button)
 {
-    return (Game.Input.MouseState.Buttons & Button) &&
-        !(Game.PrevInput.MouseState.Buttons & Button);
+    return (Game->Input.MouseState.Buttons & Button) &&
+        !(Game->PrevInput.MouseState.Buttons & Button);
 }
 
-inline static bool IsJustReleased(game_state &Game, uint8 Button)
+inline static bool IsJustReleased(game_state *Game, uint8 Button)
 {
-    return !(Game.Input.MouseState.Buttons & Button) &&
-        (Game.PrevInput.MouseState.Buttons & Button);
+    return !(Game->Input.MouseState.Buttons & Button) &&
+        (Game->PrevInput.MouseState.Buttons & Button);
 }
 
-inline static float GetRealPixels(game_state &game, float p)
+inline static float GetRealPixels(game_state *game, float p)
 {
-    return p * (float(game.Width)/float(GAME_BASE_WIDTH));
+    return p * (float(game->Width)/float(GAME_BASE_WIDTH));
 }
 
 #endif

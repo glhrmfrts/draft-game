@@ -27,7 +27,11 @@ enum level_gen_type
     LevelGenType_MAX,
 };
 
-typedef void level_gen_func();
+struct game_state;
+struct level_mode;
+struct level_gen_params;
+
+typedef void level_gen_func(level_gen_params *p, game_state *g, level_mode *l);
 
 struct level_gen_params
 {

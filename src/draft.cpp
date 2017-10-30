@@ -59,7 +59,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/vcr.ttf",
                 "vcr_16",
-                (void *)int(GetRealPixels(*g, 40.0f))
+                (void *)int(GetRealPixels(g, 40.0f))
             )
         );
         g->Assets.push_back(
@@ -67,7 +67,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
                 "g_type_16",
-                (void *)int(GetRealPixels(*g, 40.0f))
+                (void *)int(GetRealPixels(g, 40.0f))
             )
         );
         g->Assets.push_back(
@@ -79,7 +79,7 @@ extern "C"
             )
         );
 
-        InitLoadingScreen(*g);
+        InitLoadingScreen(g);
     }
 
     // @TODO: this exists only for imgui, remove in the future
@@ -94,7 +94,7 @@ extern "C"
         float dt = DeltaTime;
 
         ImGui_ImplSdlGL3_NewFrame(g->Window);
-        if (IsJustPressed(*g, Action_debugUI))
+        if (IsJustPressed(g, Action_debugUI))
         {
             Global_DebugUI = !Global_DebugUI;
         }
@@ -102,11 +102,11 @@ extern "C"
         switch (g->Mode)
         {
         case GameMode_LoadingScreen:
-            RenderLoadingScreen(*g, dt, InitLevel);
+            RenderLoadingScreen(g, dt, InitLevel);
             break;
 
         case GameMode_Level:
-            RenderLevel(*g, dt);
+            RenderLevel(g, dt);
             break;
         }
 
@@ -123,7 +123,7 @@ extern "C"
         }
 #endif
 
-        DrawDebugUI(*g, dt);
+        DrawDebugUI(g, dt);
         ImGui::Render();
     }
 

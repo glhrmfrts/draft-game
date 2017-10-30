@@ -30,14 +30,14 @@ static void UpdateAudioParams(audio_source *audio)
     alSourcef(audio->Source, AL_GAIN, audio->Gain);
 }
 
-static int GetNextSpawnLane(level_mode &l, bool isShip = false)
+static int GetNextSpawnLane(level_mode *l, bool isShip = false)
 {
     static int lastLane = 0;
     static int lastShipLane = 0;
     int lane = lastLane;
-    while (lane == lastLane || (isShip && lane == lastShipLane) || (l.ReservedLanes[lane+2] == 1))
+    while (lane == lastLane || (isShip && lane == lastShipLane) || (l->ReservedLanes[lane+2] == 1))
     {
-        lane = RandomBetween(l.Entropy, -2, 2);
+        lane = RandomBetween(l->Entropy, -2, 2);
     }
     lastLane = lane;
     if (isShip)
@@ -47,151 +47,157 @@ static int GetNextSpawnLane(level_mode &l, bool isShip = false)
     return lane;
 }
 
-static int GetNextShipColor(level_mode &l)
+static int GetNextShipColor(level_mode *l)
 {
     static int lastColor = 0;
     int color = lastColor;
     while (color == lastColor)
     {
-        color = RandomBetween(l.Entropy, 0, 1);
+        color = RandomBetween(l->Entropy, 0, 1);
     }
     lastColor = color;
     return color;
 }
 
-static void GenerateCrystal(level_gen_params *p, game_state &g, level_mode &l)
+static void GenerateCrystal(level_gen_params *p, game_state *g, level_mode *l)
 {
     int lane = GetNextSpawnLane(l);
-    auto ent = CreateCrystalEntity(GetEntry(g.World.CrystalPool), GetCrystalMesh(g));
+    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g));
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
     ent->Pos().z = SHIP_Z + 0.4f;
     ent->Scl().x = 0.3f;
     ent->Scl().y = 0.3f;
     ent->Scl().z = 0.5f;
     ent->Vel().y = PLAYER_MIN_VEL * 0.5f;
-    AddEntity(g.World, ent);
+    AddEntity(g->World, ent);
 }
 
-static void GenerateShip(level_gen_params *p, game_state &g, level_mode &l)
+static void GenerateShip(level_gen_params *p, game_state *g, level_mode *l)
 {
     int colorIndex = GetNextShipColor(l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
     int lane = GetNextSpawnLane(l, true);
-    auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false);
     ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = colorIndex;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
-    AddEntity(g.World, ent);
+    AddEntity(g->World, ent);
 }
 
-static void GenerateRedShip(level_gen_params *p, game_state &g, level_mode &l)
+static void GenerateRedShip(level_gen_params *p, game_state *g, level_mode *l)
 {
     color c = IntColor(ShipPalette.Colors[2]);
-    auto ent = CreateShipEntity(GetEntry(g.World.ShipPool), GetShipMesh(g), c, c, false);
-    int lane = l.RedShipReservedLane;
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false);
+    int lane = p->ReservedLane;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g.PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = 2;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
-    AddEntity(g.World, ent);
+    AddEntity(g->World, ent);
 }
 
-static void GenerateAsteroid(level_gen_params *p, game_state &g, level_mode &l)
+static void GenerateAsteroid(level_gen_params *p, game_state *g, level_mode *l)
 {
     Println("I should be generating an asteroid");
 }
 
-static void InitLevel(game_state &g)
+static void InitLevel(game_state *g)
 {
-    g.Mode = GameMode_Level;
+    g->Mode = GameMode_Level;
 
-    auto &l = g.LevelMode;
-    FreeArena(l.Arena);
-    l.Entropy = RandomSeed(g.Platform.GetMilliseconds());
+    auto l = &g->LevelMode;
+    FreeArena(l->Arena);
+    l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
 
-    g.RenderState.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
-    g.RenderState.FogColor.a = 1.0f;
-    ApplyExplosionLight(g.RenderState, IntColor(FirstPalette.Colors[3]));
+    g->RenderState.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
+    g->RenderState.FogColor.a = 1.0f;
+    ApplyExplosionLight(g->RenderState, IntColor(FirstPalette.Colors[3]));
 
-    g.Gravity = vec3(0, 0, 0);
-    g.World.Camera = &g.Camera;
+    g->Gravity = vec3(0, 0, 0);
+    g->World.Camera = &g->Camera;
 
-    g.PlayerEntity = CreateShipEntity(&g.World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
-    g.PlayerEntity->Transform.Position.z = SHIP_Z;
-    g.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
-    AddEntity(g.World, g.PlayerEntity);
+    g->PlayerEntity = CreateShipEntity(&g->World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
+    g->PlayerEntity->Transform.Position.z = SHIP_Z;
+    g->PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
+    AddEntity(g->World, g->PlayerEntity);
 
     for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
     {
-        auto ent = PushStruct<entity>(g.World.Arena);
+        auto ent = PushStruct<entity>(g->World.Arena);
         ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
         ent->Transform.Position.z = -0.25f;
         ent->Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 0};
-        ent->Model = CreateModel(&g.World.Arena, GetFloorMesh(g));
-        ent->Repeat = PushStruct<entity_repeat>(g.World.Arena);
+        ent->Model = CreateModel(&g->World.Arena, GetFloorMesh(g));
+        ent->Repeat = PushStruct<entity_repeat>(g->World.Arena);
         ent->Repeat->Count = LEVEL_PLANE_COUNT;
         ent->Repeat->Size = LEVEL_PLANE_SIZE;
         ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE/2;
-        AddEntity(g.World, ent);
+        AddEntity(g->World, ent);
     }
     for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
     {
-        auto ent = PushStruct<entity>(g.World.Arena);
+        auto ent = PushStruct<entity>(g->World.Arena);
         ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
         ent->Transform.Position.z = 0.0f;
         ent->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
-        ent->Model = CreateModel(&g.World.Arena, GetRoadMesh(g));
-        ent->Repeat = PushStruct<entity_repeat>(g.World.Arena);
+        ent->Model = CreateModel(&g->World.Arena, GetRoadMesh(g));
+        ent->Repeat = PushStruct<entity_repeat>(g->World.Arena);
         ent->Repeat->Count = LEVEL_PLANE_COUNT;
         ent->Repeat->Size = LEVEL_PLANE_SIZE;
         ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE / 2;
-        AddEntity(g.World, ent);
+        AddEntity(g->World, ent);
     }
 
-    g.TestFont = FindBitmapFont(g.AssetLoader, "g_type_16");
-    l.DraftBoostAudio = CreateAudioSource(g.Arena, FindSound(g.AssetLoader, "boost")->Buffer);
+    g->TestFont = FindBitmapFont(g->AssetLoader, "g_type_16");
+    l->DraftBoostAudio = CreateAudioSource(g->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
 
-    InitFormat(l.ScoreFormat, "Score: %d\n", 24, &l.Arena);
-    InitFormat(l.ScoreNumberFormat, "+%d", 8, &l.Arena);
+    InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
+    InitFormat(l->ScoreNumberFormat, "+%d", 8, &l->Arena);
 
-    auto gen = l.GenParams + LevelGenType_Crystal;
+    auto gen = l->GenParams + LevelGenType_Crystal;
     gen->Flags = LevelGenFlag_Randomize;
     gen->Interval = BASE_CRYSTAL_INTERVAL;
     gen->Func = GenerateCrystal;
 
-    gen = l.GenParams + LevelGenType_Ship;
+    gen = l->GenParams + LevelGenType_Ship;
+    gen->Flags = LevelGenFlag_BasedOnVelocity;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateShip;
 
-    gen = l.GenParams + LevelGenType_RedShip;
-    gen->Flags = LevelGenFlag_ReserveLane;
+    gen = l->GenParams + LevelGenType_RedShip;
+    gen->Flags = LevelGenFlag_BasedOnVelocity | LevelGenFlag_ReserveLane;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateRedShip;
 
-    gen = l.GenParams + LevelGenType_Asteroid;
+    gen = l->GenParams + LevelGenType_Asteroid;
     gen->Flags = LevelGenFlag_ReserveLane;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateAsteroid;
+
+    for (int i = 0; i < ROAD_LANE_COUNT; i++)
+    {
+        l->ReservedLanes[i] = 0;
+    }
 }
 
-static void DebugReset(game_state &g)
+static void DebugReset(game_state *g)
 {
 }
 
-static void AddScoreText(game_state &g, level_mode &l, int score, vec3 pos, color c)
+static void AddScoreText(game_state *g, level_mode *l, int score, vec3 pos, color c)
 {
-    vec4 v = g.Camera.ProjectionView * vec4{pos, 1.0f};
+    vec4 v = g->Camera.ProjectionView * vec4{pos, 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
-    screenPos.x = (g.Width/2) * screenPos.x + (g.Width/2);
-    screenPos.y = (g.Height/2) * screenPos.y + (g.Height/2);
+    screenPos.x = (g->Width/2) * screenPos.x + (g->Width/2);
+    screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);
 
-    auto seq = PushStruct<tween_sequence>(GetEntry(l.SequencePool));
-    auto scoreText = PushStruct<level_score_text>(GetEntry(l.ScoreTextPool));
+    auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+    auto scoreText = PushStruct<level_score_text>(GetEntry(l->ScoreTextPool));
     scoreText->Color = c;
     scoreText->Pos = screenPos;
     scoreText->TargetPos = screenPos + vec2{20.0f, -100.0f};
@@ -199,9 +205,9 @@ static void AddScoreText(game_state &g, level_mode &l, int score, vec3 pos, colo
     scoreText->Sequence = seq;
 
     seq->Tweens.push_back(tween{&scoreText->TweenValue, 0.0f, 1.0f, 1, 1.0f, TweenEasing_Linear});
-    AddSequences(g.TweenState, seq, 1);
-    PlaySequence(g.TweenState, seq);
-    l.ScoreTextList.push_back(scoreText);
+    AddSequences(g->TweenState, seq, 1);
+    PlaySequence(g->TweenState, seq);
+    l->ScoreTextList.push_back(scoreText);
 }
 
 struct find_entity_result
@@ -241,9 +247,9 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
 #define SHIP_IS_BLUE(s)   (s->ColorIndex == 0)
 #define SHIP_IS_ORANGE(s) (s->ColorIndex == 1)
 #define SHIP_IS_RED(s)    (s->ColorIndex == 2)
-static bool HandleCollision(game_state &g, entity *first, entity *second, float dt)
+static bool HandleCollision(game_state *g, entity *first, entity *second, float dt)
 {
-    auto &l = g.LevelMode;
+    auto l = &g->LevelMode;
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
     auto crystalEntity = FindEntityOfType(first, second, ColliderType_Crystal).Found;
     if (first->Collider->Type == ColliderType_TrailPiece || second->Collider->Type == ColliderType_TrailPiece)
@@ -251,12 +257,12 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
         auto trailPieceEntity = FindEntityOfType(first, second, ColliderType_TrailPiece).Found;
         if (shipEntity && ENTITY_IS_PLAYER(shipEntity) && shipEntity != trailPieceEntity->TrailPiece->Owner)
         {
-            if (l.NumTrailCollisions == 0 && (!l.DraftActive || l.DraftTarget != trailPieceEntity->TrailPiece->Owner))
+            if (l->NumTrailCollisions == 0 && (!l->DraftActive || l->DraftTarget != trailPieceEntity->TrailPiece->Owner))
             {
-                l.CurrentDraftTime += dt;
-                l.NumTrailCollisions++;
-                l.DraftTarget = trailPieceEntity->TrailPiece->Owner;
-                l.DraftActive = false;
+                l->CurrentDraftTime += dt;
+                l->NumTrailCollisions++;
+                l->DraftTarget = trailPieceEntity->TrailPiece->Owner;
+                l->DraftActive = false;
             }
         }
         return false;
@@ -276,12 +282,12 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
             entityToExplode = second;
             otherEntity = first;
         }
-        if ((ENTITY_IS_PLAYER(otherEntity) && l.DraftActive && l.DraftTarget == entityToExplode) ||
+        if ((ENTITY_IS_PLAYER(otherEntity) && l->DraftActive && l->DraftTarget == entityToExplode) ||
             (SHIP_IS_RED(otherEntity->Ship) || SHIP_IS_RED(entityToExplode->Ship)))
         {
             if (ENTITY_IS_PLAYER(otherEntity))
             {
-                l.DraftActive = false;
+                l->DraftActive = false;
             }
             else if (ENTITY_IS_PLAYER(entityToExplode))
             {
@@ -290,13 +296,13 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
 
             if (SHIP_IS_BLUE(entityToExplode->Ship))
             {
-                l.Score += SCORE_DESTROY_BLUE_SHIP;
+                l->Score += SCORE_DESTROY_BLUE_SHIP;
                 entityToExplode->Ship->Scored = true;
                 AddScoreText(g, l, SCORE_DESTROY_BLUE_SHIP, entityToExplode->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
             }
 
             auto exp = CreateExplosionEntity(
-                GetEntry(g.World.ExplosionPool),
+                GetEntry(g->World.ExplosionPool),
                 *entityToExplode->Model->Mesh,
                 entityToExplode->Model->Mesh->Parts[0],
                 entityToExplode->Transform.Position,
@@ -306,8 +312,8 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
                 entityToExplode->Ship->OutlineColor,
                 vec3{ 0, 1, 1 }
             );
-            AddEntity(g.World, exp);
-            RemoveEntity(g.World, entityToExplode);
+            AddEntity(g->World, exp);
+            RemoveEntity(g->World, entityToExplode);
             return false;
         }
         else
@@ -323,12 +329,12 @@ static bool HandleCollision(game_state &g, entity *first, entity *second, float 
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
-            l.Score += SCORE_CRYSTAL;
+            l->Score += SCORE_CRYSTAL;
             AddScoreText(g, l, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
 
-            auto pup = CreatePowerupEntity(GetEntry(g.World.PowerupPool), g.LevelMode.Entropy, g.LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
-            AddEntity(g.World, pup);
-            RemoveEntity(g.World, crystalEntity);
+            auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool), g->LevelMode.Entropy, g->LevelMode.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
+            AddEntity(g->World, pup);
+            RemoveEntity(g->World, crystalEntity);
         }
         return false;
     }
@@ -385,79 +391,84 @@ static void KeepEntityInsideOfRoad(entity *ent)
 static void ResetGen(level_gen_params *p)
 {
     p->Interval = INITIAL_SHIP_INTERVAL;
-    p->Timer = 0;
+    p->Timer = p->Interval;
 }
 
-static float GetNextTimer(level_gen_params *p)
+static float GetNextTimer(level_gen_params *p, random_series random)
 {
     if (p->Flags & LevelGenFlag_Randomize)
     {
         const float offset = 1.5f;
-        return p->Interval + RandomBetween(series, -offset, offset);
+        return p->Interval + RandomBetween(random, -offset, offset);
     }
     return p->Interval;
 }
 
-static void UpdateGen(game_state &g, level_mode &l, level_gen_params *p, float dt)
+static void UpdateGen(game_state *g, level_mode *l, level_gen_params *p, float dt)
 {
-    if (p->Timer >= p->Interval)
+    if (!(p->Flags & LevelGenFlag_Enabled))
+    {
+        return;
+    }
+
+    if (p->Timer <= 0)
     {
         p->Func(p, g, l);
-        p->Timer = GetNextTimer(p);
+        p->Timer = GetNextTimer(p, l->Entropy);
         if (p->Flags & LevelGenFlag_BasedOnVelocity)
         {
-            p->Timer -= (p->Timer * 0.9f) * (g.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
+            p->Timer -= (p->Timer * 0.9f) * (g->PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
         }
+        l->ReservedLanes[p->ReservedLane + 2] = 0;
         p->ReservedLane = NO_RESERVED_LANE;
-        l.ReservedLanes[p->ReservedLane + 2] = 0;
     }
 
     if (p->Flags & LevelGenFlag_ReserveLane)
     {
-        if (p->Timer >= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
+        if (p->Timer <= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
         {
             const int maxTries = 5;
             int i = 0;
-            int laneIndex = l.PlayerLaneIndex;
+            int laneIndex = l->PlayerLaneIndex;
 
             // get the first non-occupied lane, or give up for this frame
-            while (l.LaneSlots[laneIndex] > 0 && i < maxTries)
+            while (l->LaneSlots[laneIndex] > 0 && i < maxTries)
             {
-                laneIndex = RandomBetween(l.Entropy, 0, 4);
+                laneIndex = RandomBetween(l->Entropy, 0, 4);
                 i++;
             }
             if (i >= maxTries)
             {
-                p->Timer = GetNextTimer(p);
+                p->Timer = GetNextTimer(p, l->Entropy);
             }
             else
             {
                 p->ReservedLane = laneIndex - 2;
-                l.ReservedLanes[laneIndex] = 1;
+                l->ReservedLanes[laneIndex] = 1;
             }
         }
     }
 
-    p->Timer += dt;
+    p->Timer -= dt;
 }
 
-void RenderLevel(game_state &g, float dt)
+static void RenderLevel(game_state *g, float dt)
 {
-    auto &l = g.LevelMode;
-    auto &updateTime = g.UpdateTime;
-    auto &renderTime = g.RenderTime;
+    auto l = &g->LevelMode;
+    auto &updateTime = g->UpdateTime;
+    auto &renderTime = g->RenderTime;
 
-    auto &world = g.World;
-    auto &input = g.Input;
-    auto &cam = g.Camera;
-    auto *playerEntity = g.PlayerEntity;
+    auto &world = g->World;
+    auto &input = g->Input;
+    auto &cam = g->Camera;
+    auto *playerEntity = g->PlayerEntity;
     auto *playerShip = playerEntity->Ship;
     dt *= Global_Game_TimeSpeed;
 
-    l.PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
-    l.PlayerMaxVel = std::min(l.PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
-    l.TimeElapsed += dt;
-    updateTime.Begin = g.Platform.GetMilliseconds();
+    l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+    l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
+    l->TimeElapsed += dt;
+    updateTime.Begin = g->Platform.GetMilliseconds();
 
     static bool paused = false;
     if (IsJustPressed(g, Action_debugPause))
@@ -466,7 +477,7 @@ void RenderLevel(game_state &g, float dt)
     }
     if (paused) return;
 
-    if (g.Input.Keys[SDL_SCANCODE_R])
+    if (g->Input.Keys[SDL_SCANCODE_R])
     {
         DebugReset(g);
     }
@@ -475,25 +486,25 @@ void RenderLevel(game_state &g, float dt)
         UpdateFreeCam(cam, input, dt);
     }
 
-    if (g.Input.Keys[SDL_SCANCODE_E])
+    if (g->Input.Keys[SDL_SCANCODE_E])
     {
-        auto exp = CreateExplosionEntity(GetEntry(g.World.ExplosionPool),
-                                         *g.PlayerEntity->Model->Mesh,
-                                         g.PlayerEntity->Model->Mesh->Parts[0],
-                                         g.PlayerEntity->Transform.Position,
-                                         g.PlayerEntity->Transform.Velocity,
-                                         g.PlayerEntity->Transform.Scale,
-                                         g.PlayerEntity->Ship->Color,
-                                         g.PlayerEntity->Ship->OutlineColor,
+        auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+                                         *g->PlayerEntity->Model->Mesh,
+                                         g->PlayerEntity->Model->Mesh->Parts[0],
+                                         g->PlayerEntity->Transform.Position,
+                                         g->PlayerEntity->Transform.Velocity,
+                                         g->PlayerEntity->Transform.Scale,
+                                         g->PlayerEntity->Ship->Color,
+                                         g->PlayerEntity->Ship->OutlineColor,
                                          vec3{ 0, 1, 1 });
         AddEntity(world, exp);
     }
 
     // we have a different state each 10 seconds elapsed
-    int state = int(std::floor(l.TimeElapsed / 10.0f));
-    auto crystals = l.GenParams + LevelGenType_Crystal;
-    auto ships = l.GenParams + LevelGenType_Ship;
-    auto redShips = l.GenParams + LevelGenType_RedShip;
+    int state = int(std::floor(l->TimeElapsed / 10.0f));
+    auto crystals = l->GenParams + LevelGenType_Crystal;
+    auto ships = l->GenParams + LevelGenType_Ship;
+    auto redShips = l->GenParams + LevelGenType_RedShip;
     switch (state)
     {
     case 0:
@@ -516,7 +527,7 @@ void RenderLevel(game_state &g, float dt)
     }
     for (int i = 0; i < LevelGenType_MAX; i++)
     {
-        UpdateGen(l.GenParams + i);
+        UpdateGen(g, l, l->GenParams + i, dt);
     }
 
     {
@@ -527,7 +538,7 @@ void RenderLevel(game_state &g, float dt)
         {
             moveY = 0.0f;
         }
-        MoveShipEntity(playerEntity, moveX, moveY, l.PlayerMaxVel, dt);
+        MoveShipEntity(playerEntity, moveX, moveY, l->PlayerMaxVel, dt);
 
         float &playerX = playerEntity->Pos().x;
         float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);
@@ -542,41 +553,41 @@ void RenderLevel(game_state &g, float dt)
             }
         }
 
-        if (l.DraftCharge == 1.0f && IsPressed(g, Action_boost))
+        if (l->DraftCharge == 1.0f && IsPressed(g, Action_boost))
         {
-            l.Score += SCORE_DRAFT;
-            l.CurrentDraftTime = 0.0f;
-            l.DraftActive = true;
-            l.DraftTarget->Ship->HasBeenDrafted = true;
+            l->Score += SCORE_DRAFT;
+            l->CurrentDraftTime = 0.0f;
+            l->DraftActive = true;
+            l->DraftTarget->Ship->HasBeenDrafted = true;
             ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
 
-            AddScoreText(g, l, SCORE_DRAFT, playerEntity->Pos(), l.DraftTarget->Ship->Color);
+            AddScoreText(g, l, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
         }
 
-        l.PlayerLaneIndex = int(nearestLane)+2;
+        l->PlayerLaneIndex = int(nearestLane)+2;
     }
 
     size_t FrameCollisionCount = 0;
-    DetectCollisions(world.CollisionEntities, l.CollisionCache, FrameCollisionCount);
+    DetectCollisions(world.CollisionEntities, l->CollisionCache, FrameCollisionCount);
     for (size_t i = 0; i < FrameCollisionCount; i++)
     {
-        auto &Col = l.CollisionCache[i];
-        Col.First->NumCollisions++;
-        Col.Second->NumCollisions++;
+        auto col = &l->CollisionCache[i];
+        col->First->NumCollisions++;
+        col->Second->NumCollisions++;
 
-        if (HandleCollision(g, Col.First, Col.Second, dt))
+        if (HandleCollision(g, col->First, col->Second, dt))
         {
-            ResolveCollision(Col);
+            ResolveCollision(*col);
         }
     }
-    Integrate(world.CollisionEntities, g.Gravity, dt);
-    if (l.NumTrailCollisions == 0)
+    Integrate(world.CollisionEntities, g->Gravity, dt);
+    if (l->NumTrailCollisions == 0)
     {
-        l.CurrentDraftTime -= dt;
+        l->CurrentDraftTime -= dt;
     }
-    l.CurrentDraftTime = std::max(0.0f, std::min(l.CurrentDraftTime, Global_Game_DraftChargeTime));
-    l.DraftCharge = l.CurrentDraftTime / Global_Game_DraftChargeTime;
-    l.NumTrailCollisions = 0;
+    l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
+    l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
+    l->NumTrailCollisions = 0;
     if (!Global_Camera_FreeCam)
     {
         const float CAMERA_LERP = 10.0f;
@@ -588,13 +599,13 @@ void RenderLevel(game_state &g, float dt)
     UpdateLogiclessEntities(world, dt);
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
     {
-        l.LaneSlots[i] = 0;
+        l->LaneSlots[i] = 0;
     }
     for (auto ent : world.LaneSlotEntities)
     {
         if (!ent) continue;
 
-        l.LaneSlots[ent->LaneSlot->Index]++;
+        l->LaneSlots[ent->LaneSlot->Index]++;
     }
     for (auto ent : world.ShipEntities)
     {
@@ -604,11 +615,11 @@ void RenderLevel(game_state &g, float dt)
         if (SHIP_IS_RED(ent->Ship))
         {
             ent->Rot().z = 180.0f;
-            ent->Vel().y = playerEntity->Vel().y * -0.8f;
+            ent->Vel().y = -PLAYER_MIN_VEL;
         }
         else
         {
-            if (!(l.DraftTarget == ent && l.DraftActive) ||
+            if (!(l->DraftTarget == ent && l->DraftActive) ||
                 (ent->Pos().y < playerEntity->Pos().y && playerEntity->Vel().y < ent->Ship->PassedVelocity))
             {
                 ent->Ship->PassedVelocity = playerEntity->Vel().y;
@@ -626,7 +637,7 @@ void RenderLevel(game_state &g, float dt)
                 ent->Ship->HasBeenDrafted &&
                 !ent->Ship->Scored)
             {
-                l.Score += SCORE_MISS_ORANGE_SHIP;
+                l->Score += SCORE_MISS_ORANGE_SHIP;
                 ent->Ship->Scored = true;
                 AddScoreText(g, l, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
             }
@@ -646,21 +657,21 @@ void RenderLevel(game_state &g, float dt)
         // TODO: temporary i hope
         if (ent->Pos().z < 0.0f)
         {
-            RemoveEntity(g.World, ent);
+            RemoveEntity(g->World, ent);
         }
     }
 
     auto playerPosition = playerEntity->Pos();
-    alSourcefv(l.DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
-    UpdateListener(g.Camera, playerPosition);
-    UpdateProjectionView(g.Camera);
+    alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
+    UpdateListener(g->Camera, playerPosition);
+    UpdateProjectionView(g->Camera);
 
-    updateTime.End = g.Platform.GetMilliseconds();
-    renderTime.Begin = g.Platform.GetMilliseconds();
+    updateTime.End = g->Platform.GetMilliseconds();
+    renderTime.Begin = g->Platform.GetMilliseconds();
 
-    PostProcessBegin(g.RenderState);
-    RenderBegin(g.RenderState, dt);
-    RenderEntityWorld(g.RenderState, g.World, dt);
+    PostProcessBegin(g->RenderState);
+    RenderBegin(g->RenderState, dt);
+    RenderEntityWorld(g->RenderState, g->World, dt);
 
 #ifdef DRAFT_DEBUG
     if (Global_Collision_DrawCollider)
@@ -669,43 +680,43 @@ void RenderLevel(game_state &g, float dt)
         {
             if (!ent) continue;
 
-            DrawDebugCollider(g.RenderState, ent->Collider->Box, ent->NumCollisions > 0);
+            DrawDebugCollider(g->RenderState, ent->Collider->Box, ent->NumCollisions > 0);
         }
     }
 #endif
 
-    RenderEnd(g.RenderState, g.Camera);
-    UpdateProjectionView(g.GUICamera);
-    Begin(g.GUI, g.GUICamera, 1.0f);
-    for (auto text : l.ScoreTextList)
+    RenderEnd(g->RenderState, g->Camera);
+    UpdateProjectionView(g->GUICamera);
+    Begin(g->GUI, g->GUICamera, 1.0f);
+    for (auto text : l->ScoreTextList)
     {
         vec2 p = text->Pos;
         float t = text->TweenValue;
         text->Color.a = 1.0f - t;
         p += (text->TargetPos - p) * t;
-        DrawTextCentered(g.GUI, g.TestFont, Format(l.ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+        DrawTextCentered(g->GUI, g->TestFont, Format(l->ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
-    End(g.GUI);
-    PostProcessEnd(g.RenderState);
+    End(g->GUI);
+    PostProcessEnd(g->RenderState);
 
-    auto lastText = l.ScoreTextList.back();
+    auto lastText = l->ScoreTextList.back();
     if (lastText && lastText->TweenValue >= 1.0f)
     {
-        l.ScoreTextList.pop_back();
-        DestroySequences(g.TweenState, lastText->Sequence, 1);
-        FreeEntryFromData(l.ScoreTextPool, lastText);
-        FreeEntryFromData(l.SequencePool, lastText->Sequence);
+        l->ScoreTextList.pop_back();
+        DestroySequences(g->TweenState, lastText->Sequence, 1);
+        FreeEntryFromData(l->ScoreTextPool, lastText);
+        FreeEntryFromData(l->SequencePool, lastText->Sequence);
     }
 
-    Begin(g.GUI, g.GUICamera);
-    DrawRect(g.GUI, rect{20,20,200,20},
+    Begin(g->GUI, g->GUICamera);
+    DrawRect(g->GUI, rect{20,20,200,20},
              IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
 
-    DrawRect(g.GUI, rect{25,25,190 * l.DraftCharge,10},
+    DrawRect(g->GUI, rect{25,25,190 * l->DraftCharge,10},
              IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
-    DrawText(g.GUI, g.TestFont, Format(l.ScoreFormat, l.Score), rect{50, 20, 0, 0}, Color_white);
-    End(g.GUI);
+    DrawText(g->GUI, g->TestFont, Format(l->ScoreFormat, l->Score), rect{50, 20, 0, 0}, Color_white);
+    End(g->GUI);
 
-    renderTime.End = g.Platform.GetMilliseconds();
+    renderTime.End = g->Platform.GetMilliseconds();
 }

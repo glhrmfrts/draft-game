@@ -129,22 +129,22 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
 #define LEVEL_PLANE_SIZE  512
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-mesh *GetFloorMesh(game_state &Game)
+mesh *GetFloorMesh(game_state *Game)
 {
-    auto &m = Game.Meshes;
+    auto &m = Game->Meshes;
     if (m.FloorMesh)
     {
         return m.FloorMesh;
     }
 
-    auto *FloorMesh = PushStruct<mesh>(Game.Arena);
+    auto *FloorMesh = PushStruct<mesh>(Game->Arena);
     InitMeshBuffer(FloorMesh->Buffer);
 
     material FloorMaterial = {
         IntColor(SecondPalette.Colors[2]),
         1.0f,
         1,
-        FindTexture(Game.AssetLoader, "grid"),
+        FindTexture(Game->AssetLoader, "grid"),
         0,
         vec2{LEVEL_PLANE_SIZE/16,LEVEL_PLANE_SIZE/16}
     };
@@ -160,15 +160,15 @@ mesh *GetFloorMesh(game_state &Game)
 }
 
 #define ROAD_LANE_COUNT 5
-mesh *GetRoadMesh(game_state &Game)
+mesh *GetRoadMesh(game_state *Game)
 {
-    auto &m = Game.Meshes;
+    auto &m = Game->Meshes;
     if (m.RoadMesh)
     {
         return m.RoadMesh;
     }
 
-    auto *RoadMesh = PushStruct<mesh>(Game.Arena);
+    auto *RoadMesh = PushStruct<mesh>(Game->Arena);
     InitMeshBuffer(RoadMesh->Buffer);
 
     material RoadMaterial = {Color_black, 0, 0, NULL, 0, vec2{0, 0}};
@@ -188,15 +188,15 @@ mesh *GetRoadMesh(game_state &Game)
     return m.RoadMesh = RoadMesh;
 }
 
-mesh *GetShipMesh(game_state &Game)
+mesh *GetShipMesh(game_state *Game)
 {
-    auto &m = Game.Meshes;
+    auto &m = Game->Meshes;
     if (m.ShipMesh)
     {
         return m.ShipMesh;
     }
 
-    auto *ShipMesh = PushStruct<mesh>(Game.Arena);
+    auto *ShipMesh = PushStruct<mesh>(Game->Arena);
     float h = 0.5f;
 
     InitMeshBuffer(ShipMesh->Buffer);
@@ -215,15 +215,15 @@ mesh *GetShipMesh(game_state &Game)
     return m.ShipMesh = ShipMesh;
 }
 
-mesh *GetCrystalMesh(game_state &Game)
+mesh *GetCrystalMesh(game_state *Game)
 {
-    auto &m = Game.Meshes;
+    auto &m = Game->Meshes;
     if (m.CrystalMesh)
     {
         return m.CrystalMesh;
     }
 
-    auto *CrystalMesh = PushStruct<mesh>(Game.Arena);
+    auto *CrystalMesh = PushStruct<mesh>(Game->Arena);
     InitMeshBuffer(CrystalMesh->Buffer);
 
     AddTriangle(CrystalMesh->Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
@@ -242,15 +242,15 @@ mesh *GetCrystalMesh(game_state &Game)
     return m.CrystalMesh = CrystalMesh;
 }
 
-mesh *GetAsteroidMesh(game_state &game)
+mesh *GetAsteroidMesh(game_state *game)
 {
-    auto &m = game.Meshes;
+    auto &m = game->Meshes;
     if (m.AsteroidMesh)
     {
         return m.AsteroidMesh;
     }
 
-    auto astMesh = PushStruct<mesh>(game.Arena);
+    auto astMesh = PushStruct<mesh>(game->Arena);
     InitMeshBuffer(astMesh->Buffer);
 
     const int p = 8;
