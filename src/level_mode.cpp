@@ -101,9 +101,18 @@ static void GenerateRedShip(level_gen_params *p, game_state *g, level_mode *l)
     AddEntity(g->World, ent);
 }
 
+#define ASTEROID_Z (SHIP_Z + 10)
 static void GenerateAsteroid(level_gen_params *p, game_state *g, level_mode *l)
 {
-    Println("I should be generating an asteroid");
+    //Println("I should be generating an asteroid");
+    auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g));
+    int lane = l->PlayerLaneIndex - 2;
+    ent->Pos().x = lane * ROAD_LANE_WIDTH;
+    ent->Pos().y = g->PlayerEntity->Pos().y;
+    ent->Pos().z = ASTEROID_Z;
+    ent->Vel().y = g->PlayerEntity->Vel().y * 1.5f;
+    AddFlags(ent, EntityFlag_RemoveOffscreen);
+    AddEntity(g->World, ent);
 }
 
 static void InitLevel(game_state *g)
@@ -175,7 +184,7 @@ static void InitLevel(game_state *g)
     gen->Func = GenerateRedShip;
 
     gen = l->GenParams + LevelGenType_Asteroid;
-    gen->Flags = LevelGenFlag_ReserveLane;
+    gen->Flags = 0;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateAsteroid;
 
@@ -303,11 +312,8 @@ static bool HandleCollision(game_state *g, entity *first, entity *second, float 
 
             auto exp = CreateExplosionEntity(
                 GetEntry(g->World.ExplosionPool),
-                *entityToExplode->Model->Mesh,
-                entityToExplode->Model->Mesh->Parts[0],
                 entityToExplode->Transform.Position,
                 otherEntity->Transform.Velocity,
-                entityToExplode->Transform.Scale,
                 entityToExplode->Ship->Color,
                 entityToExplode->Ship->OutlineColor,
                 vec3{ 0, 1, 1 }
@@ -489,11 +495,8 @@ static void RenderLevel(game_state *g, float dt)
     if (g->Input.Keys[SDL_SCANCODE_E])
     {
         auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
-                                         *g->PlayerEntity->Model->Mesh,
-                                         g->PlayerEntity->Model->Mesh->Parts[0],
                                          g->PlayerEntity->Transform.Position,
                                          g->PlayerEntity->Transform.Velocity,
-                                         g->PlayerEntity->Transform.Scale,
                                          g->PlayerEntity->Ship->Color,
                                          g->PlayerEntity->Ship->OutlineColor,
                                          vec3{ 0, 1, 1 });
@@ -505,10 +508,12 @@ static void RenderLevel(game_state *g, float dt)
     auto crystals = l->GenParams + LevelGenType_Crystal;
     auto ships = l->GenParams + LevelGenType_Ship;
     auto redShips = l->GenParams + LevelGenType_RedShip;
+    auto asteroids = l->GenParams + LevelGenType_Asteroid;
     switch (state)
     {
     case 0:
         crystals->Flags |= LevelGenFlag_Enabled | LevelGenFlag_Randomize;
+        asteroids->Flags |= LevelGenFlag_Enabled;
         break;
 
     case 1:
@@ -658,6 +663,40 @@ static void RenderLevel(game_state *g, float dt)
         if (ent->Pos().z < 0.0f)
         {
             RemoveEntity(g->World, ent);
+        }
+    }
+    for (auto ent : world.AsteroidEntities)
+    {
+        if (!ent) continue;
+
+        if (ent->Pos().z > 0.0f)
+        {
+            if (ent->Pos().y > playerEntity->Pos().y)
+            {
+                ent->Vel().z -= 30.0f * dt;
+            }
+            else
+            {
+                ent->Vel().z -= 8.0f * dt;
+            }
+            //ent->Vel().y = playerEntity->Vel().y * 1.2f;
+        }
+        else
+        {
+            ent->Pos().z = SHIP_Z;
+            ent->Vel().y = 0;
+            ent->Vel().z = 0;
+            if (!ent->Asteroid->Exploded)
+            {
+                ent->Asteroid->Exploded = true;
+                auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+                                                 ent->Pos(),
+                                                 vec3(0.0f),
+                                                 ASTEROID_COLOR,
+                                                 ASTEROID_COLOR,
+                                                 vec3(0.0f));
+                AddEntity(g->World, exp);
+            }
         }
     }
 

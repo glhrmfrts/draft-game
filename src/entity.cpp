@@ -7,27 +7,27 @@ inline static void AddFlags(entity *Entity, uint32 Flags)
 
 static material *CreateMaterial(allocator *alloc, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
 {
-    material *Result = PushStruct<material>(alloc);
-    Result->DiffuseColor = Color;
-    Result->Emission = Emission;
-    Result->TexWeight = TexWeight;
-    Result->Texture = Texture;
-    Result->Flags = Flags;
-    return Result;
+    auto result = PushStruct<material>(alloc);
+    result->DiffuseColor = Color;
+    result->Emission = Emission;
+    result->TexWeight = TexWeight;
+    result->Texture = Texture;
+    result->Flags = Flags;
+    return result;
 }
 
 static model *CreateModel(allocator *alloc, mesh *Mesh)
 {
-    model *Result = PushStruct<model>(alloc);
-    Result->Mesh = Mesh;
-    return Result;
+    auto result = PushStruct<model>(alloc);
+    result->Mesh = Mesh;
+    return result;
 }
 
 static collider *CreateCollider(allocator *alloc, collider_type Type)
 {
-    collider *Result = PushStruct<collider>(alloc);
-    Result->Type = Type;
-    return Result;
+    auto result = PushStruct<collider>(alloc);
+    result->Type = Type;
+    return result;
 }
 
 #define TRAIL_SIZE (sizeof(trail) + (sizeof(trail_piece)+sizeof(collider))*TrailCount)
@@ -164,10 +164,8 @@ entity *CreatePowerupEntity(allocator *alloc, random_series &series, float timeS
 }
 
 #define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(explosion) + (TRAIL_SIZE*EXPLOSION_PARTS_COUNT))
-entity *CreateExplosionEntity(allocator *alloc, mesh &baseMesh, mesh_part &part, vec3 pos, vec3 vel, vec3 scale, color c, color outlineColor, vec3 sign)
+entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, color outlineColor, vec3 sign)
 {
-    assert(part.PrimitiveType == GL_TRIANGLES);
-
     auto exp = PushStruct<explosion>(alloc);
     exp->LifeTime = Global_Game_ExplosionLifeTime;
     exp->Color = c;
@@ -239,6 +237,17 @@ entity *CreateExplosionEntity(allocator *alloc, mesh &baseMesh, mesh_part &part,
     auto result = CreateEntity(alloc);
     result->Transform.Position = pos;
     result->Explosion = exp;
+    return result;
+}
+
+#define ASTEROID_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_SIZE+sizeof(asteroid))
+static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
+{
+    auto result = PushStruct<entity>(alloc);
+    result->Model = CreateModel(alloc, astMesh);
+    result->Collider = CreateCollider(alloc, ColliderType_Asteroid);
+    result->Trail = CreateTrail(alloc, result, ASTEROID_COLOR, 0.5f, true);
+    result->Asteroid = PushStruct<asteroid>(alloc);
     return result;
 }
 
@@ -318,12 +327,14 @@ void InitEntityWorld(entity_world &world)
     world.CrystalPool.ElemSize = CRYSTAL_ENTITY_SIZE;
     world.PowerupPool.ElemSize = POWERUP_ENTITY_SIZE;
     world.ExplosionPool.ElemSize = EXPLOSION_ENTITY_SIZE;
+    world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
 
 #ifdef DRAFT_DEBUG
     world.ShipPool.DEBUGName = "ShipPool";
     world.CrystalPool.DEBUGName = "CrystalPool";
     world.PowerupPool.DEBUGName = "PowerupPool";
     world.ExplosionPool.DEBUGName = "ExplosionPool";
+    world.AsteroidPool.DEBUGName = "AsteroidPool";
 #endif
 }
 
@@ -395,6 +406,10 @@ void AddEntity(entity_world &world, entity *ent)
     if (ent->FrameRotation)
     {
         AddEntityToList(world.RotatingEntities, ent);
+    }
+    if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
+    {
+        AddEntityToList(world.AsteroidEntities, ent);
     }
     world.NumEntities++;
 }
@@ -470,6 +485,10 @@ void RemoveEntity(entity_world &world, entity *ent)
     if (ent->Collider && ent->Collider->Type == ColliderType_Crystal)
     {
         FreeEntry(world.CrystalPool, ent->PoolEntry);
+    }
+    if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
+    {
+        FreeEntry(world.AsteroidPool, ent->PoolEntry);
     }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }

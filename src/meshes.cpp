@@ -242,6 +242,8 @@ mesh *GetCrystalMesh(game_state *Game)
     return m.CrystalMesh = CrystalMesh;
 }
 
+#define ASTEROID_COLOR Color_green
+
 mesh *GetAsteroidMesh(game_state *game)
 {
     auto &m = game->Meshes;
@@ -273,7 +275,7 @@ mesh *GetAsteroidMesh(game_state *game)
         }
     }
 
-    AddPart(astMesh, mesh_part{material{Color_green, 1.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
+    AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 1.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
     EndMesh(astMesh, GL_STATIC_DRAW);
     return m.AsteroidMesh = astMesh;
 }

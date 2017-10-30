@@ -42,6 +42,11 @@ struct frame_rotation
     vec3 Rotation;
 };
 
+struct asteroid
+{
+    bool Exploded = false;
+};
+
 struct explosion;
 struct trail;
 struct trail_piece;
@@ -54,6 +59,7 @@ enum collider_type
     ColliderType_Crystal,
     ColliderType_Ship,
     ColliderType_TrailPiece,
+    ColliderType_Asteroid,
 };
 struct collider
 {
@@ -69,6 +75,7 @@ struct entity
     memory_pool_entry *PoolEntry = NULL;
 
     // entity components
+    asteroid *Asteroid = NULL;
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
@@ -126,7 +133,9 @@ struct entity_world
     memory_pool CrystalPool;
     memory_pool ExplosionPool;
     memory_pool PowerupPool;
+    memory_pool AsteroidPool;
 
+    std::vector<entity *> AsteroidEntities;
     std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;

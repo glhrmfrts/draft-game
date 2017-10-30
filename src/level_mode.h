@@ -57,9 +57,6 @@ struct level_mode
     memory_arena Arena;
     random_series Entropy;
     audio_source *DraftBoostAudio;
-    uint64 GenFlags = 0; // entity generation flags
-    uint64 IncFlags = 0; // timer increment flags
-    uint64 RandFlags = 0; // random timer flags
     int LaneSlots[5];
     int ReservedLanes[5];
 
