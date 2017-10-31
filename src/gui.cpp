@@ -261,7 +261,7 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bo
     return GUIElementState_none;
 }
 
-uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
+static uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
 {
     vec2 size = MeasureText(font, text);
     r.X -= size.x/2;

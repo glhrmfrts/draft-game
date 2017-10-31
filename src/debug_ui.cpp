@@ -11,21 +11,21 @@
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0')
 
-void DrawDebugUI(game_state *g, float dt)
+void DrawDebugUI(game_main *g, float dt)
 {
     if (!Global_DebugUI) return;
 
     auto &updateTime = g->UpdateTime;
     auto &renderTime = g->RenderTime;
     auto playerEntity = g->PlayerEntity;
-    auto lanes = g->LevelMode.LaneSlots;
+    auto lanes = g->LevelState.LaneSlots;
     ImGui::Text("ms: %.2f", dt * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/dt);
     ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);
     ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
-    ImGui::Text("Player max vel: %.2f", g->LevelMode.PlayerMaxVel);
+    ImGui::Text("Player max vel: %.2f", g->LevelState.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
-    ImGui::Text("State: %d (%.2f)", int(std::floor(g->LevelMode.TimeElapsed/10.0f)), g->LevelMode.TimeElapsed);
+    ImGui::Text("State: %d (%.2f)", int(std::floor(g->LevelState.TimeElapsed/10.0f)), g->LevelState.TimeElapsed);
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 
     if (ImGui::CollapsingHeader("Camera"))

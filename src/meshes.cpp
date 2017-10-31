@@ -129,7 +129,7 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
 #define LEVEL_PLANE_SIZE  512
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-mesh *GetFloorMesh(game_state *Game)
+mesh *GetFloorMesh(game_main *Game)
 {
     auto &m = Game->Meshes;
     if (m.FloorMesh)
@@ -160,7 +160,7 @@ mesh *GetFloorMesh(game_state *Game)
 }
 
 #define ROAD_LANE_COUNT 5
-mesh *GetRoadMesh(game_state *Game)
+mesh *GetRoadMesh(game_main *Game)
 {
     auto &m = Game->Meshes;
     if (m.RoadMesh)
@@ -188,7 +188,7 @@ mesh *GetRoadMesh(game_state *Game)
     return m.RoadMesh = RoadMesh;
 }
 
-mesh *GetShipMesh(game_state *Game)
+mesh *GetShipMesh(game_main *Game)
 {
     auto &m = Game->Meshes;
     if (m.ShipMesh)
@@ -215,7 +215,7 @@ mesh *GetShipMesh(game_state *Game)
     return m.ShipMesh = ShipMesh;
 }
 
-mesh *GetCrystalMesh(game_state *Game)
+mesh *GetCrystalMesh(game_main *Game)
 {
     auto &m = Game->Meshes;
     if (m.CrystalMesh)
@@ -244,7 +244,7 @@ mesh *GetCrystalMesh(game_state *Game)
 
 #define ASTEROID_COLOR Color_green
 
-mesh *GetAsteroidMesh(game_state *game)
+mesh *GetAsteroidMesh(game_main *game)
 {
     auto &m = game->Meshes;
     if (m.AsteroidMesh)

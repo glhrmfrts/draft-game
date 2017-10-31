@@ -16,7 +16,8 @@
 #include "gui.h"
 #include "random.h"
 #include "entity.h"
-#include "level_mode.h"
+#include "menu_state.h"
+#include "level_state.h"
 
 #define GAME_BASE_WIDTH  1280
 #define GAME_BASE_HEIGHT 720
@@ -36,12 +37,12 @@ struct platform_api
     platform_get_milliseconds_func *GetMilliseconds;
 };
 
-#define GAME_INIT(name) void name(game_state *Game)
-#define GAME_RENDER(name) void name(game_state *Game, float DeltaTime)
-#define GAME_DESTROY(name) void name(game_state *Game)
-#define GAME_PROCESS_EVENT(name) void name(game_state *Game, SDL_Event *Event)
+#define GAME_INIT(name) void name(game_main *Game)
+#define GAME_RENDER(name) void name(game_main *Game, float DeltaTime)
+#define GAME_DESTROY(name) void name(game_main *Game)
+#define GAME_PROCESS_EVENT(name) void name(game_main *Game, SDL_Event *Event)
 
-struct game_state;
+struct game_main;
 
 extern "C"
 {
@@ -154,15 +155,15 @@ struct profile_time
     uint64 End;
 };
 
-enum game_mode
+enum game_state
 {
-	GameMode_LoadingScreen,
-    GameMode_Level,
-    GameMode_Editor,
+	GameState_LoadingScreen,
+    GameState_Level,
+    GameState_Menu,
 };
-struct game_state
+struct game_main
 {
-	game_mode Mode;
+	game_state State;
     game_input Input;
     game_input PrevInput;
 
@@ -182,7 +183,7 @@ struct game_state
     vec3 Gravity;
     entity_world World;
     entity *PlayerEntity;
-    level_mode LevelMode;
+    level_state LevelState;
 
     random_series ExplosionEntropy;
     bitmap_font *TestFont;
@@ -195,7 +196,7 @@ struct game_state
     int RealHeight;
     bool Running = true;
 
-    game_state() {}
+    game_main() {}
 };
 
 inline static float GetAxisValue(game_input &Input, action_type Type)
@@ -203,30 +204,30 @@ inline static float GetAxisValue(game_input &Input, action_type Type)
     return Input.Actions[Type].AxisValue;
 }
 
-inline static bool IsPressed(game_state *game, action_type type)
+inline static bool IsPressed(game_main *game, action_type type)
 {
     return game->Input.Actions[type].Pressed > 0;
 }
 
-inline static bool IsJustPressed(game_state *Game, action_type Type)
+inline static bool IsJustPressed(game_main *Game, action_type Type)
 {
     return Game->Input.Actions[Type].Pressed > 0 &&
         Game->PrevInput.Actions[Type].Pressed == 0;
 }
 
-inline static bool IsJustPressed(game_state *Game, uint8 Button)
+inline static bool IsJustPressed(game_main *Game, uint8 Button)
 {
     return (Game->Input.MouseState.Buttons & Button) &&
         !(Game->PrevInput.MouseState.Buttons & Button);
 }
 
-inline static bool IsJustReleased(game_state *Game, uint8 Button)
+inline static bool IsJustReleased(game_main *Game, uint8 Button)
 {
     return !(Game->Input.MouseState.Buttons & Button) &&
         (Game->PrevInput.MouseState.Buttons & Button);
 }
 
-inline static float GetRealPixels(game_state *game, float p)
+inline static float GetRealPixels(game_main *game, float p)
 {
     return p * (float(game->Width)/float(GAME_BASE_WIDTH));
 }

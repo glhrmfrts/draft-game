@@ -1,5 +1,5 @@
-#ifndef DRAFT_LEVEL_MODE_H
-#define DRAFT_LEVEL_MODE_H
+#ifndef DRAFT_LEVEL_STATE_H
+#define DRAFT_LEVEL_STATE_H
 
 struct audio_source;
 
@@ -27,11 +27,11 @@ enum level_gen_type
     LevelGenType_MAX,
 };
 
-struct game_state;
-struct level_mode;
+struct game_main;
+struct level_state;
 struct level_gen_params;
 
-typedef void level_gen_func(level_gen_params *p, game_state *g, level_mode *l);
+typedef void level_gen_func(level_gen_params *p, game_main *g, level_state *l);
 
 struct level_gen_params
 {
@@ -52,7 +52,7 @@ struct level_score_text
     int Score = 0;
 };
 
-struct level_mode
+struct level_state
 {
     memory_arena Arena;
     random_series Entropy;

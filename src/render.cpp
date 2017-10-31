@@ -640,80 +640,82 @@ InitShaderProgram(shader_program &Program, const string &vsPath, const string &f
     };
 }
 
-void InitRenderState(render_state &RenderState, uint32 Width, uint32 Height)
+static void InitRenderState(render_state &r, uint32 width, uint32 height)
 {
     glLineWidth(2);
-    glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &RenderState.MaxMultiSampleCount);
-    if (RenderState.MaxMultiSampleCount > 8)
+    glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &r.MaxMultiSampleCount);
+    if (r.MaxMultiSampleCount > 8)
     {
-        RenderState.MaxMultiSampleCount = 8;
+        r.MaxMultiSampleCount = 8;
     }
-    RenderState.Width = Width;
-    RenderState.Height = Height;
+    r.Width = width;
+    r.Height = height;
+    r.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
+    r.FogColor.a = 1.0f;
 
     InitShaderProgram(
-        RenderState.ModelProgram,
+        r.ModelProgram,
         "data/shaders/model.vert.glsl",
         "data/shaders/model.frag.glsl",
         ModelProgramCallback
     );
     InitShaderProgram(
-        RenderState.BlurHorizontalProgram,
+        r.BlurHorizontalProgram,
         "data/shaders/blit.vert.glsl",
         "data/shaders/blurh.frag.glsl",
         BlurProgramCallback
     );
     InitShaderProgram(
-        RenderState.BlurVerticalProgram,
+        r.BlurVerticalProgram,
         "data/shaders/blit.vert.glsl",
         "data/shaders/blurv.frag.glsl",
         BlurProgramCallback
     );
     InitShaderProgram(
-        RenderState.BlendProgram,
+        r.BlendProgram,
         "data/shaders/blit.vert.glsl",
         "data/shaders/blend.frag.glsl",
         BlendProgramCallback
     );
     InitShaderProgram(
-        RenderState.BlitProgram,
+        r.BlitProgram,
         "data/shaders/blit.vert.glsl",
         "data/shaders/blit.frag.glsl",
         BlitProgramCallback
     );
     InitShaderProgram(
-        RenderState.ResolveMultisampleProgram,
+        r.ResolveMultisampleProgram,
         "data/shaders/blit.vert.glsl",
         "data/shaders/multisample.frag.glsl",
         ResolveMultisampleProgramCallback
     );
 
-    InitMeshBuffer(RenderState.SpriteBuffer);
-    InitBuffer(RenderState.ScreenBuffer, 4, 2,
+    InitMeshBuffer(r.SpriteBuffer);
+    InitBuffer(r.ScreenBuffer, 4, 2,
                vertex_attribute{0, 2, GL_FLOAT, 4*sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
-    PushVertex(RenderState.ScreenBuffer, {-1, -1, 0, 0});
-    PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
-    PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
-    PushVertex(RenderState.ScreenBuffer, {1, -1, 1, 0});
-    PushVertex(RenderState.ScreenBuffer, {1, 1, 1, 1});
-    PushVertex(RenderState.ScreenBuffer, {-1, 1, 0, 1});
-    UploadVertices(RenderState.ScreenBuffer, GL_STATIC_DRAW);
+    PushVertex(r.ScreenBuffer, {-1, -1, 0, 0});
+    PushVertex(r.ScreenBuffer, {1, -1, 1, 0});
+    PushVertex(r.ScreenBuffer, {-1, 1, 0, 1});
+    PushVertex(r.ScreenBuffer, {1, -1, 1, 0});
+    PushVertex(r.ScreenBuffer, {1, 1, 1, 1});
+    PushVertex(r.ScreenBuffer, {-1, 1, 0, 1});
+    UploadVertices(r.ScreenBuffer, GL_STATIC_DRAW);
 
-    InitFramebuffer(RenderState, RenderState.MultisampledSceneFramebuffer, Width, Height, FramebufferFlag_HasDepth | FramebufferFlag_Multisampled, ColorTextureFlag_Count);
-    InitFramebuffer(RenderState, RenderState.SceneFramebuffer, Width, Height, FramebufferFlag_HasDepth, ColorTextureFlag_Count);
+    InitFramebuffer(r, r.MultisampledSceneFramebuffer, width, height, FramebufferFlag_HasDepth | FramebufferFlag_Multisampled, ColorTextureFlag_Count);
+    InitFramebuffer(r, r.SceneFramebuffer, width, height, FramebufferFlag_HasDepth, ColorTextureFlag_Count);
     for (int i = 0; i < BloomBlurPassCount; i++)
     {
         // @TODO: maybe it is not necessary to scale down
-        size_t BlurWidth = Width >> i;
-        size_t BlurHeight = Height >> i;
+        size_t BlurWidth = width >> i;
+        size_t BlurHeight = height >> i;
 
-        InitFramebuffer(RenderState, RenderState.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
-        InitFramebuffer(RenderState, RenderState.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
+        InitFramebuffer(r, r.BlurHorizontalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
+        InitFramebuffer(r, r.BlurVerticalFramebuffers[i], BlurWidth, BlurHeight, FramebufferFlag_Filtered, 1);
     }
 
 #ifdef DRAFT_DEBUG
-    InitMeshBuffer(RenderState.DebugBuffer);
+    InitMeshBuffer(r.DebugBuffer);
 #endif
 }
 

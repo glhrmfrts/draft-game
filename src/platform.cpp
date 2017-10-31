@@ -87,7 +87,7 @@ int main(int argc, char **argv)
     glEnable(GL_MULTISAMPLE);
     glViewport(0, 0, Width, Height);
 
-    game_state game;
+    game_main game;
     game.Window = Window;
     game.RealWidth = Width;
     game.RealHeight = Height;

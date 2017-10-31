@@ -20,7 +20,8 @@
 #include "meshes.cpp"
 #include "entity.cpp"
 #include "init.cpp"
-#include "level_mode.cpp"
+#include "menu_state.cpp"
+#include "level_state.cpp"
 
 #ifdef _WIN32
 #define export_func __declspec(dllexport)
@@ -99,19 +100,23 @@ extern "C"
             Global_DebugUI = !Global_DebugUI;
         }
         Update(g->TweenState, dt);
-        switch (g->Mode)
+        switch (g->State)
         {
-        case GameMode_LoadingScreen:
-            RenderLoadingScreen(g, dt, InitLevel);
+        case GameState_LoadingScreen:
+            RenderLoadingScreen(g, dt, InitMenu);
             break;
 
-        case GameMode_Level:
+        case GameState_Level:
             RenderLevel(g, dt);
+            break;
+
+        case GameState_Menu:
+            RenderMenu(g, dt);
             break;
         }
 
 #ifdef DRAFT_DEBUG
-        if (g->Mode != GameMode_LoadingScreen)
+        if (g->State != GameState_LoadingScreen)
         {
             static float reloadTimer = 0.0f;
             reloadTimer += dt;

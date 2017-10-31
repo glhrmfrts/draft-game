@@ -11,9 +11,9 @@ void RegisterInputActions(game_input &Input)
     Input.Actions[Action_debugPause] = action_state{ SDL_SCANCODE_P, 0, 0, 0, Axis_Invalid, Button_Invalid };
 }
 
-void InitLoadingScreen(game_state *Game)
+void InitLoadingScreen(game_main *Game)
 {
-    Game->Mode = GameMode_LoadingScreen;
+    Game->State = GameState_LoadingScreen;
     InitAssetLoader(Game->AssetLoader, Game->Platform);
 
     for (auto &Asset : Game->Assets)
@@ -30,9 +30,9 @@ void InitLoadingScreen(game_state *Game)
     StartLoading(Game->AssetLoader);
 }
 
-typedef void init_func(game_state *Game);
+typedef void init_func(game_main *Game);
 
-void RenderLoadingScreen(game_state *Game, float DeltaTime, init_func *NextModeInit)
+void RenderLoadingScreen(game_main *Game, float DeltaTime, init_func *NextModeInit)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 

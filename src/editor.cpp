@@ -119,7 +119,7 @@ static void WriteLevel(void *Arg)
 }
 
 #define EDITOR_MAX_LINES 16
-void InitEditor(game_state &Game)
+void InitEditor(game_main &Game)
 {
     Game.Mode = GameMode_Editor;
     Game.EditorState = PushStruct<editor_state>(Game.Arena);
@@ -280,7 +280,7 @@ static void RenderEntity(entity *Entity, render_state &RenderState)
     }
 }
 
-void RenderEditor(game_state &Game, float DeltaTime)
+void RenderEditor(game_main &Game, float DeltaTime)
 {
     auto *Editor = Game.EditorState;
     auto *FloorMesh = GetFloorMesh(Game);

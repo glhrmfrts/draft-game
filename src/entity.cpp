@@ -264,6 +264,7 @@ static float Interp(float c, float t, float a, float dt)
 
 #define ShipMinVel              40.0f
 #define PLAYER_MIN_VEL          50.0f
+#define PLAYER_MIN_VEL_BREAKING 20.0f
 #define ShipAcceleration        20.0f
 #define ShipBreakAcceleration   30.0f
 #define ShipSteerSpeed          20.0f
@@ -278,7 +279,7 @@ void MoveShipEntity(entity *ent, float moveX, float moveY, float maxVel, float d
     }
     if (moveY < 0.0f)
     {
-        minVel = 20.0f;
+        minVel = PLAYER_MIN_VEL_BREAKING;
     }
     if (ent->Transform.Velocity.y < minVel)
     {
