@@ -42,7 +42,7 @@ extern "C"
         RegisterInputActions(g->Input);
         InitGUI(g->GUI, g->Input);
         MakeCameraOrthographic(g->GUICamera, 0, Width, 0, Height, -1, 1);
-        MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 70.0f, 0.1f, 1000.0f);
+        MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height);
         InitTweenState(g->TweenState);
         InitEntityWorld(g->World);
@@ -60,15 +60,23 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/vcr.ttf",
                 "vcr_16",
-                (void *)int(GetRealPixels(g, 40.0f))
+                (void *)int(GetRealPixels(g, 32.0f))
             )
         );
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
-                "g_type_16",
-                (void *)int(GetRealPixels(g, 40.0f))
+                "unispace_24",
+                (void *)int(GetRealPixels(g, 24.0f))
+            )
+        );
+        g->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_32",
+                (void *)int(GetRealPixels(g, 32.0f))
             )
         );
         g->Assets.push_back(
@@ -100,6 +108,7 @@ extern "C"
             Global_DebugUI = !Global_DebugUI;
         }
         Update(g->TweenState, dt);
+        MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
         switch (g->State)
         {
         case GameState_LoadingScreen:

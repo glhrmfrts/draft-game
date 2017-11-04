@@ -97,6 +97,7 @@ enum action_type
     Action_boost,
 	Action_debugUI,
     Action_debugPause,
+    Action_select,
     Action_count,
 };
 struct action_state
@@ -184,9 +185,9 @@ struct game_main
     entity_world World;
     entity *PlayerEntity;
     level_state LevelState;
+    menu_state MenuState;
 
     random_series ExplosionEntropy;
-    bitmap_font *TestFont;
 
     platform_api Platform;
 	SDL_Window *Window;
@@ -230,6 +231,11 @@ inline static bool IsJustReleased(game_main *Game, uint8 Button)
 inline static float GetRealPixels(game_main *game, float p)
 {
     return p * (float(game->Width)/float(GAME_BASE_WIDTH));
+}
+
+inline static rect GetRealPixels(game_main *game, rect r)
+{
+    return r * (float(game->Width)/float(GAME_BASE_WIDTH));
 }
 
 #endif

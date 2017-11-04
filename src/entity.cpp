@@ -630,8 +630,7 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
             {
                 meshPart.Material.DiffuseColor.a = alpha;
             }
-        }
-/*
+        }/*
         ResetBuffer(exp->Mesh.Buffer);
         for (size_t i = 0; i < exp->Pieces.size(); i++)
         {

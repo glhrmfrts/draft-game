@@ -181,6 +181,7 @@ FindSound(asset_loader &Loader, const string &ID)
             return Entry.Sound.Result;
         }
     }
+    return NULL;
 }
 
 static inline ALenum

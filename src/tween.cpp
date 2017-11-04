@@ -40,14 +40,18 @@ inline void AddTween(tween_sequence *seq, const tween &t)
     seq->Tweens.push_back(t);
 }
 
-void PlaySequence(tween_state &state, tween_sequence *seq)
+void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = false)
 {
     if (!seq->Active)
     {
         seq->Active = true;
+    }
+    if (reset)
+    {
         for (auto &t : seq->Tweens)
         {
             t.Timer = 0.0f;
+            *t.Value = t.From;
         }
     }
 }

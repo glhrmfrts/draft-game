@@ -615,6 +615,12 @@ static void RenderLevel(game_main *g, float dt)
         vec3 dirToPlayer = glm::normalize(distToPlayer);
         ent->SetVel(ent->Vel() + dirToPlayer);
         ent->SetPos(ent->Pos() + ent->Vel() * dt);
+        for (auto &meshPart : ent->Trail->Mesh.Parts)
+        {
+            float &alpha = meshPart.Material.DiffuseColor.a;
+            alpha -= 1.5f * dt;
+            alpha = std::max(alpha, 0.0f);
+        }
 
         // TODO: temporary i hope
         if (ent->Pos().z < 0.0f)
@@ -681,6 +687,7 @@ static void RenderLevel(game_main *g, float dt)
     }
 #endif
 
+    static auto scoreFont = FindBitmapFont(g->AssetLoader, "unispace_32");
     RenderEnd(g->RenderState, g->Camera);
     UpdateProjectionView(g->GUICamera);
     Begin(g->GUI, g->GUICamera, 1.0f);
@@ -690,7 +697,7 @@ static void RenderLevel(game_main *g, float dt)
         float t = text->TweenValue;
         text->Color.a = 1.0f - t;
         p += (text->TargetPos - p) * t;
-        DrawTextCentered(g->GUI, g->TestFont, Format(l->ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+        DrawTextCentered(g->GUI, scoreFont, Format(l->ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
     End(g->GUI);
     PostProcessEnd(g->RenderState);
@@ -711,7 +718,7 @@ static void RenderLevel(game_main *g, float dt)
     DrawRect(g->GUI, rect{25,25,190 * l->DraftCharge,10},
              IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
-    DrawText(g->GUI, g->TestFont, Format(l->ScoreFormat, l->Score), rect{50, 20, 0, 0}, Color_white);
+    DrawText(g->GUI, scoreFont, Format(l->ScoreFormat, l->Score), rect{50, 20, 0, 0}, Color_white);
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();

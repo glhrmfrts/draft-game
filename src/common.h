@@ -16,6 +16,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <GL/glew.h>
 
+#define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
+
 typedef uint8_t  uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
@@ -90,9 +92,10 @@ inline void Println(T Arg)
     std::cout << Arg << std::endl;
 }
 
-inline float Lerp(float A, float t, float B)
+template<typename T>
+inline T Lerp(T a, float t, T b)
 {
-    return (1.0f - t)*A + t*B;
+    return (1.0f - t)*a + t*b;
 }
 
 inline float Square(float f)

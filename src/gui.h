@@ -9,6 +9,11 @@ struct rect
 {
     float X, Y;
     float Width, Height;
+
+    rect operator *(float f)
+    {
+        return rect{X*f, Y*f, Width*f, Height*f};
+    }
 };
 
 struct gui_draw_command

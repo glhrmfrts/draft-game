@@ -14,6 +14,8 @@ static void UpdateCameraToPlayer(camera &cam, entity *playerEntity, float dt)
 
 static void InitMenu(game_main *g)
 {
+    auto m = &g->MenuState;
+
     g->State = GameState_Menu;
     FreeArena(g->World.Arena);
 
@@ -50,13 +52,79 @@ static void InitMenu(game_main *g)
         AddEntity(g->World, ent);
     }
 
-    g->TestFont = FindBitmapFont(g->AssetLoader, "g_type_16");
+    m->SubMenuChangeSequence.Tweens.push_back(
+        tween{&m->SubMenuChangeTimer, 0.0f, 1.0f, 0.25f, 1.0f, TweenEasing_Linear}
+    );
+    AddSequences(g->TweenState, &m->SubMenuChangeSequence, 1);
+
+    m->HorizontalAxis.Type = Action_horizontal;
+    m->VerticalAxis.Type = Action_vertical;
+}
+
+static float GetMenuAxisValue(game_input &input, menu_axis &axis, float dt)
+{
+    const float moveInterval = 0.05f;
+    float value = GetAxisValue(input, (action_type)axis.Type);
+    if (value == 0.0f)
+    {
+        axis.Timer += dt;
+    }
+    else if (axis.Timer >= moveInterval)
+    {
+        axis.Timer = 0.0f;
+        return value;
+    }
+    return 0.0f;
+}
+
+enum menu_item_type
+{
+    MenuItemType_Text,
+};
+struct menu_item
+{
+    const char *Text;
+    menu_item_type Type;
+};
+
+static struct {const char *Text; rect Pos;} mainMenuTexts[] = {
+    {"PLAY", rect{292,32,0,0}},
+    {"OPTS", rect{464,32,0,0}},
+    {"CRED", rect{816,32,0,0}},
+    {"QUIT", rect{992,32,0,0}}
+};
+static struct {int NumItems; menu_item Items[4]; int HotItem=0;} subMenus[] = {
+    {2,
+     {
+         menu_item{"CLASSIC MODE", MenuItemType_Text},
+         menu_item{"SCORE MODE", MenuItemType_Text}
+     }
+    },
+};
+static menu_item backItem = {"BACK", MenuItemType_Text};
+static color textColor = Color_white;
+static color textSelectedColor = IntColor(FirstPalette.Colors[3]);
+
+static void DrawSubMenu(game_main *g, bitmap_font *font, menu_item &item, float baseY, float width, float height, bool selected = false, float changeTimer = 0.0f)
+{
+    float textPadding = GetRealPixels(g, 10.0f);
+    color bgColor = IntColor(FirstPalette.Colors[2], 0.5f);
+    color bgSelectedColor = IntColor(FirstPalette.Colors[3], 1.0f);
+    if (selected)
+    {
+        bgColor = Lerp(bgColor, changeTimer, bgSelectedColor);
+    }
+    DrawRect(g->GUI, rect{0,baseY,width,height}, bgColor);
+    DrawText(g->GUI, font, item.Text, rect{textPadding,baseY + textPadding,0,0}, textColor);
 }
 
 static void RenderMenu(game_main *g, float dt)
 {
-    static color textColor = Color_white;
-    static color textSelectedColor = IntColor(ShipPalette.Colors[SHIP_ORANGE]);
+    static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+    static auto subMenuFont = FindBitmapFont(g->AssetLoader, "unispace_24");
+    auto m = &g->MenuState;
+    float moveX = GetMenuAxisValue(g->Input, m->HorizontalAxis, dt);
+    float moveY = GetMenuAxisValue(g->Input, m->VerticalAxis, dt);
 
     g->PlayerEntity->Vel().y = PLAYER_MIN_VEL;
     g->PlayerEntity->Pos().y += g->PlayerEntity->Vel().y * dt;
@@ -72,9 +140,86 @@ static void RenderMenu(game_main *g, float dt)
 
     UpdateProjectionView(g->GUICamera);
     Begin(g->GUI, g->GUICamera);
-    DrawTextCentered(g->GUI, g->TestFont, "PLAY", rect{146,16,0,0}, textSelectedColor);
-    DrawTextCentered(g->GUI, g->TestFont, "OPTS", rect{232,16,0,0}, textColor);
-    DrawTextCentered(g->GUI, g->TestFont, "CRED", rect{408,16,0,0}, textColor);
-    DrawTextCentered(g->GUI, g->TestFont, "QUIT", rect{496,16,0,0}, textColor);
+    if (m->SelectedMainMenu == -1)
+    {
+        if (moveX > 0.0f)
+        {
+            m->HotMainMenu++;
+        }
+        else if (moveX < 0.0f)
+        {
+            m->HotMainMenu--;
+        }
+        m->HotMainMenu = glm::clamp(m->HotMainMenu, 0, (int)ARRAY_COUNT(mainMenuTexts) - 1);
+
+        for (int i = 0; i < ARRAY_COUNT(mainMenuTexts); i++)
+        {
+            auto &item = mainMenuTexts[i];
+            color col = textColor;
+            if (i == m->HotMainMenu)
+            {
+                col = textSelectedColor;
+            }
+            DrawTextCentered(g->GUI, mainMenuFont, item.Text, GetRealPixels(g, item.Pos), col);
+        }
+
+        if (IsJustPressed(g, Action_select))
+        {
+            if (m->HotMainMenu < ARRAY_COUNT(mainMenuTexts) - 1)
+            {
+                m->SelectedMainMenu = m->HotMainMenu;
+            }
+            else
+            {
+                g->Running = false;
+            }
+        }
+    }
+    else
+    {
+        auto &subMenu = subMenus[m->SelectedMainMenu];
+        int prevHotItem = subMenu.HotItem;
+        if (moveY < 0.0f)
+        {
+            subMenu.HotItem++;
+        }
+        else if (moveY > 0.0f)
+        {
+            subMenu.HotItem--;
+        }
+        subMenu.HotItem = glm::clamp(subMenu.HotItem, 0, subMenu.NumItems);
+        if (prevHotItem != subMenu.HotItem)
+        {
+            PlaySequence(g->TweenState, &m->SubMenuChangeSequence, true);
+        }
+
+        float width = g->Width*0.33f;
+        float height = g->Height*0.075f;
+        float baseY = 660.0f;
+        auto &item = mainMenuTexts[m->SelectedMainMenu];
+        DrawText(g->GUI, mainMenuFont, item.Text, GetRealPixels(g, rect{10,660,0,0}), textColor);
+        DrawLine(g->GUI, vec2{0,GetRealPixels(g,650.0f)}, vec2{width,GetRealPixels(g,650.0f)}, textColor);
+
+        baseY = GetRealPixels(g, baseY);
+        baseY -= height + GetRealPixels(g, 20.0f);
+        for (int i = 0; i < subMenu.NumItems; i++)
+        {
+            auto &item = subMenu.Items[i];
+            bool selected = (i == subMenu.HotItem);
+            DrawSubMenu(g, subMenuFont, item, baseY, width, height, selected, m->SubMenuChangeTimer);
+
+            baseY -= height + GetRealPixels(g, 10.0f);
+        }
+        bool backSelected = subMenu.HotItem == subMenu.NumItems;
+        DrawSubMenu(g, subMenuFont, backItem, baseY, width, height, backSelected, m->SubMenuChangeTimer);
+
+        if (IsJustPressed(g, Action_select))
+        {
+            if (backSelected)
+            {
+                m->SelectedMainMenu = -1;
+            }
+        }
+    }
     End(g->GUI);
 }

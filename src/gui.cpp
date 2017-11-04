@@ -82,7 +82,7 @@ static void CompileGUIShader(gui &g)
 
 #define GUIVertexSize 8
 
-void InitGUI(gui &g, game_input &Input)
+static void InitGUI(gui &g, game_input &Input)
 {
     g.Input = &Input;
     CompileGUIShader(g);
@@ -92,7 +92,7 @@ void InitGUI(gui &g, game_input &Input)
                vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
 }
 
-void Begin(gui &g, camera &Camera, float emission = 0.0f)
+static void Begin(gui &g, camera &Camera, float emission = 0.0f)
 {
     assert(g.Program.ID);
     assert(Camera.Updated);
@@ -121,7 +121,20 @@ static void PushDrawCommand(gui &g)
     g.DrawCommandList.push_back(Curr);
 }
 
-uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
+static void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
+{
+    auto &curr = g.CurrentDrawCommand;
+    if (curr.PrimitiveType != GL_LINES)
+    {
+        PushDrawCommand(g);
+        g.CurrentDrawCommand = NextDrawCommand(g, GL_LINES, 0.0f, Color_white, NULL);
+    }
+
+    PushVertex(g.Buffer, {p1.x, p1.y, 0,0, c.r, c.g, c.b, c.a});
+    PushVertex(g.Buffer, {p2.x, p2.y, 0,0, c.r, c.g, c.b, c.a});
+}
+
+static uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
                 texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
                 bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
@@ -182,17 +195,17 @@ uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
     return GUIElementState_none;
 }
 
-uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+static uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return DrawRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
+static uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
 {
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-vec2 MeasureText(bitmap_font *font, const char *text)
+static vec2 MeasureText(bitmap_font *font, const char *text)
 {
     vec2 result = {};
     int curX = 0;
@@ -216,7 +229,7 @@ vec2 MeasureText(bitmap_font *font, const char *text)
     return result;
 }
 
-uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
+static uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
@@ -269,7 +282,7 @@ static uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect
     return DrawText(g, font, text, r, c, checkState);
 }
 
-void End(gui &g)
+static void End(gui &g)
 {
     PushDrawCommand(g);
 

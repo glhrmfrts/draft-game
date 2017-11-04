@@ -5,7 +5,7 @@ struct audio_source;
 
 #define PLAYER_INITIAL_MAX_VEL 70.0f
 
-#define BASE_CRYSTAL_INTERVAL 4.0f
+#define BASE_CRYSTAL_INTERVAL 2.0f
 
 #define INITIAL_SHIP_INTERVAL 4.0f
 #define CHANGE_SHIP_TIMER     8.0f
@@ -80,5 +80,7 @@ struct level_state
     int Score = 0;
     std::list<level_score_text *> ScoreTextList;
 };
+
+static void InitLevel(game_main *g);
 
 #endif

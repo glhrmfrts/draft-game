@@ -33,6 +33,7 @@ void DrawDebugUI(game_main *g, float dt)
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);
         ImGui::SliderFloat("Offset Y", &Global_Camera_OffsetY, -50.0f, 50.0f, "%.2f");
         ImGui::SliderFloat("Offset Z", &Global_Camera_OffsetZ, -50.0f, 50.0f, "%.2f");
+        ImGui::SliderFloat("FOV", &Global_Camera_FieldOfView, 20.0f, 200.0f, "%.2f");
         ImGui::Spacing();
     }
     if (ImGui::CollapsingHeader("Collision"))
