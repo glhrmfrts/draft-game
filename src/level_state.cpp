@@ -175,7 +175,7 @@ static void AddScoreText(game_main *g, level_state *l, int score, vec3 pos, colo
 
     seq->Tweens.push_back(tween{&scoreText->TweenValue, 0.0f, 1.0f, 1, 1.0f, TweenEasing_Linear});
     AddSequences(g->TweenState, seq, 1);
-    PlaySequence(g->TweenState, seq);
+    PlaySequence(g->TweenState, seq, true);
     l->ScoreTextList.push_back(scoreText);
 }
 

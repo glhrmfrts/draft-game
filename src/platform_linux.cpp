@@ -38,9 +38,10 @@ PLATFORM_COMPARE_FILE_TIME(PlatformCompareFileTime)
 
 PLATFORM_GET_MILLISECONDS(PlatformGetMilliseconds)
 {
-    timeval time;
-    gettimeofday(&time, 0);
-    return time.tv_sec*1000;
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    long ms = std::round(time.tv_nsec / 1.0e6);
+    return ms;
 }
 
 void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)

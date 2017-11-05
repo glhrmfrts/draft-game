@@ -118,20 +118,23 @@ int main(int argc, char **argv)
 
     Lib.GameInit(&game);
 
-    float ReloadTimer = GameLibraryReloadTime;
-    float DeltaTime = 0.016f;
-    float DeltaTimeMS = DeltaTime * 1000.0f;
-    uint32 PreviousTime = SDL_GetTicks();
+    float reloadTimer = GameLibraryReloadTime;
+    float deltaTime = 0.016f;
+    float deltaTimeMS = deltaTime * 1000.0f;
+    float accul = deltaTime;
+    uint32 previousTime = PlatformGetMilliseconds();
     while (game.Running)
     {
-        uint32 CurrentTime = SDL_GetTicks();
-        float Elapsed = ((CurrentTime - PreviousTime) / 1000.0f);
+        uint32 currentTime = PlatformGetMilliseconds();
+        float elapsedMS = std::min((uint32)deltaTimeMS, (currentTime - previousTime));
+        float elapsed = (elapsedMS / 1000.0f);
+        accul += elapsed;
 
 #ifdef DRAFT_DEBUG
-        ReloadTimer -= Elapsed;
-        if (ReloadTimer <= 0)
+        reloadTimer -= elapsed;
+        if (reloadTimer <= 0)
         {
-            ReloadTimer = GameLibraryReloadTime;
+            reloadTimer = GameLibraryReloadTime;
             if (GameLibraryChanged(Lib))
             {
                 UnloadGameLibrary(Lib);
@@ -258,7 +261,7 @@ int main(int argc, char **argv)
             }
             }
         }
-        Lib.GameRender(&game, Elapsed);
+        Lib.GameRender(&game, elapsed);
 
         memcpy(&game.PrevInput, &game.Input, sizeof(game_input));
         Input.MouseState.dX = 0;
@@ -266,12 +269,12 @@ int main(int argc, char **argv)
 
         SDL_GL_SwapWindow(Window);
 
-        if (Elapsed*1000.0f < DeltaTimeMS)
+        if (elapsedMS < deltaTimeMS)
         {
-            SDL_Delay(DeltaTimeMS - Elapsed*1000.0f);
+            SDL_Delay(deltaTimeMS - elapsedMS);
         }
 
-        PreviousTime = CurrentTime;
+        previousTime = currentTime;
     }
 
     Lib.GameDestroy(&game);
