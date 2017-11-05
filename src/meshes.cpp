@@ -1,15 +1,13 @@
 // Copyright
 
-static void
-AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
+static void AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
 {
     PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c, n });
     PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c, n });
 }
 
-static void
-AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1 = Color_white, vec3 n = vec3(1), bool FlipV = false)
+static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
+                    color c1 = Color_white, vec3 n = vec3(1), bool FlipV = false)
 {
     color c2 = c1;
     color c3 = c1;
@@ -30,10 +28,9 @@ AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
     PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
 }
 
-static void
-AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
-        color c1, color c2, color c3, color c4,
-        vec3 n = vec3(1), bool FlipV = false)
+static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
+                    color c1, color c2, color c3, color c4,
+                    vec3 n = vec3(1), bool FlipV = false)
 {
     texture_rect Uv = { 0, 0, 1, 1 };
     if (FlipV)
@@ -50,15 +47,14 @@ AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
     PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
 }
 
-inline static vec3
-GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
+inline static vec3 GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
 {
     vec3 v1 = p2 - p1;
     vec3 v2 = p3 - p1;
     return glm::normalize(glm::cross(v1, v2));
 }
 
-void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
+static void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
 {
     color c2 = c1;
     color c3 = c1;
@@ -68,14 +64,13 @@ void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color
     PushVertex(Buffer, mesh_vertex{ p3, vec2{ 0, 0 }, c3, n });
 }
 
-void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
+static void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
 {
     AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
 }
 
-static void AddCubeWithRotation(vertex_buffer &Buffer, color c = Color_white,
-                                bool NoLight = false, vec3 Center = vec3(0.0f),
-                                vec3 Scale = vec3(1.0f), float Angle = 0.0f)
+static void AddCubeWithRotation(vertex_buffer &Buffer, color c, bool NoLight, vec3 Center,
+                                vec3 Scale, float Angle)
 {
     float z = -0.5f;
     float h = 0.5f;

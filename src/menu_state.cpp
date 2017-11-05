@@ -77,6 +77,19 @@ static float GetMenuAxisValue(game_input &input, menu_axis &axis, float dt)
     return 0.0f;
 }
 
+#define MENU_FUNC(name) void name(game_main *g, int itemIndex)
+typedef MENU_FUNC(menu_func);
+
+MENU_FUNC(PlayMenuCallback)
+{
+    switch (itemIndex)
+    {
+    case 0: // classic mode
+        InitLevel(g);
+        break;
+    }
+}
+
 enum menu_item_type
 {
     MenuItemType_Text,
@@ -93,8 +106,14 @@ static struct {const char *Text; rect Pos;} mainMenuTexts[] = {
     {"CRED", rect{816,32,0,0}},
     {"QUIT", rect{992,32,0,0}}
 };
-static struct {int NumItems; menu_item Items[4]; int HotItem=0;} subMenus[] = {
-    {2,
+static struct
+{
+    int NumItems;
+    menu_func *SelectFunc; // function called when an item in the submenu is selected
+    menu_item Items[4];
+    int HotItem=0;
+} subMenus[] = {
+    {2, PlayMenuCallback,
      {
          menu_item{"CLASSIC MODE", MenuItemType_Text},
          menu_item{"SCORE MODE", MenuItemType_Text}
@@ -218,6 +237,10 @@ static void RenderMenu(game_main *g, float dt)
             if (backSelected)
             {
                 m->SelectedMainMenu = -1;
+            }
+            else
+            {
+                subMenu.SelectFunc(g, subMenu.HotItem);
             }
         }
     }

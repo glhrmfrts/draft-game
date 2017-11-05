@@ -151,7 +151,7 @@ struct camera
     };
 };
 
-#define MaterialFlag_PolygonLines 0x1
+#define MaterialFlag_PolygonLines     0x1
 #define MaterialFlag_ForceTransparent 0x2
 struct material
 {
@@ -319,5 +319,9 @@ struct render_state
     vertex_buffer DebugBuffer;
 #endif
 };
+
+static void AddCubeWithRotation(vertex_buffer &Buffer, color c = Color_white,
+                                bool NoLight = false, vec3 Center = vec3(0.0f),
+                                vec3 Scale = vec3(1.0f), float Angle = 0.0f);
 
 #endif

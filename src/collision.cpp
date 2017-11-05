@@ -2,20 +2,19 @@
 
 #include "collision.h"
 
-inline static void
-UpdateEntityBounds(entity *Entity)
+static void UpdateEntityBounds(entity *ent)
 {
     // TODO: this is not good
-    if (Entity->Model)
+    if (ent->Model)
     {
-        Entity->Collider->Box = BoundsFromMinMax(Entity->Model->Mesh->Min*Entity->Transform.Scale,
-                                               Entity->Model->Mesh->Max*Entity->Transform.Scale);
-        Entity->Collider->Box.Center += Entity->Transform.Position;
+        ent->Collider->Box = BoundsFromMinMax(ent->Model->Mesh->Min*ent->Scl()*ent->Collider->Scale,
+                                              ent->Model->Mesh->Max*ent->Scl()*ent->Collider->Scale);
+        ent->Collider->Box.Center += ent->Transform.Position;
     }
     else
     {
-        //Entity->Bounds->Center = Entity->Position;
-        //Entity->Bounds->Half = Entity->Size*0.5f;
+        //ent->Bounds->Center = ent->Position;
+        //ent->Bounds->Half = ent->Size*0.5f;
     }
 }
 

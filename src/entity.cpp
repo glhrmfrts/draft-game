@@ -23,10 +23,11 @@ static model *CreateModel(allocator *alloc, mesh *Mesh)
     return result;
 }
 
-static collider *CreateCollider(allocator *alloc, collider_type Type)
+static collider *CreateCollider(allocator *alloc, collider_type type, vec3 scale = vec3(1.0f))
 {
     auto result = PushStruct<collider>(alloc);
-    result->Type = Type;
+    result->Type = type;
+    result->Scale = scale;
     return result;
 }
 
@@ -245,7 +246,7 @@ static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 {
     auto result = PushStruct<entity>(alloc);
     result->Model = CreateModel(alloc, astMesh);
-    result->Collider = CreateCollider(alloc, ColliderType_Asteroid);
+    result->Collider = CreateCollider(alloc, ColliderType_Asteroid, vec3(0.5f));
     result->Trail = CreateTrail(alloc, result, ASTEROID_COLOR, 0.5f, true);
     result->Asteroid = PushStruct<asteroid>(alloc);
     return result;

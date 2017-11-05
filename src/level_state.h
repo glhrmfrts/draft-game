@@ -31,7 +31,8 @@ struct game_main;
 struct level_state;
 struct level_gen_params;
 
-typedef void level_gen_func(level_gen_params *p, game_main *g, level_state *l);
+#define LEVEL_GEN_FUNC(name) void name(level_gen_params *p, game_main *g, level_state *l)
+typedef LEVEL_GEN_FUNC(level_gen_func);
 
 struct level_gen_params
 {

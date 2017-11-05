@@ -905,6 +905,8 @@ static void RenderRenderable(render_state &RenderState, camera &Camera, renderab
     }
 }
 
+static material DebugMaterial{Color_white, 0.0f, 0.0f, NULL, MaterialFlag_PolygonLines};
+
 void RenderEnd(render_state &RenderState, camera &Camera)
 {
     assert(Camera.Updated);
@@ -917,7 +919,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
         r.VAO = RenderState.DebugBuffer.VAO;
         r.VertexOffset = 0;
         r.VertexCount = RenderState.DebugBuffer.VertexCount;
-        r.Material = &BlankMaterial;
+        r.Material = &DebugMaterial;
         r.PrimitiveType = GL_LINES;
         r.Transform = transform{};
         RenderState.FrameSolidRenderables.push_back(i);
@@ -943,15 +945,15 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     glDisable(GL_DEPTH_TEST);
 }
 
-inline static void AddRenderable(render_state &RenderState, size_t Index, material *Material)
+static void AddRenderable(render_state &rs, size_t index, material *material)
 {
-    if (Material->DiffuseColor.a < 1.0f || (Material->Flags & MaterialFlag_ForceTransparent))
+    if (material->DiffuseColor.a < 1.0f || (material->Flags & MaterialFlag_ForceTransparent))
     {
-        RenderState.FrameTransparentRenderables.push_back(Index);
+        rs.FrameTransparentRenderables.push_back(index);
     }
     else
     {
-        RenderState.FrameSolidRenderables.push_back(Index);
+        rs.FrameSolidRenderables.push_back(index);
     }
 }
 
@@ -1003,8 +1005,14 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
 }
 
 #ifdef DRAFT_DEBUG
-void DrawDebugCollider(render_state &RenderState, bounding_box &Box, bool IsColliding)
+inline static void DrawDebugCollider(render_state &rs, bounding_box &box, bool isColliding)
 {
+    color c = Color_green;
+    if (isColliding)
+    {
+        c = Color_red;
+    }
+    AddCubeWithRotation(rs.DebugBuffer, c, true, box.Center, box.Half*2.0f, 0.0f);
 }
 #endif
 

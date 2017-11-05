@@ -65,6 +65,7 @@ struct collider
 {
     collider_type Type;
     bounding_box Box;
+    vec3 Scale = vec3(1.0f);
 };
 
 struct entity

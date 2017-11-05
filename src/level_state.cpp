@@ -55,7 +55,7 @@ static int GetNextShipColor(level_state *l)
     return color;
 }
 
-static void GenerateCrystal(level_gen_params *p, game_main *g, level_state *l)
+LEVEL_GEN_FUNC(GenerateCrystal)
 {
     int lane = GetNextSpawnLane(l);
     auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g));
@@ -69,7 +69,7 @@ static void GenerateCrystal(level_gen_params *p, game_main *g, level_state *l)
     AddEntity(g->World, ent);
 }
 
-static void GenerateShip(level_gen_params *p, game_main *g, level_state *l)
+LEVEL_GEN_FUNC(GenerateShip)
 {
     int colorIndex = GetNextShipColor(l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
@@ -84,7 +84,7 @@ static void GenerateShip(level_gen_params *p, game_main *g, level_state *l)
     AddEntity(g->World, ent);
 }
 
-static void GenerateRedShip(level_gen_params *p, game_main *g, level_state *l)
+LEVEL_GEN_FUNC(GenerateRedShip)
 {
     color c = IntColor(ShipPalette.Colors[2]);
     auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false);
@@ -98,7 +98,7 @@ static void GenerateRedShip(level_gen_params *p, game_main *g, level_state *l)
 }
 
 #define ASTEROID_Z (SHIP_Z + 10)
-static void GenerateAsteroid(level_gen_params *p, game_main *g, level_state *l)
+LEVEL_GEN_FUNC(GenerateAsteroid)
 {
     //Println("I should be generating an asteroid");
     auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g));
@@ -220,7 +220,6 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
 {
     auto l = &g->LevelState;
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
-    auto crystalEntity = FindEntityOfType(first, second, ColliderType_Crystal).Found;
     if (first->Collider->Type == ColliderType_TrailPiece || second->Collider->Type == ColliderType_TrailPiece)
     {
         auto trailPieceEntity = FindEntityOfType(first, second, ColliderType_TrailPiece).Found;
@@ -291,6 +290,8 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
         }
         return false;
     }
+
+    auto crystalEntity = FindEntityOfType(first, second, ColliderType_Crystal).Found;
     if (shipEntity != NULL && crystalEntity != NULL)
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
@@ -298,10 +299,31 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
             l->Score += SCORE_CRYSTAL;
             AddScoreText(g, l, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
 
-            auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool), g->LevelState.Entropy, g->LevelState.TimeElapsed, crystalEntity->Pos(), shipEntity->Vel(), CRYSTAL_COLOR);
+            auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool),
+                                           g->LevelState.Entropy,
+                                           g->LevelState.TimeElapsed,
+                                           crystalEntity->Pos(),
+                                           shipEntity->Vel(),
+                                           CRYSTAL_COLOR);
             AddEntity(g->World, pup);
             RemoveEntity(g->World, crystalEntity);
         }
+        return false;
+    }
+
+    auto asteroidEntity = FindEntityOfType(first, second, ColliderType_Asteroid).Found;
+    if (shipEntity != NULL && asteroidEntity != NULL)
+    {
+        auto exp = CreateExplosionEntity(
+            GetEntry(g->World.ExplosionPool),
+            shipEntity->Pos(),
+            shipEntity->Vel(), // maybe not right
+            shipEntity->Ship->Color,
+            shipEntity->Ship->OutlineColor,
+            vec3{ 0, 1, 1 }
+        );
+        AddEntity(g->World, exp);
+        RemoveEntity(g->World, shipEntity);
         return false;
     }
     return false;
@@ -632,7 +654,7 @@ static void RenderLevel(game_main *g, float dt)
     {
         if (!ent) continue;
 
-        if (ent->Pos().z > 0.0f)
+        if (ent->Pos().z > 0.0f && !ent->Asteroid->Exploded)
         {
             if (ent->Pos().y > playerEntity->Pos().y)
             {
