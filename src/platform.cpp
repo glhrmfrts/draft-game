@@ -47,8 +47,8 @@ int main(int argc, char **argv)
 
     int Width = GAME_BASE_WIDTH;
     int Height = GAME_BASE_HEIGHT;
-    int vWidth = Width;
-    int vHeight = Height;
+    int vWidth = Width/2;
+    int vHeight = Height/2;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_WINDOW_OPENGL);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -156,15 +156,15 @@ int main(int argc, char **argv)
         }
         for (int i = 0; i < Action_count; i++)
         {
-            auto &Action = Input.Actions[i];
-            Action.Pressed = 0;
-            Action.AxisValue = 0;
+            auto &action = Input.Actions[i];
+            action.Pressed = 0;
+            action.AxisValue = 0;
             if (HasJoystick)
             {
-                if (Action.AxisID != Axis_Invalid)
+                if (action.AxisID != Axis_Invalid)
                 {
-                    int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, Action.AxisID);
-                    if (Action.AxisID == Axis_RightTrigger || Action.AxisID == Axis_LeftTrigger)
+                    int Value = SDL_JoystickGetAxis(Input.Controller.Joystick, action.AxisID);
+                    if (action.AxisID == Axis_RightTrigger || action.AxisID == Axis_LeftTrigger)
                     {
                         float fv = (Value + 32768) / float(65535);
                         Value = short(fv * 32767);
@@ -173,35 +173,35 @@ int main(int argc, char **argv)
                     {
                         Value = 0;
                     }
-                    Action.AxisValue = Value / float(32767);
+                    action.AxisValue = Value / float(32767);
                 }
-                if (Action.ButtonID != Button_Invalid)
+                if (action.ButtonID != Button_Invalid)
                 {
-                    if (SDL_JoystickGetButton(Input.Controller.Joystick, Action.ButtonID))
+                    if (SDL_JoystickGetButton(Input.Controller.Joystick, action.ButtonID))
                     {
-                        Action.Pressed++;
+                        action.Pressed++;
                     }
                     else
                     {
-                        Action.Pressed = 0;
+                        action.Pressed = 0;
                     }
                 }
             }
 
-            const uint8 *Keys = SDL_GetKeyboardState(&Input.KeyCount);
-            uint8 Positive = Keys[Action.Positive];
-            uint8 Negative = Keys[Action.Negative];
-            Action.Pressed += Positive + Negative;
-            if (Positive)
+            const uint8 *keys = SDL_GetKeyboardState(&Input.KeyCount);
+            uint8 positive = keys[action.Positive];
+            uint8 negative = keys[action.Negative];
+            action.Pressed += positive + negative;
+            if (positive)
             {
-                Action.AxisValue = 1;
+                action.AxisValue = 1;
             }
-            else if (Negative)
+            else if (negative)
             {
-                Action.AxisValue = -1;
+                action.AxisValue = -1;
             }
 
-            Input.Keys = Keys;
+            Input.Keys = keys;
         }
 
         SDL_Event Event;

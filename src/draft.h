@@ -96,6 +96,7 @@ enum action_type
     Action_camVertical,
     Action_horizontal,
     Action_vertical,
+    Action_navVertical,
     Action_boost,
 	Action_debugUI,
     Action_debugPause,

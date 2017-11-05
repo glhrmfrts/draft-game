@@ -8,7 +8,7 @@ struct audio_source;
 #define BASE_CRYSTAL_INTERVAL 2.0f
 
 #define INITIAL_SHIP_INTERVAL 4.0f
-#define CHANGE_SHIP_TIMER     8.0f
+#define CHANGE_SHIP_TIMER 8.0f
 
 #define NO_RESERVED_LANE 500
 
@@ -50,6 +50,7 @@ struct level_score_text
     vec2 TargetPos;
     tween_sequence *Sequence;
     float TweenValue = 0;
+    const char *Text;
     int Score = 0;
 };
 

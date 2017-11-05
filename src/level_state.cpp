@@ -3,6 +3,11 @@
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
 #define PLAYER_MAX_VEL_LIMIT           170.0f
 
+#define SCORE_TEXT_DRAFT   "DRAFT"
+#define SCORE_TEXT_BLAST   "BLAST"
+#define SCORE_TEXT_MISS    "MISS"
+#define SCORE_TEXT_CRYSTAL "CRYSTAL"
+
 struct audio_source
 {
     ALuint Source;
@@ -126,7 +131,7 @@ static void InitLevel(game_main *g)
     l->DraftBoostAudio = CreateAudioSource(g->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
 
     InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
-    InitFormat(l->ScoreNumberFormat, "+%d", 8, &l->Arena);
+    InitFormat(l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
 
     auto gen = l->GenParams + LevelGenType_Crystal;
     gen->Flags = LevelGenFlag_Randomize;
@@ -158,7 +163,7 @@ static void DebugReset(game_main *g)
 {
 }
 
-static void AddScoreText(game_main *g, level_state *l, int score, vec3 pos, color c)
+static void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
     vec4 v = g->Camera.ProjectionView * vec4{pos, 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
@@ -170,6 +175,7 @@ static void AddScoreText(game_main *g, level_state *l, int score, vec3 pos, colo
     scoreText->Color = c;
     scoreText->Pos = screenPos;
     scoreText->TargetPos = screenPos + vec2{20.0f, -100.0f};
+    scoreText->Text = text;
     scoreText->Score = score;
     scoreText->Sequence = seq;
 
@@ -266,7 +272,7 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
             {
                 l->Score += SCORE_DESTROY_BLUE_SHIP;
                 entityToExplode->Ship->Scored = true;
-                AddScoreText(g, l, SCORE_DESTROY_BLUE_SHIP, entityToExplode->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
+                AddScoreText(g, l, SCORE_TEXT_BLAST, SCORE_DESTROY_BLUE_SHIP, entityToExplode->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
             }
 
             auto exp = CreateExplosionEntity(
@@ -297,7 +303,7 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
             l->Score += SCORE_CRYSTAL;
-            AddScoreText(g, l, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
+            AddScoreText(g, l, SCORE_TEXT_CRYSTAL, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
 
             auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool),
                                            g->LevelState.Entropy,
@@ -314,16 +320,19 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
     auto asteroidEntity = FindEntityOfType(first, second, ColliderType_Asteroid).Found;
     if (shipEntity != NULL && asteroidEntity != NULL)
     {
-        auto exp = CreateExplosionEntity(
-            GetEntry(g->World.ExplosionPool),
-            shipEntity->Pos(),
-            shipEntity->Vel(), // maybe not right
-            shipEntity->Ship->Color,
-            shipEntity->Ship->OutlineColor,
-            vec3{ 0, 1, 1 }
-        );
-        AddEntity(g->World, exp);
-        RemoveEntity(g->World, shipEntity);
+        if (ENTITY_IS_PLAYER(shipEntity))
+        {
+            auto exp = CreateExplosionEntity(
+                GetEntry(g->World.ExplosionPool),
+                shipEntity->Pos(),
+                vec3(0.0f),
+                shipEntity->Ship->Color,
+                shipEntity->Ship->OutlineColor,
+                vec3{ 0, 1, 1 }
+                );
+            AddEntity(g->World, exp);
+            RemoveEntity(g->World, shipEntity);
+        }
         return false;
     }
     return false;
@@ -532,9 +541,13 @@ static void UpdateLevel(game_main *g, float dt)
         if (moveX == 0.0f)
         {
             float dif = targetX - playerX;
-            if (std::abs(dif) > 0.05f)
+            if (std::abs(dif) > ROAD_LANE_WIDTH)
             {
-                playerEntity->Transform.Velocity.x = dif*4.0f;
+                playerEntity->Vel().x += ROAD_LANE_WIDTH * glm::normalize(dif);
+            }
+            else if (std::abs(dif) > 0.05f)
+            {
+                playerEntity->Vel().x += dif;
             }
         }
 
@@ -546,15 +559,15 @@ static void UpdateLevel(game_main *g, float dt)
             l->DraftTarget->Ship->HasBeenDrafted = true;
             ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
 
-            AddScoreText(g, l, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
+            AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
         }
 
         l->PlayerLaneIndex = int(nearestLane)+2;
     }
 
-    size_t FrameCollisionCount = 0;
-    DetectCollisions(world.CollisionEntities, l->CollisionCache, FrameCollisionCount);
-    for (size_t i = 0; i < FrameCollisionCount; i++)
+    size_t frameCollisionCount = 0;
+    DetectCollisions(world.CollisionEntities, l->CollisionCache, frameCollisionCount);
+    for (size_t i = 0; i < frameCollisionCount; i++)
     {
         auto col = &l->CollisionCache[i];
         col->First->NumCollisions++;
@@ -621,7 +634,7 @@ static void UpdateLevel(game_main *g, float dt)
             {
                 l->Score += SCORE_MISS_ORANGE_SHIP;
                 ent->Ship->Scored = true;
-                AddScoreText(g, l, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+                AddScoreText(g, l, SCORE_TEXT_MISS, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
             }
 
             KeepEntityInsideOfRoad(ent);
@@ -633,12 +646,12 @@ static void UpdateLevel(game_main *g, float dt)
 
         vec3 distToPlayer = (playerEntity->Pos() + playerEntity->Vel()*dt) - ent->Pos();
         vec3 dirToPlayer = glm::normalize(distToPlayer);
-        ent->SetVel(ent->Vel() + dirToPlayer);
+        ent->SetVel(ent->Vel() + dirToPlayer * (1.0f/dt) * dt);
         ent->SetPos(ent->Pos() + ent->Vel() * dt);
         for (auto &meshPart : ent->Trail->Mesh.Parts)
         {
             float &alpha = meshPart.Material.DiffuseColor.a;
-            alpha -= 1.5f * dt;
+            alpha -= 1.0f * dt;
             alpha = std::max(alpha, 0.0f);
         }
 
@@ -732,7 +745,7 @@ static void RenderLevel(game_main *g, float dt)
         float t = text->TweenValue;
         text->Color.a = 1.0f - t;
         p += (text->TargetPos - p) * t;
-        DrawTextCentered(g->GUI, scoreFont, Format(l->ScoreNumberFormat, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+        DrawTextCentered(g->GUI, scoreFont, Format(l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
     End(g->GUI);
     PostProcessEnd(g->RenderState);
