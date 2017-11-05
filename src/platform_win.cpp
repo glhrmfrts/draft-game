@@ -16,6 +16,7 @@ struct game_library
     uint64                  LoadTime;
     const char              *Path;
     game_init_func          *GameInit;
+    game_update_func        *GameUpdate;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
     game_process_event_func *GameProcessEvent;
@@ -80,6 +81,7 @@ static void LoadGameLibrary(game_library &Lib, const char *Path, const char *Tem
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
+        Lib.GameUpdate = (game_render_func *)GetProcAddress(Lib.Library, "GameUpdate");
         Lib.GameRender = (game_render_func *)GetProcAddress(Lib.Library, "GameRender");
         Lib.GameDestroy = (game_destroy_func *)GetProcAddress(Lib.Library, "GameDestroy");
         Lib.GameProcessEvent = (game_process_event_func *)GetProcAddress(Lib.Library, "GameProcessEvent");

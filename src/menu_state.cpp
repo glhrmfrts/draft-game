@@ -137,28 +137,16 @@ static void DrawSubMenu(game_main *g, bitmap_font *font, menu_item &item, float 
     DrawText(g->GUI, font, item.Text, rect{textPadding,baseY + textPadding,0,0}, textColor);
 }
 
-static void RenderMenu(game_main *g, float dt)
+static void UpdateMenu(game_main *g, float dt)
 {
-    static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
-    static auto subMenuFont = FindBitmapFont(g->AssetLoader, "unispace_24");
     auto m = &g->MenuState;
     float moveX = GetMenuAxisValue(g->Input, m->HorizontalAxis, dt);
     float moveY = GetMenuAxisValue(g->Input, m->VerticalAxis, dt);
-
     g->PlayerEntity->Vel().y = PLAYER_MIN_VEL;
     g->PlayerEntity->Pos().y += g->PlayerEntity->Vel().y * dt;
-
     UpdateLogiclessEntities(g->World, dt);
     UpdateCameraToPlayer(g->Camera, g->PlayerEntity, dt);
-    UpdateProjectionView(g->Camera);
-    PostProcessBegin(g->RenderState);
-    RenderBegin(g->RenderState, dt);
-    RenderEntityWorld(g->RenderState, g->World, dt);
-    RenderEnd(g->RenderState, g->Camera);
-    PostProcessEnd(g->RenderState);
 
-    UpdateProjectionView(g->GUICamera);
-    Begin(g->GUI, g->GUICamera);
     if (m->SelectedMainMenu == -1)
     {
         if (moveX > 0.0f)
@@ -170,17 +158,6 @@ static void RenderMenu(game_main *g, float dt)
             m->HotMainMenu--;
         }
         m->HotMainMenu = glm::clamp(m->HotMainMenu, 0, (int)ARRAY_COUNT(mainMenuTexts) - 1);
-
-        for (int i = 0; i < ARRAY_COUNT(mainMenuTexts); i++)
-        {
-            auto &item = mainMenuTexts[i];
-            color col = textColor;
-            if (i == m->HotMainMenu)
-            {
-                col = textSelectedColor;
-            }
-            DrawTextCentered(g->GUI, mainMenuFont, item.Text, GetRealPixels(g, item.Pos), col);
-        }
 
         if (IsJustPressed(g, Action_select))
         {
@@ -212,6 +189,52 @@ static void RenderMenu(game_main *g, float dt)
             PlaySequence(g->TweenState, &m->SubMenuChangeSequence, true);
         }
 
+        bool backSelected = subMenu.HotItem == subMenu.NumItems;
+        if (IsJustPressed(g, Action_select))
+        {
+            if (backSelected)
+            {
+                m->SelectedMainMenu = -1;
+            }
+            else
+            {
+                subMenu.SelectFunc(g, subMenu.HotItem);
+            }
+        }
+    }
+}
+
+static void RenderMenu(game_main *g, float dt)
+{
+    static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+    static auto subMenuFont = FindBitmapFont(g->AssetLoader, "unispace_24");
+    auto m = &g->MenuState;
+
+    UpdateProjectionView(g->Camera);
+    PostProcessBegin(g->RenderState);
+    RenderBegin(g->RenderState, dt);
+    RenderEntityWorld(g->RenderState, g->World, dt);
+    RenderEnd(g->RenderState, g->Camera);
+    PostProcessEnd(g->RenderState);
+
+    UpdateProjectionView(g->GUICamera);
+    Begin(g->GUI, g->GUICamera);
+    if (m->SelectedMainMenu == -1)
+    {
+        for (int i = 0; i < ARRAY_COUNT(mainMenuTexts); i++)
+        {
+            auto &item = mainMenuTexts[i];
+            color col = textColor;
+            if (i == m->HotMainMenu)
+            {
+                col = textSelectedColor;
+            }
+            DrawTextCentered(g->GUI, mainMenuFont, item.Text, GetRealPixels(g, item.Pos), col);
+        }
+    }
+    else
+    {
+        auto &subMenu = subMenus[m->SelectedMainMenu];
         float width = g->Width*0.33f;
         float height = g->Height*0.075f;
         float baseY = 660.0f;
@@ -231,18 +254,6 @@ static void RenderMenu(game_main *g, float dt)
         }
         bool backSelected = subMenu.HotItem == subMenu.NumItems;
         DrawSubMenu(g, subMenuFont, backItem, baseY, width, height, backSelected, m->SubMenuChangeTimer);
-
-        if (IsJustPressed(g, Action_select))
-        {
-            if (backSelected)
-            {
-                m->SelectedMainMenu = -1;
-            }
-            else
-            {
-                subMenu.SelectFunc(g, subMenu.HotItem);
-            }
-        }
     }
     End(g->GUI);
 }

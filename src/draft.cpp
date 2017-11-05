@@ -33,7 +33,7 @@ extern "C"
 {
     export_func GAME_INIT(GameInit)
     {
-        auto g = Game;
+        auto g = game;
         int Width = g->Width;
         int Height = g->Height;
 
@@ -46,7 +46,6 @@ extern "C"
         InitRenderState(g->RenderState, Width, Height);
         InitTweenState(g->TweenState);
         InitEntityWorld(g->World);
-
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Texture,
@@ -94,33 +93,29 @@ extern "C"
     // @TODO: this exists only for imgui, remove in the future
     export_func GAME_PROCESS_EVENT(GameProcessEvent)
     {
-        ImGui_ImplSdlGL3_ProcessEvent(Event);
+        ImGui_ImplSdlGL3_ProcessEvent(event);
     }
 
-    export_func GAME_RENDER(GameRender)
+    export_func GAME_UPDATE(GameUpdate)
     {
-        auto g = Game;
-        float dt = DeltaTime;
-
-        ImGui_ImplSdlGL3_NewFrame(g->Window);
+        auto g = game;
         if (IsJustPressed(g, Action_debugUI))
         {
             Global_DebugUI = !Global_DebugUI;
         }
         Update(g->TweenState, dt);
-        MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
         switch (g->State)
         {
         case GameState_LoadingScreen:
-            RenderLoadingScreen(g, dt, InitMenu);
+            UpdateLoadingScreen(g, dt, InitMenu);
             break;
 
         case GameState_Level:
-            RenderLevel(g, dt);
+            UpdateLevel(g, dt);
             break;
 
         case GameState_Menu:
-            RenderMenu(g, dt);
+            UpdateMenu(g, dt);
             break;
         }
 
@@ -136,14 +131,34 @@ extern "C"
             }
         }
 #endif
+    }
 
+    export_func GAME_RENDER(GameRender)
+    {
+        auto g = game;
+        ImGui_ImplSdlGL3_NewFrame(g->Window);
+        MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
+        switch (g->State)
+        {
+        case GameState_LoadingScreen:
+            RenderLoadingScreen(g, dt);
+            break;
+
+        case GameState_Level:
+            RenderLevel(g, dt);
+            break;
+
+        case GameState_Menu:
+            RenderMenu(g, dt);
+            break;
+        }
         DrawDebugUI(g, dt);
         ImGui::Render();
     }
 
     export_func GAME_DESTROY(GameDestroy)
     {
-        auto g = Game;
+        auto g = game;
         ImGui_ImplSdlGL3_Shutdown();
         DestroyAssetLoader(g->AssetLoader);
         FreeArena(g->Arena);

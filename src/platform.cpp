@@ -47,8 +47,8 @@ int main(int argc, char **argv)
 
     int Width = GAME_BASE_WIDTH;
     int Height = GAME_BASE_HEIGHT;
-    int vWidth = Width/2;
-    int vHeight = Height/2;
+    int vWidth = Width;
+    int vHeight = Height;
     SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_WINDOW_OPENGL);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -118,15 +118,19 @@ int main(int argc, char **argv)
 
     Lib.GameInit(&game);
 
+    const float deltaTime = 0.016f;
+    const float deltaTimeMS = deltaTime * 1000.0f;
     float reloadTimer = GameLibraryReloadTime;
-    float deltaTime = 0.016f;
-    float deltaTimeMS = deltaTime * 1000.0f;
     float accul = deltaTime;
-    uint32 previousTime = PlatformGetMilliseconds();
+    uint32 previousTime = SDL_GetTicks();
     while (game.Running)
     {
-        uint32 currentTime = PlatformGetMilliseconds();
-        float elapsedMS = std::min((uint32)deltaTimeMS, (currentTime - previousTime));
+        uint32 currentTime = SDL_GetTicks();
+        float elapsedMS = (currentTime - previousTime);
+        if (elapsedMS > deltaTimeMS*2)
+        {
+            elapsedMS = deltaTimeMS*2;
+        }
         float elapsed = (elapsedMS / 1000.0f);
         accul += elapsed;
 
@@ -261,19 +265,24 @@ int main(int argc, char **argv)
             }
             }
         }
-        Lib.GameRender(&game, elapsed);
 
-        memcpy(&game.PrevInput, &game.Input, sizeof(game_input));
-        Input.MouseState.dX = 0;
-        Input.MouseState.dY = 0;
-
-        SDL_GL_SwapWindow(Window);
-
-        if (elapsedMS < deltaTimeMS)
+        int i = 0;
+        while (accul >= deltaTime)
         {
-            SDL_Delay(deltaTimeMS - elapsedMS);
+            Lib.GameUpdate(&game, deltaTime);
+            if (i == 0)
+            {
+                memcpy(&game.PrevInput, &game.Input, sizeof(game_input));
+                Input.MouseState.dX = 0;
+                Input.MouseState.dY = 0;
+            }
+            accul -= deltaTime;
+            i++;
         }
 
+        Lib.GameRender(&game, elapsed);
+        SDL_GL_SwapWindow(Window);
+        SDL_Delay(10);
         previousTime = currentTime;
     }
 

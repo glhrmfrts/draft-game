@@ -37,16 +37,18 @@ struct platform_api
     platform_get_milliseconds_func *GetMilliseconds;
 };
 
-#define GAME_INIT(name) void name(game_main *Game)
-#define GAME_RENDER(name) void name(game_main *Game, float DeltaTime)
-#define GAME_DESTROY(name) void name(game_main *Game)
-#define GAME_PROCESS_EVENT(name) void name(game_main *Game, SDL_Event *Event)
+#define GAME_INIT(name) void name(game_main *game)
+#define GAME_UPDATE(name) void name(game_main *game, float dt)
+#define GAME_RENDER(name) void name(game_main *game, float dt)
+#define GAME_DESTROY(name) void name(game_main *game)
+#define GAME_PROCESS_EVENT(name) void name(game_main *game, SDL_Event *event)
 
 struct game_main;
 
 extern "C"
 {
 	typedef GAME_INIT(game_init_func);
+    typedef GAME_UPDATE(game_update_func);
 	typedef GAME_RENDER(game_render_func);
 	typedef GAME_DESTROY(game_destroy_func);
 	typedef GAME_PROCESS_EVENT(game_process_event_func);

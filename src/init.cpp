@@ -12,7 +12,7 @@ void RegisterInputActions(game_input &input)
     input.Actions[Action_select] = action_state{ SDL_SCANCODE_RETURN, 0, 0, 0, Axis_Invalid, XboxButton_A };
 }
 
-void InitLoadingScreen(game_main *Game)
+static void InitLoadingScreen(game_main *Game)
 {
     Game->State = GameState_LoadingScreen;
     InitAssetLoader(Game->AssetLoader, Game->Platform);
@@ -33,7 +33,15 @@ void InitLoadingScreen(game_main *Game)
 
 typedef void init_func(game_main *Game);
 
-void RenderLoadingScreen(game_main *Game, float DeltaTime, init_func *NextModeInit)
+static void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
+{
+    if (Update(g->AssetLoader))
+    {
+        nextModeInit(g);
+    }
+}
+
+static void RenderLoadingScreen(game_main *Game, float DeltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -50,9 +58,4 @@ void RenderLoadingScreen(game_main *Game, float DeltaTime, init_func *NextModeIn
     DrawRect(g, rect{ x, y, Width, Height }, Color_white, GL_LINE_LOOP);
     DrawRect(g, rect{ x + 5, y + 5, ProgressBarWidth - 10, Height - 10 }, Color_white);
     End(g);
-
-    if (Update(Game->AssetLoader))
-    {
-        NextModeInit(Game);
-    }
 }

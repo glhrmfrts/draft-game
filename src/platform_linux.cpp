@@ -18,6 +18,7 @@ struct game_library
     uint64                  LoadTime;
     const char              *Path;
     game_init_func          *GameInit;
+    game_update_func        *GameUpdate;
     game_render_func        *GameRender;
     game_destroy_func       *GameDestroy;
     game_process_event_func *GameProcessEvent;
@@ -66,6 +67,7 @@ void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)dlsym(Lib.Library, "GameInit");
+        Lib.GameUpdate = (game_update_func *)dlsym(Lib.Library, "GameUpdate");
         Lib.GameRender = (game_render_func *)dlsym(Lib.Library, "GameRender");
         Lib.GameDestroy = (game_destroy_func *)dlsym(Lib.Library, "GameDestroy");
         Lib.GameProcessEvent = (game_process_event_func *)dlsym(Lib.Library, "GameProcessEvent");

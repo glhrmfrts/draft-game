@@ -440,12 +440,10 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
     p->Timer -= dt;
 }
 
-static void RenderLevel(game_main *g, float dt)
+static void UpdateLevel(game_main *g, float dt)
 {
     auto l = &g->LevelState;
     auto &updateTime = g->UpdateTime;
-    auto &renderTime = g->RenderTime;
-
     auto &world = g->World;
     auto &input = g->Input;
     auto &cam = g->Camera;
@@ -688,11 +686,26 @@ static void RenderLevel(game_main *g, float dt)
     auto playerPosition = playerEntity->Pos();
     alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
     UpdateListener(g->Camera, playerPosition);
-    UpdateProjectionView(g->Camera);
 
+    auto lastText = l->ScoreTextList.back();
+    if (lastText && lastText->TweenValue >= 1.0f)
+    {
+        l->ScoreTextList.pop_back();
+        DestroySequences(g->TweenState, lastText->Sequence, 1);
+        FreeEntryFromData(l->ScoreTextPool, lastText);
+        FreeEntryFromData(l->SequencePool, lastText->Sequence);
+    }
     updateTime.End = g->Platform.GetMilliseconds();
-    renderTime.Begin = g->Platform.GetMilliseconds();
+}
 
+static void RenderLevel(game_main *g, float dt)
+{
+    auto l = &g->LevelState;
+    auto &renderTime = g->RenderTime;
+    auto &world = g->World;
+
+    renderTime.Begin = g->Platform.GetMilliseconds();
+    UpdateProjectionView(g->Camera);
     PostProcessBegin(g->RenderState);
     RenderBegin(g->RenderState, dt);
     RenderEntityWorld(g->RenderState, g->World, dt);
@@ -723,15 +736,6 @@ static void RenderLevel(game_main *g, float dt)
     }
     End(g->GUI);
     PostProcessEnd(g->RenderState);
-
-    auto lastText = l->ScoreTextList.back();
-    if (lastText && lastText->TweenValue >= 1.0f)
-    {
-        l->ScoreTextList.pop_back();
-        DestroySequences(g->TweenState, lastText->Sequence, 1);
-        FreeEntryFromData(l->ScoreTextPool, lastText);
-        FreeEntryFromData(l->SequencePool, lastText->Sequence);
-    }
 
     Begin(g->GUI, g->GUICamera);
     DrawRect(g->GUI, rect{20,20,200,20},

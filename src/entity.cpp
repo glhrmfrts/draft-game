@@ -495,7 +495,7 @@ void RemoveEntity(entity_world &world, entity *ent)
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
 
-void UpdateLogiclessEntities(entity_world &world, float dt)
+static void UpdateLogiclessEntities(entity_world &world, float dt)
 {
     for (auto ent : world.RemoveOffscreenEntities)
     {
@@ -520,10 +520,6 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 
         ent->Transform.Rotation += ent->FrameRotation->Rotation * dt;
     }
-}
-
-void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
-{
     static vec3 PointCache[TrailCount*4];
     for (auto ent : world.TrailEntities)
     {
@@ -604,9 +600,6 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
             vec3 *p = PointCache + i*4 + 2;
             AddLine(m.Buffer, *p++, *p++);
         }
-        UploadVertices(m.Buffer, 0, m.Buffer.VertexCount);
-
-        DrawModel(rs, tr->Model, transform{});
     }
 
     for (auto ent : world.ExplosionEntities)
@@ -651,14 +644,22 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
         DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[1], transform{});
 */
     }
+}
 
+static void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
+{
+    for (auto ent : world.TrailEntities)
+    {
+        if (!ent) continue;
+        auto tr = ent->Trail;
+        UploadVertices(tr->Mesh.Buffer, 0, tr->Mesh.Buffer.VertexCount);
+        DrawModel(rs, tr->Model, transform{});
+    }
     for (auto ent : world.ModelEntities)
     {
         if (!ent) continue;
-
         DrawModel(rs, *ent->Model, ent->Transform);
     }
-
     if (world.LastExplosion)
     {
         ApplyExplosionLight(rs, world.LastExplosion->Color);
