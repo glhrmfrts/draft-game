@@ -244,7 +244,7 @@ entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, col
 #define ASTEROID_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_SIZE+sizeof(asteroid))
 static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 {
-    auto result = PushStruct<entity>(alloc);
+    auto result = CreateEntity(alloc);
     result->Model = CreateModel(alloc, astMesh);
     result->Collider = CreateCollider(alloc, ColliderType_Asteroid, vec3(0.5f));
     result->Trail = CreateTrail(alloc, result, ASTEROID_COLOR, 0.5f, true);
