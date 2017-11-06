@@ -43,6 +43,21 @@ struct level_gen_params
     int ReservedLane = NO_RESERVED_LANE;
 };
 
+inline static void Enable(level_gen_params *p)
+{
+    p->Flags |= LevelGenFlag_Enabled;
+}
+
+inline static void Disable(level_gen_params *p)
+{
+    p->Flags &= ~LevelGenFlag_Enabled;
+}
+
+inline static void Randomize(level_gen_params *p)
+{
+    p->Flags |= LevelGenFlag_Randomize;
+}
+
 struct level_score_text
 {
     color Color;

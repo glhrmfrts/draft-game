@@ -151,6 +151,7 @@ struct game_meshes
     mesh *CrystalMesh = NULL;
     mesh *RoadMesh = NULL;
     mesh *AsteroidMesh = NULL;
+    mesh *CheckpointMesh = NULL;
 };
 
 struct profile_time

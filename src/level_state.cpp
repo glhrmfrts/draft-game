@@ -8,6 +8,8 @@
 #define SCORE_TEXT_MISS    "MISS"
 #define SCORE_TEXT_CRYSTAL "CRYSTAL"
 
+#define GEN_PLAYER_OFFSET 200
+
 struct audio_source
 {
     ALuint Source;
@@ -65,12 +67,12 @@ LEVEL_GEN_FUNC(GenerateCrystal)
     int lane = GetNextSpawnLane(l);
     auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g));
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z + 0.4f;
     ent->Scl().x = 0.3f;
     ent->Scl().y = 0.3f;
     ent->Scl().z = 0.5f;
-    ent->Vel().y = PLAYER_MIN_VEL * 0.5f;
+    ent->Vel().y = PLAYER_MIN_VEL * 0.2f;
     AddEntity(g->World, ent);
 }
 
@@ -82,7 +84,7 @@ LEVEL_GEN_FUNC(GenerateShip)
     auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, colorIndex);
     ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = colorIndex;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
@@ -95,7 +97,7 @@ LEVEL_GEN_FUNC(GenerateRedShip)
     auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, SHIP_RED);
     int lane = p->ReservedLane;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + 200;
+    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = SHIP_RED;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
@@ -171,8 +173,8 @@ static void AddScoreText(game_main *g, level_state *l, const char *text, int sco
     screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);
 
     float offsetX = GetRealPixels(g, 100.0f);
-    float minOffsetY = GetRealPixels(g, 50.0f);
-    float maxOffsetY = GetRealPixels(g, 250.0f);
+    float minOffsetY = GetRealPixels(g, 200.0f);
+    float maxOffsetY = GetRealPixels(g, 300.0f);
     vec2 targetPos = vec2{RandomBetween(l->Entropy, -offsetX, offsetX),
                           RandomBetween(l->Entropy, -minOffsetY, -maxOffsetY)};
     auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
@@ -462,6 +464,84 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
     p->Timer -= dt;
 }
 
+static void SpawnCheckpoint(game_main *g, level_state *l)
+{
+    auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g));
+    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Pos().z = SHIP_Z * 0.5f;
+    AddFlags(ent, EntityFlag_RemoveOffscreen);
+    AddEntity(g->World, ent);
+}
+
+static void UpdateClassicMode(game_main *g, level_state *l, int state)
+{
+    auto crystals = l->GenParams + LevelGenType_Crystal;
+    auto ships = l->GenParams + LevelGenType_Ship;
+    auto redShips = l->GenParams + LevelGenType_RedShip;
+    auto asteroids = l->GenParams + LevelGenType_Asteroid;
+    switch (state)
+    {
+    case 0:
+    {
+        Enable(crystals);
+        Randomize(crystals);
+        break;
+    }
+
+    case 2:
+    {
+        Disable(crystals);
+
+        static bool cp = false;
+        if (!cp)
+        {
+            cp = true;
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 3:
+        Enable(ships);
+        break;
+
+    case 6:
+    {
+        Disable(ships);
+        ResetGen(ships);
+        static bool cp = false;
+        if (!cp)
+        {
+            cp = true;
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 7:
+        Enable(redShips);
+        break;
+
+    case 9:
+    {
+        Disable(redShips);
+
+        static bool cp = false;
+        if (!cp)
+        {
+            cp = true;
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 10:
+        Enable(ships);
+        Enable(redShips);
+        break;
+    }
+}
+
 static void UpdateLevel(game_main *g, float dt)
 {
     auto l = &g->LevelState;
@@ -507,31 +587,7 @@ static void UpdateLevel(game_main *g, float dt)
 
     // we have a different state each 10 seconds elapsed
     int state = int(std::floor(l->TimeElapsed / 10.0f));
-    auto crystals = l->GenParams + LevelGenType_Crystal;
-    auto ships = l->GenParams + LevelGenType_Ship;
-    auto redShips = l->GenParams + LevelGenType_RedShip;
-    auto asteroids = l->GenParams + LevelGenType_Asteroid;
-    switch (state)
-    {
-    case 0:
-        crystals->Flags |= LevelGenFlag_Enabled | LevelGenFlag_Randomize;
-        //asteroids->Flags |= LevelGenFlag_Enabled;
-        break;
-
-    case 1:
-        ships->Flags |= LevelGenFlag_Enabled;
-        break;
-
-    case 6:
-        ships->Flags &= ~LevelGenFlag_Enabled;
-        ResetGen(ships);
-        redShips->Flags |= LevelGenFlag_Enabled;
-        break;
-
-    case 8:
-        ships->Flags |= LevelGenFlag_Enabled;
-        break;
-    }
+    UpdateClassicMode(g, l, state);
     for (int i = 0; i < LevelGenType_MAX; i++)
     {
         UpdateGen(g, l, l->GenParams + i, dt);
@@ -569,10 +625,20 @@ static void UpdateLevel(game_main *g, float dt)
             l->Score += SCORE_DRAFT;
             l->CurrentDraftTime = 0.0f;
             l->DraftActive = true;
-            l->DraftTarget->Ship->HasBeenDrafted = true;
+            if (l->DraftTarget->Checkpoint)
+            {
+                if (l->DraftTarget->Checkpoint->State == CheckpointState_Initial)
+                {
+                    l->DraftTarget->Checkpoint->State = CheckpointState_Drafted;
+                }
+                l->DraftTarget = NULL;
+            }
+            else if (l->DraftTarget->Ship)
+            {
+                l->DraftTarget->Ship->HasBeenDrafted = true;
+                AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
+            }
             ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
-
-            AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
         }
 
         l->PlayerLaneIndex = int(nearestLane)+2;
@@ -707,6 +773,63 @@ static void UpdateLevel(game_main *g, float dt)
                 AddEntity(g->World, exp);
             }
         }
+    }
+    for (auto ent : world.CheckpointEntities)
+    {
+        if (!ent) continue;
+
+        auto cp = ent->Checkpoint;
+        switch (cp->State)
+        {
+        case CheckpointState_Initial:
+            if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
+            {
+                ent->Vel().y = g->PlayerEntity->Vel().y * 0.2f;
+            }
+            else
+            {
+                ent->Vel().y = g->PlayerEntity->Vel().y * 0.5f;
+            }
+            break;
+
+        case CheckpointState_Drafted:
+            if (ent->Pos().y < g->PlayerEntity->Pos().y)
+            {
+                cp->State = CheckpointState_Active;
+                for (auto &material : ent->Model->Materials)
+                {
+                    material->Emission = 1.0f;
+                    material->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
+                }
+            }
+            break;
+
+        case CheckpointState_Active:
+        {
+            ent->Vel().y = g->PlayerEntity->Vel().y * 2.0f;
+            if (cp->Timer >= CHECKPOINT_FADE_OUT_DURATION)
+            {
+                RemoveEntity(g->World, ent);
+            }
+            else
+            {
+                float alpha = CHECKPOINT_FADE_OUT_DURATION - cp->Timer;
+                for (auto &material : ent->Model->Materials)
+                {
+                    material->DiffuseColor.a = alpha;
+                }
+                for (auto &meshPart : ent->Trail->Mesh.Parts)
+                {
+                    meshPart.Material.DiffuseColor.a = alpha;
+                }
+            }
+
+            cp->Timer += dt;
+            break;
+        }
+        }
+
+        ent->Pos().y += ent->Vel().y * dt;
     }
 
     auto playerPosition = playerEntity->Pos();

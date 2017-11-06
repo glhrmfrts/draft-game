@@ -253,6 +253,19 @@ static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
     return result;
 }
 
+#define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(checkpoint)+TRAIL_SIZE+(sizeof(material)*2))
+static entity *CreateCheckpointEntity(allocator *alloc, mesh *checkpointMesh)
+{
+    auto result = CreateEntity(alloc);
+    result->Model = CreateModel(alloc, checkpointMesh);
+    result->Model->Materials.push_back(CreateMaterial(alloc, CHECKPOINT_COLOR, 0.0f, 0.0f, NULL));
+    result->Model->Materials.push_back(CreateMaterial(alloc, CHECKPOINT_OUTLINE_COLOR, 1.0f, 0.0f, NULL));
+    result->Checkpoint = PushStruct<checkpoint>(alloc);
+    result->Trail = CreateTrail(alloc, result, CHECKPOINT_OUTLINE_COLOR, ROAD_LANE_COUNT);
+    result->SetScl(vec3{ROAD_LANE_COUNT, 1.0f, ROAD_LANE_COUNT*2});
+    return result;
+}
+
 static float Interp(float c, float t, float a, float dt)
 {
     if (c == t)
@@ -331,6 +344,7 @@ void InitEntityWorld(entity_world &world)
     world.PowerupPool.ElemSize = POWERUP_ENTITY_SIZE;
     world.ExplosionPool.ElemSize = EXPLOSION_ENTITY_SIZE;
     world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
+    world.CheckpointPool.ElemSize = CHECKPOINT_ENTITY_SIZE;
 
 #ifdef DRAFT_DEBUG
     world.ShipPool.DEBUGName = "ShipPool";
@@ -338,6 +352,7 @@ void InitEntityWorld(entity_world &world)
     world.PowerupPool.DEBUGName = "PowerupPool";
     world.ExplosionPool.DEBUGName = "ExplosionPool";
     world.AsteroidPool.DEBUGName = "AsteroidPool";
+    world.CheckpointPool.DEBUGName = "CheckpointPool";
 #endif
 }
 
@@ -413,6 +428,10 @@ void AddEntity(entity_world &world, entity *ent)
     if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
     {
         AddEntityToList(world.AsteroidEntities, ent);
+    }
+    if (ent->Checkpoint)
+    {
+        AddEntityToList(world.CheckpointEntities, ent);
     }
     world.NumEntities++;
 }
@@ -491,7 +510,13 @@ void RemoveEntity(entity_world &world, entity *ent)
     }
     if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
     {
+        RemoveEntityFromList(world.AsteroidEntities, ent);
         FreeEntry(world.AsteroidPool, ent->PoolEntry);
+    }
+    if (ent->Checkpoint)
+    {
+        RemoveEntityFromList(world.CheckpointEntities, ent);
+        FreeEntry(world.CheckpointPool, ent->PoolEntry);
     }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
@@ -549,7 +574,7 @@ static void UpdateLogiclessEntities(entity_world &world, float dt)
         // First store the quads, then the lines
         for (int i = 0; i < TRAIL_COUNT; i++)
         {
-            auto *pieceEntity = tr->Entities + i;
+            auto pieceEntity = tr->Entities + i;
             vec3 c1 = pieceEntity->Transform.Position;
             vec3 c2;
             if (i == TRAIL_COUNT - 1)
@@ -561,10 +586,10 @@ static void UpdateLogiclessEntities(entity_world &world, float dt)
                 c2 = tr->Entities[i + 1].Transform.Position;
             }
 
-            float CurrentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
+            float currentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
             if (i == 0)
             {
-                c1 -= (c2 - c1) * CurrentTrailTime;
+                c1 -= (c2 - c1) * currentTrailTime;
             }
 
             float r = tr->Radius;
@@ -575,8 +600,8 @@ static void UpdateLogiclessEntities(entity_world &world, float dt)
             vec3 p2 = c2 + vec3(r - min2, 0, 0);
             vec3 p3 = c1 - vec3(r - min1, 0, 0);
             vec3 p4 = c1 + vec3(r - min1, 0, 0);
-            color cl2 = color{ 1, 1, 1, 1.0f - min2 * 2 };
-            color cl1 = color{ 1, 1, 1, 1.0f - min1 * 2 };
+            color cl2 = color{ 1, 1, 1, 1.0f - (min2/tr->Radius) };
+            color cl1 = color{ 1, 1, 1, 1.0f - (min1/tr->Radius) };
             AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
 
             const float lo = 0.05f;

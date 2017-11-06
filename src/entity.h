@@ -47,6 +47,20 @@ struct asteroid
     bool Exploded = false;
 };
 
+enum checkpoint_state
+{
+    CheckpointState_Initial,
+    CheckpointState_Drafted,
+    CheckpointState_Active,
+};
+
+#define CHECKPOINT_FADE_OUT_DURATION 1.0f
+struct checkpoint
+{
+    float Timer = 0;
+    checkpoint_state State = CheckpointState_Initial;
+};
+
 struct explosion;
 struct trail;
 struct trail_piece;
@@ -76,6 +90,7 @@ struct entity
     memory_pool_entry *PoolEntry = NULL;
 
     // entity components
+    checkpoint *Checkpoint = NULL;
     asteroid *Asteroid = NULL;
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
@@ -135,7 +150,9 @@ struct entity_world
     memory_pool ExplosionPool;
     memory_pool PowerupPool;
     memory_pool AsteroidPool;
+    memory_pool CheckpointPool;
 
+    std::vector<entity *> CheckpointEntities;
     std::vector<entity *> AsteroidEntities;
     std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;

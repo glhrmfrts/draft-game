@@ -154,7 +154,9 @@ mesh *GetFloorMesh(game_main *Game)
     return m.FloorMesh = FloorMesh;
 }
 
+#define ROAD_LANE_WIDTH 2
 #define ROAD_LANE_COUNT 5
+
 mesh *GetRoadMesh(game_main *Game)
 {
     auto &m = Game->Meshes;
@@ -273,6 +275,28 @@ mesh *GetAsteroidMesh(game_main *game)
     AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 0.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
     EndMesh(astMesh, GL_STATIC_DRAW);
     return m.AsteroidMesh = astMesh;
+}
+
+#define CHECKPOINT_COLOR         IntColor(FirstPalette.Colors[3], 0.5f)
+#define CHECKPOINT_OUTLINE_COLOR IntColor(ShipPalette.Colors[SHIP_BLUE])
+
+mesh *GetCheckpointMesh(game_main *game)
+{
+    auto &m = game->Meshes;
+    if (m.CheckpointMesh)
+    {
+        return m.CheckpointMesh;
+    }
+
+    auto cpMesh = PushStruct<mesh>(game->Arena);
+    InitMeshBuffer(cpMesh->Buffer);
+    PushVertex(cpMesh->Buffer, mesh_vertex{vec3{-1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
+    PushVertex(cpMesh->Buffer, mesh_vertex{vec3{1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
+    PushVertex(cpMesh->Buffer, mesh_vertex{vec3{0.0f, 0.0f, 1.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
+    AddPart(cpMesh, mesh_part{material{CHECKPOINT_COLOR, 0.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_TRIANGLES});
+    AddPart(cpMesh, mesh_part{material{CHECKPOINT_OUTLINE_COLOR, 1.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_LINE_LOOP});
+    EndMesh(cpMesh, GL_STATIC_DRAW);
+    return m.CheckpointMesh = cpMesh;
 }
 
 #define WALL_HEIGHT 2.0f

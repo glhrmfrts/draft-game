@@ -1,6 +1,5 @@
 // Copyright
 
-#define ROAD_LANE_WIDTH   2
 #define LEVEL_PLANE_COUNT 5
 #define SHIP_Z            0.2f
 
