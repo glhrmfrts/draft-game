@@ -108,10 +108,10 @@ struct explosion
     entity Entities[EXPLOSION_PARTS_COUNT];
 };
 
-#define TrailCount 16
+#define TRAIL_COUNT 24
 struct trail
 {
-    entity Entities[TrailCount];
+    entity Entities[TRAIL_COUNT];
     mesh Mesh;
     model Model;
     float Timer = 0;

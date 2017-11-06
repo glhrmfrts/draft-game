@@ -79,7 +79,7 @@ LEVEL_GEN_FUNC(GenerateShip)
     int colorIndex = GetNextShipColor(l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
     int lane = GetNextSpawnLane(l, true);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, colorIndex);
     ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->PlayerEntity->Pos().y + 200;
@@ -91,13 +91,13 @@ LEVEL_GEN_FUNC(GenerateShip)
 
 LEVEL_GEN_FUNC(GenerateRedShip)
 {
-    color c = IntColor(ShipPalette.Colors[2]);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false);
+    color c = IntColor(ShipPalette.Colors[SHIP_RED]);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, SHIP_RED);
     int lane = p->ReservedLane;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->PlayerEntity->Pos().y + 200;
     ent->Pos().z = SHIP_Z;
-    ent->Ship->ColorIndex = 2;
+    ent->Ship->ColorIndex = SHIP_RED;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
 }
@@ -170,16 +170,29 @@ static void AddScoreText(game_main *g, level_state *l, const char *text, int sco
     screenPos.x = (g->Width/2) * screenPos.x + (g->Width/2);
     screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);
 
+    float offsetX = GetRealPixels(g, 100.0f);
+    float minOffsetY = GetRealPixels(g, 50.0f);
+    float maxOffsetY = GetRealPixels(g, 250.0f);
+    vec2 targetPos = vec2{RandomBetween(l->Entropy, -offsetX, offsetX),
+                          RandomBetween(l->Entropy, -minOffsetY, -maxOffsetY)};
     auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
     auto scoreText = PushStruct<level_score_text>(GetEntry(l->ScoreTextPool));
     scoreText->Color = c;
     scoreText->Pos = screenPos;
-    scoreText->TargetPos = screenPos + vec2{20.0f, -100.0f};
+    scoreText->TargetPos = screenPos + targetPos;
     scoreText->Text = text;
     scoreText->Score = score;
     scoreText->Sequence = seq;
-
-    seq->Tweens.push_back(tween{&scoreText->TweenValue, 0.0f, 1.0f, 1, 1.0f, TweenEasing_Linear});
+    seq->Tweens.push_back(tween(&scoreText->TweenPosValue)
+                          .SetFrom(0.0f)
+                          .SetTo(1.0f)
+                          .SetDuration(1.0f)
+                          .SetEasing(TweenEasing_Linear));
+    seq->Tweens.push_back(tween(&scoreText->TweenAlphaValue)
+                          .SetFrom(1.0f)
+                          .SetTo(0.0f)
+                          .SetDuration(0.5f)
+                          .SetEasing(TweenEasing_Linear));
     AddSequences(g->TweenState, seq, 1);
     PlaySequence(g->TweenState, seq, true);
     l->ScoreTextList.push_back(scoreText);
@@ -502,7 +515,7 @@ static void UpdateLevel(game_main *g, float dt)
     {
     case 0:
         crystals->Flags |= LevelGenFlag_Enabled | LevelGenFlag_Randomize;
-        asteroids->Flags |= LevelGenFlag_Enabled;
+        //asteroids->Flags |= LevelGenFlag_Enabled;
         break;
 
     case 1:
@@ -700,10 +713,10 @@ static void UpdateLevel(game_main *g, float dt)
     alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
     UpdateListener(g->Camera, playerPosition);
 
-    auto lastText = l->ScoreTextList.back();
-    if (lastText && lastText->TweenValue >= 1.0f)
+    auto lastText = l->ScoreTextList.front();
+    if (lastText && lastText->Sequence->Complete)
     {
-        l->ScoreTextList.pop_back();
+        l->ScoreTextList.pop_front();
         DestroySequences(g->TweenState, lastText->Sequence, 1);
         FreeEntryFromData(l->ScoreTextPool, lastText);
         FreeEntryFromData(l->SequencePool, lastText->Sequence);
@@ -742,9 +755,8 @@ static void RenderLevel(game_main *g, float dt)
     for (auto text : l->ScoreTextList)
     {
         vec2 p = text->Pos;
-        float t = text->TweenValue;
-        text->Color.a = 1.0f - t;
-        p += (text->TargetPos - p) * t;
+        p += (text->TargetPos - p) * text->TweenPosValue;
+        text->Color.a = text->TweenAlphaValue;
         DrawTextCentered(g->GUI, scoreFont, Format(l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
     End(g->GUI);

@@ -52,8 +52,13 @@ static void InitMenu(game_main *g)
         AddEntity(g->World, ent);
     }
 
+    m->SubMenuChangeTimer = 1.0f;
     m->SubMenuChangeSequence.Tweens.push_back(
-        tween{&m->SubMenuChangeTimer, 0.0f, 1.0f, 0.25f, 1.0f, TweenEasing_Linear}
+        tween(&m->SubMenuChangeTimer)
+        .SetFrom(0.0f)
+        .SetTo(1.0f)
+        .SetDuration(0.25f)
+        .SetEasing(TweenEasing_Linear)
     );
     AddSequences(g->TweenState, &m->SubMenuChangeSequence, 1);
 
@@ -120,22 +125,6 @@ static struct
      }
     },
 };
-static menu_item backItem = {"BACK", MenuItemType_Text};
-static color textColor = Color_white;
-static color textSelectedColor = IntColor(FirstPalette.Colors[3]);
-
-static void DrawSubMenu(game_main *g, bitmap_font *font, menu_item &item, float baseY, float width, float height, bool selected = false, float changeTimer = 0.0f)
-{
-    float textPadding = GetRealPixels(g, 10.0f);
-    color bgColor = IntColor(FirstPalette.Colors[2], 0.5f);
-    color bgSelectedColor = IntColor(FirstPalette.Colors[3], 1.0f);
-    if (selected)
-    {
-        bgColor = Lerp(bgColor, changeTimer, bgSelectedColor);
-    }
-    DrawRect(g->GUI, rect{0,baseY,width,height}, bgColor);
-    DrawText(g->GUI, font, item.Text, rect{textPadding,baseY + textPadding,0,0}, textColor);
-}
 
 static void UpdateMenu(game_main *g, float dt)
 {
@@ -204,6 +193,23 @@ static void UpdateMenu(game_main *g, float dt)
     }
 }
 
+static menu_item backItem = {"BACK", MenuItemType_Text};
+static color textColor = Color_white;
+static color textSelectedColor = IntColor(ShipPalette.Colors[SHIP_ORANGE]);
+
+static void DrawSubMenu(game_main *g, bitmap_font *font, menu_item &item,
+                        float centerX, float baseY, bool selected = false,
+                        float changeTimer = 0.0f)
+{
+    float textPadding = GetRealPixels(g, 10.0f);
+    color col = textColor;
+    if (selected)
+    {
+        col = Lerp(col, changeTimer, textSelectedColor);
+    }
+    DrawTextCentered(g->GUI, font, item.Text, rect{centerX,baseY + textPadding,0,0}, col);
+}
+
 static void RenderMenu(game_main *g, float dt)
 {
     static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
@@ -235,25 +241,27 @@ static void RenderMenu(game_main *g, float dt)
     else
     {
         auto &subMenu = subMenus[m->SelectedMainMenu];
-        float width = g->Width*0.33f;
-        float height = g->Height*0.075f;
-        float baseY = 660.0f;
         auto &item = mainMenuTexts[m->SelectedMainMenu];
-        DrawText(g->GUI, mainMenuFont, item.Text, GetRealPixels(g, rect{10,660,0,0}), textColor);
-        DrawLine(g->GUI, vec2{0,GetRealPixels(g,650.0f)}, vec2{width,GetRealPixels(g,650.0f)}, textColor);
+        float halfX = g->Width*0.5f;
+        float halfY = g->Height*0.5f;
+        float baseY = 660.0f;
+        float lineWidth = g->Width*0.75f;
+        DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f});
+        DrawTextCentered(g->GUI, mainMenuFont, item.Text, rect{halfX, GetRealPixels(g, baseY), 0, 0}, textColor);
+        DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, textColor);
 
+        float height = g->Height*0.05f;
         baseY = GetRealPixels(g, baseY);
-        baseY -= height + GetRealPixels(g, 20.0f);
+        baseY -= height + GetRealPixels(g, 40.0f);
         for (int i = 0; i < subMenu.NumItems; i++)
         {
             auto &item = subMenu.Items[i];
             bool selected = (i == subMenu.HotItem);
-            DrawSubMenu(g, subMenuFont, item, baseY, width, height, selected, m->SubMenuChangeTimer);
-
+            DrawSubMenu(g, subMenuFont, item, halfX, baseY, selected, m->SubMenuChangeTimer);
             baseY -= height + GetRealPixels(g, 10.0f);
         }
         bool backSelected = subMenu.HotItem == subMenu.NumItems;
-        DrawSubMenu(g, subMenuFont, backItem, baseY, width, height, backSelected, m->SubMenuChangeTimer);
+        DrawSubMenu(g, subMenuFont, backItem, halfX, baseY, backSelected, m->SubMenuChangeTimer);
     }
     End(g->GUI);
 }

@@ -44,6 +44,7 @@ void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = false)
 {
     if (!seq->Active)
     {
+        seq->Complete = false;
         seq->Active = true;
     }
     if (reset)
@@ -74,6 +75,7 @@ void Update(tween_state &state, float delta)
                     seq->CurrentTween = 0;
                     if (!seq->Loop)
                     {
+                        seq->Complete = true;
                         seq->Active = false;
                     }
                 }

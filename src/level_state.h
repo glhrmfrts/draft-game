@@ -49,7 +49,8 @@ struct level_score_text
     vec2 Pos;
     vec2 TargetPos;
     tween_sequence *Sequence;
-    float TweenValue = 0;
+    float TweenPosValue = 0;
+    float TweenAlphaValue = 0;
     const char *Text;
     int Score = 0;
 };

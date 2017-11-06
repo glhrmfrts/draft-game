@@ -18,6 +18,32 @@ struct tween
     float Duration = 0;
     float Timer = 0;
     tween_easing Easing = TweenEasing_Linear;
+
+    tween(float *v) : Value(v) {}
+
+    inline tween &SetFrom(float f)
+    {
+        From = f;
+        return *this;
+    }
+
+    inline tween &SetTo(float t)
+    {
+        To = t;
+        return *this;
+    }
+
+    inline tween &SetDuration(float d)
+    {
+        Duration = d;
+        return *this;
+    }
+
+    inline tween &SetEasing(tween_easing e)
+    {
+        Easing = e;
+        return *this;
+    }
 };
 
 struct tween_sequence
@@ -25,6 +51,7 @@ struct tween_sequence
     std::vector<tween> Tweens;
     int CurrentTween = 0;
     int ID = -1;
+    bool Complete = false;
     bool Active = false;
     bool Loop = false;
 };
