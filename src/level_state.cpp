@@ -10,6 +10,15 @@
 
 #define GEN_PLAYER_OFFSET 200
 
+#define SPAWN_CHECKPOINT_ONCE(g, l) { \
+        static bool cp = false; \
+        if (!cp) \
+        { \
+            cp = true; \
+            SpawnCheckpoint(g, l); \
+        } \
+    } \
+
 struct audio_source
 {
     ALuint Source;
@@ -467,79 +476,48 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
 static void SpawnCheckpoint(game_main *g, level_state *l)
 {
     auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g));
-    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2;
     ent->Pos().z = SHIP_Z * 0.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
 }
 
-static void UpdateClassicMode(game_main *g, level_state *l, int state)
+#define FrameSeconds(s) (s * 60)
+
+static void UpdateClassicMode(game_main *g, level_state *l)
 {
     auto crystals = l->GenParams + LevelGenType_Crystal;
     auto ships = l->GenParams + LevelGenType_Ship;
     auto redShips = l->GenParams + LevelGenType_RedShip;
     auto asteroids = l->GenParams + LevelGenType_Asteroid;
-    switch (state)
+    int frame = l->CurrentCheckpointFrame;
+    switch (l->CheckpointNum)
     {
     case 0:
     {
-        Enable(crystals);
-        Randomize(crystals);
-        break;
-    }
-
-    case 2:
-    {
-        Disable(crystals);
-
-        static bool cp = false;
-        if (!cp)
+        if (frame == 0)
         {
-            cp = true;
+            Enable(crystals);
+            Randomize(crystals);
+        }
+        if (frame == FrameSeconds(20))
+        {
+            Disable(crystals);
+        }
+        if (frame == FrameSeconds(21))
+        {
             SpawnCheckpoint(g, l);
         }
         break;
     }
 
-    case 3:
+    case 1:
+    {
         Enable(ships);
         break;
-
-    case 6:
-    {
-        Disable(ships);
-        ResetGen(ships);
-        static bool cp = false;
-        if (!cp)
-        {
-            cp = true;
-            SpawnCheckpoint(g, l);
-        }
-        break;
     }
-
-    case 7:
-        Enable(redShips);
-        break;
-
-    case 9:
-    {
-        Disable(redShips);
-
-        static bool cp = false;
-        if (!cp)
-        {
-            cp = true;
-            SpawnCheckpoint(g, l);
-        }
-        break;
     }
-
-    case 10:
-        Enable(ships);
-        Enable(redShips);
-        break;
-    }
+    l->CurrentCheckpointFrame++;
 }
 
 static void UpdateLevel(game_main *g, float dt)
@@ -585,9 +563,7 @@ static void UpdateLevel(game_main *g, float dt)
         AddEntity(world, exp);
     }
 
-    // we have a different state each 10 seconds elapsed
-    int state = int(std::floor(l->TimeElapsed / 10.0f));
-    UpdateClassicMode(g, l, state);
+    UpdateClassicMode(g, l);
     for (int i = 0; i < LevelGenType_MAX; i++)
     {
         UpdateGen(g, l, l->GenParams + i, dt);
@@ -788,7 +764,7 @@ static void UpdateLevel(game_main *g, float dt)
             }
             else
             {
-                ent->Vel().y = g->PlayerEntity->Vel().y * 0.5f;
+                ent->Vel().y = g->PlayerEntity->Vel().y * 0.8f;
             }
             break;
 
@@ -801,6 +777,9 @@ static void UpdateLevel(game_main *g, float dt)
                     material->Emission = 1.0f;
                     material->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
                 }
+
+                l->CheckpointNum++;
+                l->CurrentCheckpointFrame = 0;
             }
             break;
 

@@ -85,7 +85,9 @@ struct level_state
 
     std::vector<collision_result> CollisionCache;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
-    float TimeElapsed = 0.0f;
+    float TimeElapsed = 0;
+    int CurrentCheckpointFrame = 0;
+    int CheckpointNum = 0;
     int PlayerLaneIndex = 0;
 
     entity *DraftTarget;
