@@ -12,6 +12,8 @@ struct audio_source;
 
 #define NO_RESERVED_LANE 500
 
+#define MAX_INTRO_TEXTS  8
+
 // entity generation flags
 #define LevelGenFlag_Enabled         (1 << 0)
 #define LevelGenFlag_Randomize       (1 << 1)
@@ -70,6 +72,15 @@ struct level_score_text
     int Score = 0;
 };
 
+struct level_intro_text
+{
+    color Color;
+    vec2 Pos;
+    const char *Text;
+    tween_sequence *Sequence = NULL;
+    tween_sequence *PosSequence = NULL;
+};
+
 struct level_state
 {
     memory_arena Arena;
@@ -80,6 +91,7 @@ struct level_state
 
     generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;
+    generic_pool<level_intro_text> IntroTextPool;
 
     level_gen_params GenParams[LevelGenType_MAX];
 
@@ -99,6 +111,7 @@ struct level_state
     string_format ScoreNumberFormat;
     int Score = 0;
     std::list<level_score_text *> ScoreTextList;
+    std::list<level_intro_text *> IntroTextList;
 };
 
 static void InitLevel(game_main *g);

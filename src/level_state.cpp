@@ -174,6 +174,47 @@ static void DebugReset(game_main *g)
 {
 }
 
+static void AddIntroText(game_main *g, level_state *l, const char *text, color c)
+{
+    auto introText = PushStruct<level_intro_text>(GetEntry(l->IntroTextPool));
+    introText->Color = color{c.r, c.g, c.b, 0.0f};
+    introText->Text = text;
+    introText->Pos = vec2{g->Width*0.5f, g->Height*0.75f};
+
+    auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+    if (l->IntroTextList.size() > 0)
+    {
+        for (auto ctext : l->IntroTextList)
+        {
+            auto cseq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+            cseq->Tweens.push_back(tween(&ctext->Pos.y)
+                                   .SetFrom(ctext->Pos.y)
+                                   .SetTo(ctext->Pos.y - GetRealPixels(g, 40.0f))
+                                   .SetDuration(0.5f));
+
+            ctext->PosSequence = cseq;
+            AddSequences(g->TweenState, cseq, 1);
+            PlaySequence(g->TweenState, cseq, true);
+        }
+        seq->Tweens.push_back(WaitTween(0.5f));
+    }
+
+    auto twn = tween(&introText->Color.a)
+        .SetFrom(0.0f)
+        .SetTo(1.0f)
+        .SetDuration(1.0f)
+        .SetEasing(TweenEasing_Linear);
+    seq->Tweens.push_back(twn);
+    seq->Tweens.push_back(WaitTween(3.0f));
+    seq->Tweens.push_back(ReverseTween(twn));
+
+    introText->Sequence = seq;
+    AddSequences(g->TweenState, seq, 1);
+    PlaySequence(g->TweenState, seq, true);
+
+    l->IntroTextList.push_back(introText);
+}
+
 static void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
     vec4 v = g->Camera.ProjectionView * vec4{pos, 1.0f};
@@ -353,7 +394,7 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
                 shipEntity->Ship->Color,
                 shipEntity->Ship->OutlineColor,
                 vec3{ 0, 1, 1 }
-                );
+            );
             AddEntity(g->World, exp);
             RemoveEntity(g->World, shipEntity);
         }
@@ -497,14 +538,22 @@ static void UpdateClassicMode(game_main *g, level_state *l)
     {
         if (frame == 0)
         {
+            AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
+        }
+        if (frame == FrameSeconds(1))
+        {
+            AddIntroText(g, l, "COLLECT 2", CRYSTAL_COLOR);
+        }
+        if (frame == FrameSeconds(5))
+        {
             Enable(crystals);
             Randomize(crystals);
         }
-        if (frame == FrameSeconds(20))
+        if (frame == FrameSeconds(25))
         {
             Disable(crystals);
         }
-        if (frame == FrameSeconds(21))
+        if (frame == FrameSeconds(26))
         {
             SpawnCheckpoint(g, l);
         }
@@ -815,13 +864,27 @@ static void UpdateLevel(game_main *g, float dt)
     alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
     UpdateListener(g->Camera, playerPosition);
 
-    auto lastText = l->ScoreTextList.front();
-    if (lastText && lastText->Sequence->Complete)
+    auto scoreText = l->ScoreTextList.front();
+    if (scoreText && scoreText->Sequence->Complete)
     {
         l->ScoreTextList.pop_front();
-        DestroySequences(g->TweenState, lastText->Sequence, 1);
-        FreeEntryFromData(l->ScoreTextPool, lastText);
-        FreeEntryFromData(l->SequencePool, lastText->Sequence);
+        DestroySequences(g->TweenState, scoreText->Sequence, 1);
+        FreeEntryFromData(l->SequencePool, scoreText->Sequence);
+        FreeEntryFromData(l->ScoreTextPool, scoreText);
+    }
+
+    auto introText = l->IntroTextList.front();
+    if (introText && introText->Sequence->Complete)
+    {
+        l->IntroTextList.pop_front();
+        DestroySequences(g->TweenState, introText->Sequence, 1);
+        if (introText->PosSequence)
+        {
+            DestroySequences(g->TweenState, introText->PosSequence, 1);
+            FreeEntryFromData(l->SequencePool, introText->PosSequence);
+        }
+        FreeEntryFromData(l->SequencePool, introText->Sequence);
+        FreeEntryFromData(l->IntroTextPool, introText);
     }
     updateTime.End = g->Platform.GetMilliseconds();
 }
@@ -854,6 +917,12 @@ static void RenderLevel(game_main *g, float dt)
     RenderEnd(g->RenderState, g->Camera);
     UpdateProjectionView(g->GUICamera);
     Begin(g->GUI, g->GUICamera, 1.0f);
+    for (auto text : l->IntroTextList)
+    {
+        vec2 p = text->Pos;
+        Println(text->Color.a);
+        DrawTextCentered(g->GUI, scoreFont, text->Text, rect{p.x,p.y,0,0}, text->Color);
+    }
     for (auto text : l->ScoreTextList)
     {
         vec2 p = text->Pos;

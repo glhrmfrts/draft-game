@@ -5,12 +5,12 @@ TWEEN_FUNC(TweenFuncLinear)
     return t;
 }
 
-void InitTweenState(tween_state &state)
+static void InitTweenState(tween_state &state)
 {
     state.Funcs[TweenEasing_Linear] = TweenFuncLinear;
 }
 
-void AddSequences(tween_state &state, tween_sequence *seqs, int count)
+static void AddSequences(tween_state &state, tween_sequence *seqs, int count)
 {
     for (int i = 0; i < count; i++)
     {
@@ -20,7 +20,7 @@ void AddSequences(tween_state &state, tween_sequence *seqs, int count)
     }
 }
 
-void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
+static void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
 {
     for (int i = 0; i < count; i++)
     {
@@ -30,17 +30,17 @@ void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
     }
 }
 
-inline void Clear(tween_state &state)
+inline static void Clear(tween_state &state)
 {
     state.Sequences.clear();
 }
 
-inline void AddTween(tween_sequence *seq, const tween &t)
+inline static void AddTween(tween_sequence *seq, const tween &t)
 {
     seq->Tweens.push_back(t);
 }
 
-void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = false)
+static void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = false)
 {
     if (!seq->Active)
     {
@@ -52,21 +52,27 @@ void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = false)
         for (auto &t : seq->Tweens)
         {
             t.Timer = 0.0f;
-            *t.Value = t.From;
+            if (t.Value != NULL)
+            {
+                *t.Value = t.From;
+            }
         }
     }
 }
 
-void Update(tween_state &state, float delta)
+static void Update(tween_state &state, float delta)
 {
     for (auto seq : state.Sequences)
     {
         if (seq && seq->Active)
         {
             auto &t = seq->Tweens[seq->CurrentTween];
-            float amount = state.Funcs[t.Easing](t.Timer/t.Duration);
-            float dif = t.To - t.From;
-            *t.Value = t.From + dif*amount;
+            if (t.Value != NULL)
+            {
+                float amount = state.Funcs[t.Easing](t.Timer/t.Duration);
+                float dif = t.To - t.From;
+                *t.Value = t.From + dif*amount;
+            }
             if (t.Timer >= t.Duration)
             {
                 seq->CurrentTween++;
@@ -84,4 +90,18 @@ void Update(tween_state &state, float delta)
             t.Timer += delta;
         }
     }
+}
+
+inline static tween WaitTween(float duration)
+{
+    return tween(NULL).SetDuration(duration);
+}
+
+inline static tween ReverseTween(const tween &t)
+{
+    return tween(t.Value)
+        .SetFrom(t.To)
+        .SetTo(t.From)
+        .SetDuration(t.Duration)
+        .SetEasing(t.Easing);
 }
