@@ -45,6 +45,16 @@ struct level_gen_params
     int ReservedLane = NO_RESERVED_LANE;
 };
 
+inline static void AddFlags(level_gen_params *p, uint32 flags)
+{
+    p->Flags |= flags;
+}
+
+inline static void RemoveFlags(level_gen_params *p, uint32 flags)
+{
+    p->Flags &= ~flags;
+}
+
 inline static void Enable(level_gen_params *p)
 {
     p->Flags |= LevelGenFlag_Enabled;
@@ -97,10 +107,12 @@ struct level_state
 
     std::vector<collision_result> CollisionCache;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
+    float Health = 1.0f;
     float TimeElapsed = 0;
     int CurrentCheckpointFrame = 0;
     int CheckpointNum = 0;
     int PlayerLaneIndex = 0;
+    int ForceShipColor = -1;
 
     entity *DraftTarget;
     float CurrentDraftTime = 0;

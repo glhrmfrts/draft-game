@@ -3,6 +3,9 @@
 #define LEVEL_PLANE_COUNT 5
 #define SHIP_Z            0.2f
 
+#define PLAYER_BODY_COLOR     Color_blue
+#define PLAYER_OUTLINE_COLOR  IntColor(FirstPalette.Colors[1])
+
 static void UpdateCameraToPlayer(camera &cam, entity *playerEntity, float dt)
 {
     const float CAMERA_LERP = 10.0f;
@@ -19,7 +22,7 @@ static void InitMenu(game_main *g)
     FreeArena(g->World.Arena);
 
     g->World.Camera = &g->Camera;
-    g->PlayerEntity = CreateShipEntity(&g->World.Arena, GetShipMesh(g), Color_blue, IntColor(FirstPalette.Colors[1]), true);
+    g->PlayerEntity = CreateShipEntity(&g->World.Arena, GetShipMesh(g), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
     g->PlayerEntity->Transform.Position.z = SHIP_Z;
     g->PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
     AddEntity(g->World, g->PlayerEntity);

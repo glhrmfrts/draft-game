@@ -49,13 +49,11 @@ static void PlaySequence(tween_state &state, tween_sequence *seq, bool reset = f
     }
     if (reset)
     {
-        for (auto &t : seq->Tweens)
+        auto &t = seq->Tweens[0];
+        t.Timer = 0.0f;
+        if (t.Value != NULL)
         {
-            t.Timer = 0.0f;
-            if (t.Value != NULL)
-            {
-                *t.Value = t.From;
-            }
+            *t.Value = t.From;
         }
     }
 }

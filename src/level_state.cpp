@@ -63,6 +63,10 @@ static int GetNextShipColor(level_state *l)
 {
     static int lastColor = 0;
     int color = lastColor;
+    if (l->ForceShipColor > -1)
+    {
+        return lastColor = l->ForceShipColor;
+    }
     while (color == lastColor)
     {
         color = RandomBetween(l->Entropy, 0, 1);
@@ -104,7 +108,11 @@ LEVEL_GEN_FUNC(GenerateRedShip)
 {
     color c = IntColor(ShipPalette.Colors[SHIP_RED]);
     auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, SHIP_RED);
-    int lane = p->ReservedLane;
+    int lane = l->PlayerLaneIndex - 2;
+    if (p->Flags & LevelGenFlag_ReserveLane)
+    {
+        lane = p->ReservedLane;
+    }
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
@@ -189,7 +197,7 @@ static void AddIntroText(game_main *g, level_state *l, const char *text, color c
             auto cseq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
             cseq->Tweens.push_back(tween(&ctext->Pos.y)
                                    .SetFrom(ctext->Pos.y)
-                                   .SetTo(ctext->Pos.y - GetRealPixels(g, 40.0f))
+                                   .SetTo(ctext->Pos.y - GetRealPixels(g, 60.0f))
                                    .SetDuration(0.5f));
 
             ctext->PosSequence = cseq;
@@ -235,6 +243,7 @@ static void AddScoreText(game_main *g, level_state *l, const char *text, int sco
     scoreText->Text = text;
     scoreText->Score = score;
     scoreText->Sequence = seq;
+    scoreText->TweenAlphaValue = 1.0f;
     seq->Tweens.push_back(tween(&scoreText->TweenPosValue)
                           .SetFrom(0.0f)
                           .SetTo(1.0f)
@@ -357,6 +366,28 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
             if (otherEntity->Flags & EntityFlag_IsPlayer)
             {
                 otherEntity->Vel().y = std::min(PLAYER_MIN_VEL, otherEntity->Vel().y);
+                //l->Health -= 0.25f;
+
+                auto enemyExp = CreateExplosionEntity(
+                    GetEntry(g->World.ExplosionPool),
+                    entityToExplode->Pos(),
+                    entityToExplode->Vel(),
+                    entityToExplode->Ship->Color,
+                    entityToExplode->Ship->OutlineColor,
+                    vec3{0,1,1}
+                );
+                auto playerExp = CreateExplosionEntity(
+                    GetEntry(g->World.ExplosionPool),
+                    otherEntity->Pos(),
+                    otherEntity->Vel(),
+                    PLAYER_BODY_COLOR,
+                    PLAYER_OUTLINE_COLOR,
+                    vec3{0, 1, 1}
+                );
+                AddEntity(g->World, enemyExp);
+                AddEntity(g->World, playerExp);
+                RemoveEntity(g->World, entityToExplode);
+                return false;
             }
         }
         return false;
@@ -540,10 +571,6 @@ static void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
         }
-        if (frame == FrameSeconds(1))
-        {
-            AddIntroText(g, l, "COLLECT 2", CRYSTAL_COLOR);
-        }
         if (frame == FrameSeconds(5))
         {
             Enable(crystals);
@@ -552,9 +579,6 @@ static void UpdateClassicMode(game_main *g, level_state *l)
         if (frame == FrameSeconds(25))
         {
             Disable(crystals);
-        }
-        if (frame == FrameSeconds(26))
-        {
             SpawnCheckpoint(g, l);
         }
         break;
@@ -562,7 +586,76 @@ static void UpdateClassicMode(game_main *g, level_state *l)
 
     case 1:
     {
-        Enable(ships);
+        if (frame == 0)
+        {
+            AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
+        }
+        if (frame == FrameSeconds(5))
+        {
+            l->ForceShipColor = SHIP_BLUE;
+            Enable(ships);
+        }
+        if (frame == FrameSeconds(40))
+        {
+            Disable(ships);
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 2:
+    {
+        if (frame == 0)
+        {
+            AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+        }
+        if (frame == FrameSeconds(5))
+        {
+            l->ForceShipColor = SHIP_ORANGE;
+            Enable(ships);
+        }
+        if (frame == FrameSeconds(40))
+        {
+            Disable(ships);
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 3:
+    {
+        if (frame == 0)
+        {
+            AddIntroText(g, l, "DODGE", IntColor(ShipPalette.Colors[SHIP_RED]));
+        }
+        if (frame == FrameSeconds(5))
+        {
+            RemoveFlags(redShips, LevelGenFlag_ReserveLane);
+            Enable(redShips);
+        }
+        if (frame == FrameSeconds(25))
+        {
+            Disable(redShips);
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+
+    case 4:
+    {
+        if (frame == 0)
+        {
+            AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
+        }
+        if (frame == FrameSeconds(1))
+        {
+            AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+        }
+        if (frame == FrameSeconds(5))
+        {
+            l->ForceShipColor = -1;
+            Enable(ships);
+        }
         break;
     }
     }
