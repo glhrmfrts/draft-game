@@ -124,55 +124,53 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
 #define LEVEL_PLANE_SIZE  512
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-mesh *GetFloorMesh(game_main *Game)
+mesh *GetFloorMesh(entity_world &w)
 {
-    auto &m = Game->Meshes;
-    if (m.FloorMesh)
+    if (w.FloorMesh)
     {
-        return m.FloorMesh;
+        return w.FloorMesh;
     }
 
-    auto *FloorMesh = PushStruct<mesh>(Game->Arena);
+    auto *FloorMesh = PushStruct<mesh>(w.Arena);
     InitMeshBuffer(FloorMesh->Buffer);
 
     material FloorMaterial = {
         IntColor(SecondPalette.Colors[2]),
         1.0f,
         1,
-        FindTexture(Game->AssetLoader, "grid"),
+        FindTexture(*w.AssetLoader, "grid"),
         0,
         vec2{LEVEL_PLANE_SIZE/16,LEVEL_PLANE_SIZE/16}
     };
 
-    float w = 1.0f;
-    float l = -w/2;
-    float r = w/2;
+    float width = 1.0f;
+    float l = -width/2;
+    float r = width/2;
     AddQuad(FloorMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
     AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh->Buffer.VertexCount, GL_TRIANGLES});
     EndMesh(FloorMesh, GL_STATIC_DRAW);
 
-    return m.FloorMesh = FloorMesh;
+    return w.FloorMesh = FloorMesh;
 }
 
 #define ROAD_LANE_WIDTH 2
 #define ROAD_LANE_COUNT 5
 
-mesh *GetRoadMesh(game_main *Game)
+mesh *GetRoadMesh(entity_world &w)
 {
-    auto &m = Game->Meshes;
-    if (m.RoadMesh)
+    if (w.RoadMesh)
     {
-        return m.RoadMesh;
+        return w.RoadMesh;
     }
 
-    auto *RoadMesh = PushStruct<mesh>(Game->Arena);
+    auto *RoadMesh = PushStruct<mesh>(w.Arena);
     InitMeshBuffer(RoadMesh->Buffer);
 
     material RoadMaterial = {Color_black, 0, 0, NULL, 0, vec2{0, 0}};
     material LaneMaterial = {Color_white, 1.0f, 0, NULL, 0, vec2{0, 0}};
-    float w = 5.0f;
-    float l = -w/2;
-    float r = w/2;
+    float width = 5.0f;
+    float l = -width/2;
+    float r = width/2;
     AddQuad(RoadMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
     AddPart(RoadMesh, {RoadMaterial, 0, RoadMesh->Buffer.VertexCount, GL_TRIANGLES});
     for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
@@ -182,18 +180,17 @@ mesh *GetRoadMesh(game_main *Game)
     AddPart(RoadMesh, {LaneMaterial, 6, RoadMesh->Buffer.VertexCount-6, GL_LINES});
     EndMesh(RoadMesh, GL_STATIC_DRAW);
 
-    return m.RoadMesh = RoadMesh;
+    return w.RoadMesh = RoadMesh;
 }
 
-mesh *GetShipMesh(game_main *Game)
+mesh *GetShipMesh(entity_world &w)
 {
-    auto &m = Game->Meshes;
-    if (m.ShipMesh)
+    if (w.ShipMesh)
     {
-        return m.ShipMesh;
+        return w.ShipMesh;
     }
 
-    auto *ShipMesh = PushStruct<mesh>(Game->Arena);
+    auto *ShipMesh = PushStruct<mesh>(w.Arena);
     float h = 0.5f;
 
     InitMeshBuffer(ShipMesh->Buffer);
@@ -209,18 +206,17 @@ mesh *GetShipMesh(game_main *Game)
 
     EndMesh(ShipMesh, GL_STATIC_DRAW);
 
-    return m.ShipMesh = ShipMesh;
+    return w.ShipMesh = ShipMesh;
 }
 
-mesh *GetCrystalMesh(game_main *Game)
+mesh *GetCrystalMesh(entity_world &w)
 {
-    auto &m = Game->Meshes;
-    if (m.CrystalMesh)
+    if (w.CrystalMesh)
     {
-        return m.CrystalMesh;
+        return w.CrystalMesh;
     }
 
-    auto *CrystalMesh = PushStruct<mesh>(Game->Arena);
+    auto *CrystalMesh = PushStruct<mesh>(w.Arena);
     InitMeshBuffer(CrystalMesh->Buffer);
 
     AddTriangle(CrystalMesh->Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
@@ -236,20 +232,19 @@ mesh *GetCrystalMesh(game_main *Game)
     AddPart(CrystalMesh, mesh_part{ material{ CRYSTAL_COLOR, 1.0f, 0, NULL }, 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
     EndMesh(CrystalMesh, GL_STATIC_DRAW);
 
-    return m.CrystalMesh = CrystalMesh;
+    return w.CrystalMesh = CrystalMesh;
 }
 
 #define ASTEROID_COLOR IntColor(0x00fa4f, 0.5f)
 
-mesh *GetAsteroidMesh(game_main *game)
+mesh *GetAsteroidMesh(entity_world &w)
 {
-    auto &m = game->Meshes;
-    if (m.AsteroidMesh)
+    if (w.AsteroidMesh)
     {
-        return m.AsteroidMesh;
+        return w.AsteroidMesh;
     }
 
-    auto astMesh = PushStruct<mesh>(game->Arena);
+    auto astMesh = PushStruct<mesh>(w.Arena);
     InitMeshBuffer(astMesh->Buffer);
 
     const int p = 8;
@@ -274,21 +269,20 @@ mesh *GetAsteroidMesh(game_main *game)
 
     AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 0.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
     EndMesh(astMesh, GL_STATIC_DRAW);
-    return m.AsteroidMesh = astMesh;
+    return w.AsteroidMesh = astMesh;
 }
 
 #define CHECKPOINT_COLOR         IntColor(FirstPalette.Colors[3], 0.5f)
 #define CHECKPOINT_OUTLINE_COLOR IntColor(ShipPalette.Colors[SHIP_BLUE])
 
-mesh *GetCheckpointMesh(game_main *game)
+mesh *GetCheckpointMesh(entity_world &w)
 {
-    auto &m = game->Meshes;
-    if (m.CheckpointMesh)
+    if (w.CheckpointMesh)
     {
-        return m.CheckpointMesh;
+        return w.CheckpointMesh;
     }
 
-    auto cpMesh = PushStruct<mesh>(game->Arena);
+    auto cpMesh = PushStruct<mesh>(w.Arena);
     InitMeshBuffer(cpMesh->Buffer);
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{-1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
@@ -296,7 +290,25 @@ mesh *GetCheckpointMesh(game_main *game)
     AddPart(cpMesh, mesh_part{material{CHECKPOINT_COLOR, 0.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_TRIANGLES});
     AddPart(cpMesh, mesh_part{material{CHECKPOINT_OUTLINE_COLOR, 1.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_LINE_LOOP});
     EndMesh(cpMesh, GL_STATIC_DRAW);
-    return m.CheckpointMesh = cpMesh;
+    return w.CheckpointMesh = cpMesh;
+}
+
+mesh *GetBackgroundMesh(entity_world &w)
+{
+    if (w.BackgroundMesh)
+    {
+        return w.BackgroundMesh;
+    }
+    
+    auto bgMesh = PushStruct<mesh>(w.Arena);
+    auto mat = material{Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background")};
+    mat.FogWeight = 0.0f;
+    
+    InitMeshBuffer(bgMesh->Buffer);
+    AddQuad(bgMesh->Buffer, vec3{-1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 1.0f}, vec3{-1.0f, 0.0f, 1.0f});
+    AddPart(bgMesh, mesh_part{mat, 0, bgMesh->Buffer.VertexCount, GL_TRIANGLES});
+    EndMesh(bgMesh, GL_STATIC_DRAW);
+    return w.BackgroundMesh = bgMesh;
 }
 
 #define WALL_HEIGHT 2.0f

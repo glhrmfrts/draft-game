@@ -1,58 +1,20 @@
 // Copyright
 
-#define LEVEL_PLANE_COUNT 5
-#define SHIP_Z            0.2f
-
-#define PLAYER_BODY_COLOR     Color_blue
-#define PLAYER_OUTLINE_COLOR  IntColor(FirstPalette.Colors[1])
-
-static void UpdateCameraToPlayer(camera &cam, entity *playerEntity, float dt)
+void UpdateCameraToPlayer(camera &cam, entity *playerEntity, float dt)
 {
     const float CAMERA_LERP = 10.0f;
-    vec3 d = playerEntity->Pos() - cam.LookAt;
+    vec3 prevPosition = cam.Position - vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
+    vec3 d = playerEntity->Pos() - prevPosition;
     cam.Position += d * CAMERA_LERP * dt;
-    cam.LookAt = cam.Position + vec3{0, -Global_Camera_OffsetY, -Global_Camera_OffsetZ};
+    cam.LookAt = cam.Position + vec3{0, -Global_Camera_OffsetY + Global_Camera_LookYOffset, -Global_Camera_OffsetZ + Global_Camera_LookZOffset};
 }
 
-static void InitMenu(game_main *g)
+void InitMenu(game_main *g)
 {
     auto m = &g->MenuState;
 
     g->State = GameState_Menu;
-    FreeArena(g->World.Arena);
-
-    g->World.Camera = &g->Camera;
-    g->PlayerEntity = CreateShipEntity(&g->World.Arena, GetShipMesh(g), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
-    g->PlayerEntity->Transform.Position.z = SHIP_Z;
-    g->PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
-    AddEntity(g->World, g->PlayerEntity);
-
-    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
-    {
-        auto ent = PushStruct<entity>(g->World.Arena);
-        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
-        ent->Transform.Position.z = -0.25f;
-        ent->Transform.Scale = vec3{LEVEL_PLANE_SIZE, LEVEL_PLANE_SIZE, 0};
-        ent->Model = CreateModel(&g->World.Arena, GetFloorMesh(g));
-        ent->Repeat = PushStruct<entity_repeat>(g->World.Arena);
-        ent->Repeat->Count = LEVEL_PLANE_COUNT;
-        ent->Repeat->Size = LEVEL_PLANE_SIZE;
-        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE/2;
-        AddEntity(g->World, ent);
-    }
-    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
-    {
-        auto ent = PushStruct<entity>(g->World.Arena);
-        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
-        ent->Transform.Position.z = 0.0f;
-        ent->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
-        ent->Model = CreateModel(&g->World.Arena, GetRoadMesh(g));
-        ent->Repeat = PushStruct<entity_repeat>(g->World.Arena);
-        ent->Repeat->Count = LEVEL_PLANE_COUNT;
-        ent->Repeat->Size = LEVEL_PLANE_SIZE;
-        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE / 2;
-        AddEntity(g->World, ent);
-    }
+    InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
 
     m->SubMenuChangeTimer = 1.0f;
     m->SubMenuChangeSequence.Tweens.push_back(
@@ -105,13 +67,14 @@ struct menu_item
 {
     const char *Text;
     menu_item_type Type;
+    bool Enabled = true;
 };
 
 static struct {const char *Text; rect Pos;} mainMenuTexts[] = {
     {"PLAY", rect{292,32,0,0}},
     {"OPTS", rect{464,32,0,0}},
     {"CRED", rect{816,32,0,0}},
-    {"QUIT", rect{992,32,0,0}}
+    {"EXIT", rect{992,32,0,0}}
 };
 static struct
 {
@@ -122,21 +85,21 @@ static struct
 } subMenus[] = {
     {2, PlayMenuCallback,
      {
-         menu_item{"CLASSIC MODE", MenuItemType_Text},
-         menu_item{"SCORE MODE", MenuItemType_Text}
+         menu_item{"CLASSIC MODE", MenuItemType_Text, true},
+         menu_item{"SCORE MODE", MenuItemType_Text, false}
      }
     },
 };
 
-static void UpdateMenu(game_main *g, float dt)
+void UpdateMenu(game_main *g, float dt)
 {
     auto m = &g->MenuState;
     float moveX = GetMenuAxisValue(g->Input, m->HorizontalAxis, dt);
     float moveY = GetMenuAxisValue(g->Input, m->VerticalAxis, dt);
-    g->PlayerEntity->Vel().y = PLAYER_MIN_VEL;
-    g->PlayerEntity->Pos().y += g->PlayerEntity->Vel().y * dt;
+    g->World.PlayerEntity->Vel().y = PLAYER_MIN_VEL;
+    g->World.PlayerEntity->Pos().y += g->World.PlayerEntity->Vel().y * dt;
     UpdateLogiclessEntities(g->World, dt);
-    UpdateCameraToPlayer(g->Camera, g->PlayerEntity, dt);
+    UpdateCameraToPlayer(g->Camera, g->World.PlayerEntity, dt);
 
     if (m->SelectedMainMenu == -1)
     {
@@ -166,15 +129,20 @@ static void UpdateMenu(game_main *g, float dt)
     {
         auto &subMenu = subMenus[m->SelectedMainMenu];
         int prevHotItem = subMenu.HotItem;
-        if (moveY < 0.0f)
-        {
-            subMenu.HotItem++;
-        }
-        else if (moveY > 0.0f)
-        {
-            subMenu.HotItem--;
-        }
-        subMenu.HotItem = glm::clamp(subMenu.HotItem, 0, subMenu.NumItems);
+        auto item = subMenu.Items + subMenu.HotItem;
+        do {
+            if (moveY < 0.0f)
+            {
+                subMenu.HotItem++;
+            }
+            else if (moveY > 0.0f)
+            {
+                subMenu.HotItem--;
+            }
+            subMenu.HotItem = glm::clamp(subMenu.HotItem, 0, subMenu.NumItems);
+            item = subMenu.Items + subMenu.HotItem;
+        } while (!item->Enabled);
+        
         if (prevHotItem != subMenu.HotItem)
         {
             PlaySequence(g->TweenState, &m->SubMenuChangeSequence, true);
@@ -209,10 +177,14 @@ static void DrawSubMenu(game_main *g, bitmap_font *font, menu_item &item,
     {
         col = Lerp(col, changeTimer, textSelectedColor);
     }
+    if (!item.Enabled)
+    {
+        col.a = 0.25f;
+    }
     DrawTextCentered(g->GUI, font, item.Text, rect{centerX,baseY + textPadding,0,0}, col);
 }
 
-static void RenderMenu(game_main *g, float dt)
+void RenderMenu(game_main *g, float dt)
 {
     static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
     static auto subMenuFont = FindBitmapFont(g->AssetLoader, "unispace_24");

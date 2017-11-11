@@ -17,7 +17,7 @@ void DrawDebugUI(game_main *g, float dt)
 
     auto &updateTime = g->UpdateTime;
     auto &renderTime = g->RenderTime;
-    auto playerEntity = g->PlayerEntity;
+    auto playerEntity = g->World.PlayerEntity;
     auto lanes = g->LevelState.LaneSlots;
     ImGui::Text("ms: %.2f", dt * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/dt);
@@ -34,6 +34,8 @@ void DrawDebugUI(game_main *g, float dt)
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);
         ImGui::SliderFloat("Offset Y", &Global_Camera_OffsetY, -50.0f, 50.0f, "%.2f");
         ImGui::SliderFloat("Offset Z", &Global_Camera_OffsetZ, -50.0f, 50.0f, "%.2f");
+        ImGui::SliderFloat("Look Offset Y", &Global_Camera_LookYOffset, -50.0f, 50.0f, "%.2f");
+        ImGui::SliderFloat("Look Offset Z", &Global_Camera_LookZOffset, -50.0f, 50.0f, "%.2f");
         ImGui::SliderFloat("FOV", &Global_Camera_FieldOfView, 20.0f, 200.0f, "%.2f");
         ImGui::Spacing();
     }

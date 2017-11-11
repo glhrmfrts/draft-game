@@ -3,10 +3,17 @@
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
 #define PLAYER_MAX_VEL_LIMIT           170.0f
 
-#define SCORE_TEXT_DRAFT   "DRAFT"
-#define SCORE_TEXT_BLAST   "BLAST"
-#define SCORE_TEXT_MISS    "MISS"
-#define SCORE_TEXT_CRYSTAL "CRYSTAL"
+#define SCORE_TEXT_CHECKPOINT "CHECKPOINT"
+#define SCORE_TEXT_DRAFT      "DRAFT"
+#define SCORE_TEXT_BLAST      "BLAST"
+#define SCORE_TEXT_MISS       "MISS"
+#define SCORE_TEXT_CRYSTAL    "CRYSTAL"
+
+#define SCORE_CHECKPOINT        20
+#define SCORE_DESTROY_BLUE_SHIP 10
+#define SCORE_MISS_ORANGE_SHIP  10
+#define SCORE_DRAFT             5
+#define SCORE_CRYSTAL           2
 
 #define GEN_PLAYER_OFFSET 200
 
@@ -78,9 +85,9 @@ static int GetNextShipColor(level_state *l)
 LEVEL_GEN_FUNC(GenerateCrystal)
 {
     int lane = GetNextSpawnLane(l);
-    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g));
+    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g->World));
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z + 0.4f;
     ent->Scl().x = 0.3f;
     ent->Scl().y = 0.3f;
@@ -94,10 +101,10 @@ LEVEL_GEN_FUNC(GenerateShip)
     int colorIndex = GetNextShipColor(l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
     int lane = GetNextSpawnLane(l, true);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, colorIndex);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, colorIndex);
     ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = colorIndex;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
@@ -107,14 +114,14 @@ LEVEL_GEN_FUNC(GenerateShip)
 LEVEL_GEN_FUNC(GenerateRedShip)
 {
     color c = IntColor(ShipPalette.Colors[SHIP_RED]);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g), c, c, false, SHIP_RED);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, SHIP_RED);
     int lane = l->PlayerLaneIndex - 2;
     if (p->Flags & LevelGenFlag_ReserveLane)
     {
         lane = p->ReservedLane;
     }
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = SHIP_RED;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
@@ -125,12 +132,12 @@ LEVEL_GEN_FUNC(GenerateRedShip)
 LEVEL_GEN_FUNC(GenerateAsteroid)
 {
     //Println("I should be generating an asteroid");
-    auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g));
+    auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g->World));
     int lane = l->PlayerLaneIndex - 2;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->PlayerEntity->Pos().y - 10.0f;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y - 10.0f;
     ent->Pos().z = ASTEROID_Z;
-    ent->Vel().y = g->PlayerEntity->Vel().y * 1.5f;
+    ent->Vel().y = g->World.PlayerEntity->Vel().y * 1.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
 }
@@ -149,6 +156,7 @@ static void InitLevel(game_main *g)
     g->World.Camera = &g->Camera;
     l->DraftBoostAudio = CreateAudioSource(g->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
 
+    InitFormat(l->HealthFormat, "Health: %d\n", 24, &l->Arena);
     InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
     InitFormat(l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
 
@@ -286,16 +294,48 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
     ent->Transform.Velocity.y += Boost;
 }
 
-#define SCORE_DESTROY_BLUE_SHIP 10
-#define SCORE_MISS_ORANGE_SHIP  10
-#define SCORE_DRAFT             5
-#define SCORE_CRYSTAL           2
+#define PLAYER_DAMAGE_TIMER 3.0f
 
 #define ENTITY_IS_PLAYER(e) (e->Flags & EntityFlag_IsPlayer)
 
 #define SHIP_IS_BLUE(s)   (s->ColorIndex == 0)
 #define SHIP_IS_ORANGE(s) (s->ColorIndex == 1)
 #define SHIP_IS_RED(s)    (s->ColorIndex == 2)
+
+void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player, float health)
+{
+    l->DamageTimer = PLAYER_DAMAGE_TIMER;
+    l->Health -= health;
+    
+    auto playerExp = CreateExplosionEntity(
+        GetEntry(w.ExplosionPool),
+        player->Pos(),
+        player->Vel(),
+        PLAYER_BODY_COLOR,
+        PLAYER_OUTLINE_COLOR,
+        vec3{0, 1, 1}
+    );
+    AddEntity(w, playerExp);
+}
+
+void PlayerEnemyCollision(level_state *l, entity_world &w,
+                          entity *player, entity *enemy, float health)
+{
+    PlayerExplodeAndLoseHealth(l, w, player, health);
+    player->Vel().y = std::min(PLAYER_MIN_VEL, enemy->Vel().y);
+    
+    auto enemyExp = CreateExplosionEntity(
+        GetEntry(w.ExplosionPool),
+        enemy->Pos(),
+        enemy->Vel(),
+        enemy->Ship->Color,
+        enemy->Ship->OutlineColor,
+        vec3{0,1,1}
+    );
+    AddEntity(w, enemyExp);
+    RemoveEntity(w, enemy);
+}
+
 static bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
 {
     auto l = &g->LevelState;
@@ -348,6 +388,10 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
                 entityToExplode->Ship->Scored = true;
                 AddScoreText(g, l, SCORE_TEXT_BLAST, SCORE_DESTROY_BLUE_SHIP, entityToExplode->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
             }
+            else if (SHIP_IS_ORANGE(entityToExplode->Ship))
+            {
+                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 0.25f);
+            }
 
             auto exp = CreateExplosionEntity(
                 GetEntry(g->World.ExplosionPool),
@@ -365,28 +409,7 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
         {
             if (otherEntity->Flags & EntityFlag_IsPlayer)
             {
-                otherEntity->Vel().y = std::min(PLAYER_MIN_VEL, otherEntity->Vel().y);
-                //l->Health -= 0.25f;
-
-                auto enemyExp = CreateExplosionEntity(
-                    GetEntry(g->World.ExplosionPool),
-                    entityToExplode->Pos(),
-                    entityToExplode->Vel(),
-                    entityToExplode->Ship->Color,
-                    entityToExplode->Ship->OutlineColor,
-                    vec3{0,1,1}
-                );
-                auto playerExp = CreateExplosionEntity(
-                    GetEntry(g->World.ExplosionPool),
-                    otherEntity->Pos(),
-                    otherEntity->Vel(),
-                    PLAYER_BODY_COLOR,
-                    PLAYER_OUTLINE_COLOR,
-                    vec3{0, 1, 1}
-                );
-                AddEntity(g->World, enemyExp);
-                AddEntity(g->World, playerExp);
-                RemoveEntity(g->World, entityToExplode);
+                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 0.25f);
                 return false;
             }
         }
@@ -510,7 +533,7 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
         p->Timer = GetNextTimer(p, l->Entropy);
         if (p->Flags & LevelGenFlag_BasedOnVelocity)
         {
-            p->Timer -= (p->Timer * 0.9f) * (g->PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
+            p->Timer -= (p->Timer * 0.9f) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
         }
         l->ReservedLanes[p->ReservedLane + 2] = 0;
         p->ReservedLane = NO_RESERVED_LANE;
@@ -547,8 +570,8 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
 
 static void SpawnCheckpoint(game_main *g, level_state *l)
 {
-    auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g));
-    ent->Pos().y = g->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2;
+    auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g->World));
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2;
     ent->Pos().z = SHIP_Z * 0.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
@@ -662,21 +685,23 @@ static void UpdateClassicMode(game_main *g, level_state *l)
     l->CurrentCheckpointFrame++;
 }
 
-static void UpdateLevel(game_main *g, float dt)
+void UpdateLevel(game_main *g, float dt)
 {
     auto l = &g->LevelState;
     auto &updateTime = g->UpdateTime;
     auto &world = g->World;
     auto &input = g->Input;
     auto &cam = g->Camera;
-    auto *playerEntity = g->PlayerEntity;
+    auto *playerEntity = g->World.PlayerEntity;
     auto *playerShip = playerEntity->Ship;
+    updateTime.Begin = g->Platform.GetMilliseconds();
+    
     dt *= Global_Game_TimeSpeed;
-
     l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
     l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
     l->TimeElapsed += dt;
-    updateTime.Begin = g->Platform.GetMilliseconds();
+    l->DamageTimer -= dt;
+    l->DamageTimer = std::max(l->DamageTimer, 0.0f);
 
     static bool paused = false;
     if (IsJustPressed(g, Action_debugPause))
@@ -697,10 +722,10 @@ static void UpdateLevel(game_main *g, float dt)
     if (g->Input.Keys[SDL_SCANCODE_E])
     {
         auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
-                                         g->PlayerEntity->Transform.Position,
-                                         g->PlayerEntity->Transform.Velocity,
-                                         g->PlayerEntity->Ship->Color,
-                                         g->PlayerEntity->Ship->OutlineColor,
+                                         playerEntity->Transform.Position,
+                                         playerEntity->Transform.Velocity,
+                                         playerEntity->Ship->Color,
+                                         playerEntity->Ship->OutlineColor,
                                          vec3{ 0, 1, 1 });
         AddEntity(world, exp);
     }
@@ -775,17 +800,30 @@ static void UpdateLevel(game_main *g, float dt)
             ResolveCollision(*col);
         }
     }
+    
     Integrate(world.CollisionEntities, g->Gravity, dt);
     if (l->NumTrailCollisions == 0)
     {
         l->CurrentDraftTime -= dt;
     }
+    
     l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
     l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
     l->NumTrailCollisions = 0;
+    
     if (!Global_Camera_FreeCam)
     {
         UpdateCameraToPlayer(g->Camera, playerEntity, dt);
+    }
+    
+    if (l->DamageTimer > 0.0f)
+    {
+        int even = int(l->DamageTimer * 3);
+        playerEntity->Model->Visible = (even % 2) == 1;
+    }
+    else
+    {
+        playerEntity->Model->Visible = true;
     }
 
     UpdateLogiclessEntities(world, dt);
@@ -902,32 +940,48 @@ static void UpdateLevel(game_main *g, float dt)
         case CheckpointState_Initial:
             if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
             {
-                ent->Vel().y = g->PlayerEntity->Vel().y * 0.2f;
+                ent->Vel().y = playerEntity->Vel().y * 0.2f;
             }
             else
             {
-                ent->Vel().y = g->PlayerEntity->Vel().y * 0.8f;
+                ent->Vel().y = playerEntity->Vel().y * 0.8f;
+            }
+            
+            if (ent->Pos().y < playerEntity->Pos().y)
+            {
+                cp->State = CheckpointState_Active;
+                for (auto &mat : ent->Model->Materials)
+                {
+                    mat->Emission = 1.0f;
+                    mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
+                }
+                
+                l->CheckpointNum++;
+                l->CurrentCheckpointFrame = 0;
+                PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 0.25f);
             }
             break;
 
         case CheckpointState_Drafted:
-            if (ent->Pos().y < g->PlayerEntity->Pos().y)
+            if (ent->Pos().y < playerEntity->Pos().y)
             {
                 cp->State = CheckpointState_Active;
-                for (auto &material : ent->Model->Materials)
+                for (auto &mat : ent->Model->Materials)
                 {
-                    material->Emission = 1.0f;
-                    material->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
+                    mat->Emission = 1.0f;
+                    mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
                 }
 
                 l->CheckpointNum++;
                 l->CurrentCheckpointFrame = 0;
+                l->Score += SCORE_CHECKPOINT;
+                AddScoreText(g, l, SCORE_TEXT_CHECKPOINT, SCORE_CHECKPOINT, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
             }
             break;
 
         case CheckpointState_Active:
         {
-            ent->Vel().y = g->PlayerEntity->Vel().y * 2.0f;
+            ent->Vel().y = playerEntity->Vel().y * 2.0f;
             if (cp->Timer >= CHECKPOINT_FADE_OUT_DURATION)
             {
                 RemoveEntity(g->World, ent);
@@ -979,10 +1033,12 @@ static void UpdateLevel(game_main *g, float dt)
         FreeEntryFromData(l->SequencePool, introText->Sequence);
         FreeEntryFromData(l->IntroTextPool, introText);
     }
+    
+    l->Health = std::max(l->Health, 0.0f);
     updateTime.End = g->Platform.GetMilliseconds();
 }
 
-static void RenderLevel(game_main *g, float dt)
+void RenderLevel(game_main *g, float dt)
 {
     auto l = &g->LevelState;
     auto &renderTime = g->RenderTime;
@@ -1005,8 +1061,10 @@ static void RenderLevel(game_main *g, float dt)
         }
     }
 #endif
-
-    static auto scoreFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+    
+    const float fontSize = GetRealPixels(g, 24);
+    static auto hudFont = FindBitmapFont(g->AssetLoader, "unispace_24");
+    static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32"); 
     RenderEnd(g->RenderState, g->Camera);
     UpdateProjectionView(g->GUICamera);
     Begin(g->GUI, g->GUICamera, 1.0f);
@@ -1014,14 +1072,14 @@ static void RenderLevel(game_main *g, float dt)
     {
         vec2 p = text->Pos;
         Println(text->Color.a);
-        DrawTextCentered(g->GUI, scoreFont, text->Text, rect{p.x,p.y,0,0}, text->Color);
+        DrawTextCentered(g->GUI, textFont, text->Text, rect{p.x,p.y,0,0}, text->Color);
     }
     for (auto text : l->ScoreTextList)
     {
         vec2 p = text->Pos;
         p += (text->TargetPos - p) * text->TweenPosValue;
         text->Color.a = text->TweenAlphaValue;
-        DrawTextCentered(g->GUI, scoreFont, Format(l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+        DrawTextCentered(g->GUI, textFont, Format(l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
     End(g->GUI);
     PostProcessEnd(g->RenderState);
@@ -1033,7 +1091,10 @@ static void RenderLevel(game_main *g, float dt)
     DrawRect(g->GUI, rect{25,25,190 * l->DraftCharge,10},
              IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
 
-    DrawText(g->GUI, scoreFont, Format(l->ScoreFormat, l->Score), rect{50, 20, 0, 0}, Color_white);
+    float left = GetRealPixels(g, 10.0f);
+    float top = g->Height - GetRealPixels(g, 10.0f);
+    DrawText(g->GUI, hudFont, Format(l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
+    DrawText(g->GUI, hudFont, Format(l->HealthFormat, int(l->Health * 100)), rect{left + 400, top - fontSize, 0, 0}, Color_white);
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();

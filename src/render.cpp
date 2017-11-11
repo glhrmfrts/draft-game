@@ -530,37 +530,36 @@ NextRenderable(render_state &RenderState)
 
 #define IsLinkable(Program) (Program->VertexShader && Program->FragmentShader)
 
-static void
-ModelProgramCallback(shader_asset_param *Param)
+static void ModelProgramCallback(shader_asset_param *p)
 {
-    auto *Program = (model_program *)Param->ShaderProgram;
-    if (IsLinkable(Program))
+    auto *program = (model_program *)p->ShaderProgram;
+    if (IsLinkable(program))
     {
-        LinkShaderProgram(*Program);
-        Program->MaterialFlags = glGetUniformLocation(Program->ID, "u_MaterialFlags");
-        Program->ProjectionView = glGetUniformLocation(Program->ID, "u_ProjectionView");
-        Program->Transform = glGetUniformLocation(Program->ID, "u_Transform");
-        Program->NormalTransform = glGetUniformLocation(Program->ID, "u_NormalTransform");
-        Program->DiffuseColor = glGetUniformLocation(Program->ID, "u_DiffuseColor");
-        Program->TexWeight = glGetUniformLocation(Program->ID, "u_TexWeight");
-        Program->Emission = glGetUniformLocation(Program->ID, "u_Emission");
-        Program->UvScale = glGetUniformLocation(Program->ID, "u_UvScale");
-        Program->Sampler = glGetUniformLocation(Program->ID, "u_Sampler");
-        Program->ExplosionLightColor = glGetUniformLocation(Program->ID, "u_ExplosionLightColor");
-        Program->ExplosionLightTimer = glGetUniformLocation(Program->ID, "u_ExplosionLightTimer");
-        Program->CamPos = glGetUniformLocation(Program->ID, "u_CamPos");
-        Program->FogColor = glGetUniformLocation(Program->ID, "u_FogColor");
-        Program->FogStart = glGetUniformLocation(Program->ID, "u_FogStart");
-        Program->FogEnd = glGetUniformLocation(Program->ID, "u_FogEnd");
+        LinkShaderProgram(*program);
+        program->MaterialFlags = glGetUniformLocation(program->ID, "u_MaterialFlags");
+        program->ProjectionView = glGetUniformLocation(program->ID, "u_ProjectionView");
+        program->Transform = glGetUniformLocation(program->ID, "u_Transform");
+        program->NormalTransform = glGetUniformLocation(program->ID, "u_NormalTransform");
+        program->DiffuseColor = glGetUniformLocation(program->ID, "u_DiffuseColor");
+        program->TexWeight = glGetUniformLocation(program->ID, "u_TexWeight");
+        program->FogWeight = glGetUniformLocation(program->ID, "u_FogWeight");
+        program->Emission = glGetUniformLocation(program->ID, "u_Emission");
+        program->UvScale = glGetUniformLocation(program->ID, "u_UvScale");
+        program->Sampler = glGetUniformLocation(program->ID, "u_Sampler");
+        program->ExplosionLightColor = glGetUniformLocation(program->ID, "u_ExplosionLightColor");
+        program->ExplosionLightTimer = glGetUniformLocation(program->ID, "u_ExplosionLightTimer");
+        program->CamPos = glGetUniformLocation(program->ID, "u_CamPos");
+        program->FogColor = glGetUniformLocation(program->ID, "u_FogColor");
+        program->FogStart = glGetUniformLocation(program->ID, "u_FogStart");
+        program->FogEnd = glGetUniformLocation(program->ID, "u_FogEnd");
 
-        Bind(*Program);
-        SetUniform(Program->Sampler, 0);
+        Bind(*program);
+        SetUniform(program->Sampler, 0);
         UnbindShaderProgram();
     }
 }
 
-static void
-BlurProgramCallback(shader_asset_param *Param)
+static void BlurProgramCallback(shader_asset_param *Param)
 {
     auto *Program = (blur_program *)Param->ShaderProgram;
     if (IsLinkable(Program))
@@ -574,8 +573,7 @@ BlurProgramCallback(shader_asset_param *Param)
     }
 }
 
-static void
-BlendProgramCallback(shader_asset_param *Param)
+static void BlendProgramCallback(shader_asset_param *Param)
 {
     auto *Program = Param->ShaderProgram;
     if (IsLinkable(Program))
@@ -593,8 +591,7 @@ BlendProgramCallback(shader_asset_param *Param)
     }
 }
 
-static void
-BlitProgramCallback(shader_asset_param *Param)
+static void BlitProgramCallback(shader_asset_param *Param)
 {
     auto *Program = Param->ShaderProgram;
     if (IsLinkable(Program))
@@ -606,8 +603,7 @@ BlitProgramCallback(shader_asset_param *Param)
     }
 }
 
-static void
-ResolveMultisampleProgramCallback(shader_asset_param *Param)
+static void ResolveMultisampleProgramCallback(shader_asset_param *Param)
 {
     auto *Program = (resolve_multisample_program *)Param->ShaderProgram;
     if (IsLinkable(Program))
@@ -622,9 +618,8 @@ ResolveMultisampleProgramCallback(shader_asset_param *Param)
     }
 }
 
-static void
-InitShaderProgram(shader_program &Program, const string &vsPath, const string &fsPath,
-                  shader_asset_callback_func *Callback)
+static void InitShaderProgram(shader_program &Program, const string &vsPath, const string &fsPath,
+                              shader_asset_callback_func *Callback)
 {
     Program.VertexShaderParam = {
         GL_VERTEX_SHADER,
@@ -861,23 +856,23 @@ mat4 GetTransformMatrix(transform &t)
     return TransformMatrix;
 }
 
-static void RenderRenderable(render_state &RenderState, camera &Camera, renderable &r)
+static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
 {
-    if (RenderState.LastVAO != r.VAO)
+    if (rs.LastVAO != r.VAO)
     {
-        glBindVertexArray(RenderState.LastVAO = r.VAO);
+        glBindVertexArray(rs.LastVAO = r.VAO);
     }
 
-    auto &Program = RenderState.ModelProgram;
-    SetUniform(Program.FogStart, Global_Renderer_FogStart);
-    SetUniform(Program.FogEnd, Global_Renderer_FogEnd);
-    SetUniform(Program.FogColor, RenderState.FogColor);
-    SetUniform(Program.ProjectionView, Camera.ProjectionView);
-    SetUniform(Program.CamPos, Camera.Position);
-    SetUniform(Program.Transform, GetTransformMatrix(r.Transform));
+    auto &program = rs.ModelProgram;
+    SetUniform(program.FogStart, Global_Renderer_FogStart);
+    SetUniform(program.FogEnd, Global_Renderer_FogEnd);
+    SetUniform(program.FogColor, rs.FogColor);
+    SetUniform(program.ProjectionView, Camera.ProjectionView);
+    SetUniform(program.CamPos, Camera.Position);
+    SetUniform(program.Transform, GetTransformMatrix(r.Transform));
 
     // @TODO: check why this breaks the floor model
-    SetUniform(Program.NormalTransform, mat4(1.0f));
+    SetUniform(program.NormalTransform, mat4(1.0f));
 
     if (r.Material->Texture)
     {
@@ -887,13 +882,14 @@ static void RenderRenderable(render_state &RenderState, camera &Camera, renderab
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
-    SetUniform(Program.MaterialFlags, (int)r.Material->Flags);
-    SetUniform(Program.DiffuseColor, r.Material->DiffuseColor);
-    SetUniform(Program.TexWeight, r.Material->TexWeight);
-    SetUniform(Program.Emission, r.Material->Emission);
-    SetUniform(Program.UvScale, r.Material->UvScale);
-    SetUniform(Program.ExplosionLightColor, RenderState.ExplosionLightColor);
-    SetUniform(Program.ExplosionLightTimer, RenderState.ExplosionLightTimer);
+    SetUniform(program.MaterialFlags, (int)r.Material->Flags);
+    SetUniform(program.DiffuseColor, r.Material->DiffuseColor);
+    SetUniform(program.TexWeight, r.Material->TexWeight);
+    SetUniform(program.FogWeight, r.Material->FogWeight);
+    SetUniform(program.Emission, r.Material->Emission);
+    SetUniform(program.UvScale, r.Material->UvScale);
+    SetUniform(program.ExplosionLightColor, rs.ExplosionLightColor);
+    SetUniform(program.ExplosionLightTimer, rs.ExplosionLightTimer);
     glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
     if (r.Material->Flags & MaterialFlag_PolygonLines)
     {

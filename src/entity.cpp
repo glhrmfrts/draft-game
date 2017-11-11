@@ -1,5 +1,11 @@
 // Copyright
 
+#define LEVEL_PLANE_COUNT 5
+#define SHIP_Z            0.2f
+
+#define PLAYER_BODY_COLOR     Color_blue
+#define PLAYER_OUTLINE_COLOR  IntColor(FirstPalette.Colors[1])
+
 inline static void AddFlags(entity *Entity, uint32 Flags)
 {
     Entity->Flags |= Flags;
@@ -521,8 +527,58 @@ void RemoveEntity(entity_world &world, entity *ent)
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
 
-static void UpdateLogiclessEntities(entity_world &world, float dt)
+void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 {
+    FreeArena(w.Arena);
+
+    w.AssetLoader = loader;
+    w.Camera = cam;
+    w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
+    w.PlayerEntity->Transform.Position.z = SHIP_Z;
+    w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
+    AddEntity(w, w.PlayerEntity);
+    
+    w.BackgroundEntity = CreateEntity(&w.Arena);
+    w.BackgroundEntity->SetScl(vec3{LEVEL_PLANE_SIZE*4, 1, LEVEL_PLANE_SIZE*4});
+    w.BackgroundEntity->Model = CreateModel(&w.Arena, GetBackgroundMesh(w));
+    AddEntity(w, w.BackgroundEntity);
+    
+    cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
+
+    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
+    {
+        auto ent = PushStruct<entity>(w.Arena);
+        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
+        ent->Transform.Position.z = -0.25f;
+        ent->Transform.Scale = vec3{LEVEL_PLANE_SIZE*2, LEVEL_PLANE_SIZE, 0};
+        ent->Model = CreateModel(&w.Arena, GetFloorMesh(w));
+        ent->Repeat = PushStruct<entity_repeat>(w.Arena);
+        ent->Repeat->Count = LEVEL_PLANE_COUNT;
+        ent->Repeat->Size = LEVEL_PLANE_SIZE;
+        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE/2;
+        AddEntity(w, ent);
+    }
+    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
+    {
+        auto ent = PushStruct<entity>(w.Arena);
+        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
+        ent->Transform.Position.z = 0.0f;
+        ent->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
+        ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
+        ent->Repeat = PushStruct<entity_repeat>(w.Arena);
+        ent->Repeat->Count = LEVEL_PLANE_COUNT;
+        ent->Repeat->Size = LEVEL_PLANE_SIZE;
+        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE / 2;
+        AddEntity(w, ent);
+    }
+}
+
+void UpdateLogiclessEntities(entity_world &world, float dt)
+{
+    world.BackgroundEntity->Pos().x = world.PlayerEntity->Pos().x * 0.25f;
+    world.BackgroundEntity->Pos().y = world.PlayerEntity->Pos().y + LEVEL_PLANE_SIZE*1.75f;
+    world.BackgroundEntity->Pos().z = world.PlayerEntity->Pos().z + -LEVEL_PLANE_SIZE;
+    
     for (auto ent : world.RemoveOffscreenEntities)
     {
         if (!ent) continue;
@@ -672,7 +728,7 @@ static void UpdateLogiclessEntities(entity_world &world, float dt)
     }
 }
 
-static void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
+void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
 {
     for (auto ent : world.TrailEntities)
     {
@@ -684,7 +740,10 @@ static void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
     for (auto ent : world.ModelEntities)
     {
         if (!ent) continue;
-        DrawModel(rs, *ent->Model, ent->Transform);
+        if (ent->Model->Visible)
+        {
+            DrawModel(rs, *ent->Model, ent->Transform);
+        }
     }
     if (world.LastExplosion)
     {

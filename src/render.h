@@ -158,6 +158,7 @@ struct material
     color DiffuseColor = Color_white;
     float Emission = 0;
     float TexWeight = 0;
+    float FogWeight = 1;
     texture *Texture = NULL;
     uint32 Flags = 0;
     vec2 UvScale = vec2{ 1, 1 };
@@ -219,6 +220,7 @@ struct model_program : shader_program
     int NormalTransform;
     int DiffuseColor;
     int TexWeight;
+    int FogWeight;
     int Emission;
     int UvScale;
     int Sampler;

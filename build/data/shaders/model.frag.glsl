@@ -11,6 +11,7 @@ uniform sampler2D u_Sampler;
 uniform vec4 u_DiffuseColor;
 uniform float u_Emission;
 uniform float u_TexWeight;
+uniform float u_FogWeight;
 uniform int u_MaterialFlags;
 uniform vec2 u_UvScale;
 uniform vec4 u_ExplosionLightColor;
@@ -45,7 +46,7 @@ void main() {
   fog = (u_FogEnd - fog) / (u_FogEnd - u_FogStart);
   fog = clamp(fog, 0.0, 1.0);
 
-  Color = mix(Color, u_FogColor, 1.0 - fog);
+  Color = mix(Color, u_FogColor, (1.0 - fog) * u_FogWeight);
   vec4 Emit = (Color * u_Emission);
   BlendUnitColor[0] = Color;
   BlendUnitColor[1] = Emit;

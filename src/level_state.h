@@ -109,6 +109,7 @@ struct level_state
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
     float Health = 1.0f;
     float TimeElapsed = 0;
+    float DamageTimer = 0;
     int CurrentCheckpointFrame = 0;
     int CheckpointNum = 0;
     int PlayerLaneIndex = 0;
@@ -119,6 +120,7 @@ struct level_state
     float DraftCharge = 0;
     int NumTrailCollisions = 0;
     bool DraftActive = false;
+    string_format HealthFormat;
     string_format ScoreFormat;
     string_format ScoreNumberFormat;
     int Score = 0;

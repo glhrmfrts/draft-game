@@ -7,6 +7,7 @@ struct model
 {
     std::vector<material *> Materials;
     mesh *Mesh;
+    bool Visible = true;
 };
 
 struct ship
@@ -151,6 +152,14 @@ struct entity_world
     memory_pool PowerupPool;
     memory_pool AsteroidPool;
     memory_pool CheckpointPool;
+    
+    mesh *FloorMesh = NULL;
+    mesh *ShipMesh = NULL;
+    mesh *CrystalMesh = NULL;
+    mesh *RoadMesh = NULL;
+    mesh *AsteroidMesh = NULL;
+    mesh *CheckpointMesh = NULL;
+    mesh *BackgroundMesh = NULL;
 
     std::vector<entity *> CheckpointEntities;
     std::vector<entity *> AsteroidEntities;
@@ -164,8 +173,11 @@ struct entity_world
     std::vector<entity *> RemoveOffscreenEntities;
     std::vector<entity *> LaneSlotEntities;
     std::vector<entity *> RotatingEntities;
+    asset_loader *AssetLoader = NULL;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
+    entity *PlayerEntity;
+    entity *BackgroundEntity;
     int NumEntities = 0;
 };
 

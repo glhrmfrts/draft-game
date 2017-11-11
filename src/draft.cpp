@@ -56,10 +56,26 @@ extern "C"
         );
         g->Assets.push_back(
             CreateAssetEntry(
+                AssetType_Texture,
+                "data/textures/space_dn.png",
+                "background",
+                (void *)(TextureFlag_WrapRepeat)
+            )
+        );
+        g->Assets.push_back(
+            CreateAssetEntry(
                 AssetType_Font,
                 "data/fonts/vcr.ttf",
                 "vcr_16",
                 (void *)int(GetRealPixels(g, 32.0f))
+            )
+        );
+        g->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_16",
+                (void *)int(GetRealPixels(g, 16.0f))
             )
         );
         g->Assets.push_back(

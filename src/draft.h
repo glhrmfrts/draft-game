@@ -144,16 +144,6 @@ struct game_input
 	game_input() {}
 };
 
-struct game_meshes
-{
-    mesh *FloorMesh = NULL;
-    mesh *ShipMesh = NULL;
-    mesh *CrystalMesh = NULL;
-    mesh *RoadMesh = NULL;
-    mesh *AsteroidMesh = NULL;
-    mesh *CheckpointMesh = NULL;
-};
-
 struct profile_time
 {
     uint64 Begin;
@@ -184,10 +174,8 @@ struct game_main
 
     memory_arena Arena;
     camera Camera;
-    game_meshes Meshes;
     vec3 Gravity;
     entity_world World;
-    entity *PlayerEntity;
     level_state LevelState;
     menu_state MenuState;
 
