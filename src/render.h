@@ -138,7 +138,7 @@ struct camera
     mat4 View;
     vec3 Position;
     vec3 LookAt;
-    vec3 Up;
+    vec3 Up = vec3{0,0,1};
     float Near;
     float Far;
     camera_type Type;

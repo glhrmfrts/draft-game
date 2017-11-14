@@ -174,6 +174,7 @@ struct game_main
 
     memory_arena Arena;
     camera Camera;
+    camera FinalCamera;
     vec3 Gravity;
     entity_world World;
     level_state LevelState;

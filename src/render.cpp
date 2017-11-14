@@ -358,7 +358,6 @@ void MakeCameraPerspective(camera &Camera, float Width, float Height, float Fov,
 void UpdateProjectionView(camera &Camera)
 {
     Camera.Updated = true;
-    Camera.Up = vec3(0, 0, 1);
 
     switch (Camera.Type)
     {
@@ -714,12 +713,19 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
 #endif
 }
 
+inline void RenderClear()
+{
+    glClearColor(0,0,0,0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
 void PostProcessBegin(render_state &r)
 {
     if (Global_Renderer_DoPostFX)
     {
         BindFramebuffer(r.MultisampledSceneFramebuffer);
     }
+    RenderClear();
 }
 
 enum blur_orientation
@@ -924,7 +930,6 @@ void RenderEnd(render_state &RenderState, camera &Camera)
 #endif
 
     Bind(RenderState.ModelProgram);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     for (auto RenderableIndex : RenderState.FrameSolidRenderables)

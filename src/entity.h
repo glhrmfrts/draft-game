@@ -152,7 +152,7 @@ struct entity_world
     memory_pool PowerupPool;
     memory_pool AsteroidPool;
     memory_pool CheckpointPool;
-    
+
     mesh *FloorMesh = NULL;
     mesh *ShipMesh = NULL;
     mesh *CrystalMesh = NULL;
@@ -177,7 +177,6 @@ struct entity_world
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
     entity *PlayerEntity;
-    entity *BackgroundEntity;
     int NumEntities = 0;
 };
 

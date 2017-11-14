@@ -121,7 +121,8 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
     AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
 }
 
-#define LEVEL_PLANE_SIZE  512
+#define LEVEL_PLANE_COUNT 32
+#define LEVEL_PLANE_SIZE  8
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
 mesh *GetFloorMesh(entity_world &w)
@@ -140,7 +141,7 @@ mesh *GetFloorMesh(entity_world &w)
         1,
         FindTexture(*w.AssetLoader, "grid"),
         0,
-        vec2{LEVEL_PLANE_SIZE/16,LEVEL_PLANE_SIZE/16}
+        vec2{2,2}
     };
 
     float width = 1.0f;
@@ -171,8 +172,8 @@ mesh *GetRoadMesh(entity_world &w)
     float width = 5.0f;
     float l = -width/2;
     float r = width/2;
-    AddQuad(RoadMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
-    AddPart(RoadMesh, {RoadMaterial, 0, RoadMesh->Buffer.VertexCount, GL_TRIANGLES});
+    //AddQuad(RoadMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
+    //AddPart(RoadMesh, {RoadMaterial, 0, RoadMesh->Buffer.VertexCount, GL_TRIANGLES});
     for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
     {
         AddLine(RoadMesh->Buffer, vec3{l + i, -0.5f, 0.05f}, vec3{l + i, 0.5f, 0.05f});
@@ -299,11 +300,11 @@ mesh *GetBackgroundMesh(entity_world &w)
     {
         return w.BackgroundMesh;
     }
-    
+
     auto bgMesh = PushStruct<mesh>(w.Arena);
     auto mat = material{Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background")};
     mat.FogWeight = 0.0f;
-    
+
     InitMeshBuffer(bgMesh->Buffer);
     AddQuad(bgMesh->Buffer, vec3{-1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 1.0f}, vec3{-1.0f, 0.0f, 1.0f});
     AddPart(bgMesh, mesh_part{mat, 0, bgMesh->Buffer.VertexCount, GL_TRIANGLES});

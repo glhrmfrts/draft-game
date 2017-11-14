@@ -200,7 +200,7 @@ static uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, 
     return DrawRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-static uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV, GLuint PrimType, bool CheckState = true)
+static uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }

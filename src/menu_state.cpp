@@ -9,6 +9,33 @@ void UpdateCameraToPlayer(camera &cam, entity *playerEntity, float dt)
     cam.LookAt = cam.Position + vec3{0, -Global_Camera_OffsetY + Global_Camera_LookYOffset, -Global_Camera_OffsetZ + Global_Camera_LookZOffset};
 }
 
+void UpdateFinalCamera(game_main *g)
+{
+    auto &fc = g->FinalCamera;
+    auto &c = g->Camera;
+
+    float r = (500.0f - c.Position.z);
+    float d = c.Position.y*0.005f;
+    fc.Position = c.Position;
+    fc.Position.y = std::cos(d) * r;
+    fc.Position.z = std::sin(d) * r;
+
+    float ld = c.LookAt.y * 0.005f;
+    fc.LookAt = c.LookAt;
+    fc.LookAt.y = std::cos(ld) * r;
+    fc.LookAt.z = std::sin(ld) * r;
+
+    if (fc.LookAt.y < fc.Position.y)
+    {
+        fc.Up = vec3{0,0,-1};
+    }
+    else
+    {
+        fc.Up = vec3{0,0,1};
+    }
+    UpdateProjectionView(fc);
+}
+
 void InitMenu(game_main *g)
 {
     auto m = &g->MenuState;
@@ -142,7 +169,7 @@ void UpdateMenu(game_main *g, float dt)
             subMenu.HotItem = glm::clamp(subMenu.HotItem, 0, subMenu.NumItems);
             item = subMenu.Items + subMenu.HotItem;
         } while (!item->Enabled);
-        
+
         if (prevHotItem != subMenu.HotItem)
         {
             PlaySequence(g->TweenState, &m->SubMenuChangeSequence, true);
@@ -192,9 +219,11 @@ void RenderMenu(game_main *g, float dt)
 
     UpdateProjectionView(g->Camera);
     PostProcessBegin(g->RenderState);
+    RenderBackground(g, g->World);
     RenderBegin(g->RenderState, dt);
     RenderEntityWorld(g->RenderState, g->World, dt);
-    RenderEnd(g->RenderState, g->Camera);
+    UpdateFinalCamera(g);
+    RenderEnd(g->RenderState, g->FinalCamera);
     PostProcessEnd(g->RenderState);
 
     UpdateProjectionView(g->GUICamera);

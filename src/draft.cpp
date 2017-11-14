@@ -43,6 +43,7 @@ extern "C"
         InitGUI(g->GUI, g->Input);
         MakeCameraOrthographic(g->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
+        MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height);
         InitTweenState(g->TweenState);
         InitEntityWorld(g->World);
@@ -154,6 +155,7 @@ extern "C"
         auto g = game;
         ImGui_ImplSdlGL3_NewFrame(g->Window);
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
+        MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
         switch (g->State)
         {
         case GameState_LoadingScreen:

@@ -15,11 +15,16 @@ smooth out vec3 v_Normal;
 smooth out vec4 v_WorldPos;
 
 void main() {
-  vec4 WorldPos = u_Transform * vec4(a_Position, 1.0);
-  gl_Position = u_ProjectionView * WorldPos;
+  vec4 worldPos = u_Transform * vec4(a_Position, 1.0);
+  float d = worldPos.y*0.005f;
+  float r = 500.0f - worldPos.z;
+  //worldPos.y += cos(d) * 5;
+  worldPos.y = cos(d) * r;
+  worldPos.z = sin(d) * r;
+  gl_Position = u_ProjectionView * worldPos;
 
   v_Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
   v_Uv = a_Uv;
   v_Color = a_Color;
-  v_WorldPos = WorldPos;
+  v_WorldPos = worldPos;
 }

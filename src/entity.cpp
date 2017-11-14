@@ -1,6 +1,5 @@
 // Copyright
 
-#define LEVEL_PLANE_COUNT 5
 #define SHIP_Z            0.2f
 
 #define PLAYER_BODY_COLOR     Color_blue
@@ -537,12 +536,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.PlayerEntity->Transform.Position.z = SHIP_Z;
     w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
     AddEntity(w, w.PlayerEntity);
-    
-    w.BackgroundEntity = CreateEntity(&w.Arena);
-    w.BackgroundEntity->SetScl(vec3{LEVEL_PLANE_SIZE*4, 1, LEVEL_PLANE_SIZE*4});
-    w.BackgroundEntity->Model = CreateModel(&w.Arena, GetBackgroundMesh(w));
-    AddEntity(w, w.BackgroundEntity);
-    
+
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
 
     for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
@@ -575,10 +569,6 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
-    world.BackgroundEntity->Pos().x = world.PlayerEntity->Pos().x * 0.25f;
-    world.BackgroundEntity->Pos().y = world.PlayerEntity->Pos().y + LEVEL_PLANE_SIZE*1.75f;
-    world.BackgroundEntity->Pos().z = world.PlayerEntity->Pos().z + -LEVEL_PLANE_SIZE;
-    
     for (auto ent : world.RemoveOffscreenEntities)
     {
         if (!ent) continue;
@@ -726,6 +716,15 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[1], transform{});
 */
     }
+}
+
+void RenderBackground(game_main *g, entity_world &w)
+{
+    static auto background = FindTexture(*w.AssetLoader, "background");
+    UpdateProjectionView(g->GUICamera);
+    Begin(g->GUI, g->GUICamera, 1.0f);
+    DrawTexture(g->GUI, rect{0,0,float(g->Width),float(g->Height)}, background);
+    End(g->GUI);
 }
 
 void RenderEntityWorld(render_state &rs, entity_world &world, float dt)

@@ -306,7 +306,7 @@ void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player,
 {
     l->DamageTimer = PLAYER_DAMAGE_TIMER;
     l->Health -= health;
-    
+
     auto playerExp = CreateExplosionEntity(
         GetEntry(w.ExplosionPool),
         player->Pos(),
@@ -323,7 +323,7 @@ void PlayerEnemyCollision(level_state *l, entity_world &w,
 {
     PlayerExplodeAndLoseHealth(l, w, player, health);
     player->Vel().y = std::min(PLAYER_MIN_VEL, enemy->Vel().y);
-    
+
     auto enemyExp = CreateExplosionEntity(
         GetEntry(w.ExplosionPool),
         enemy->Pos(),
@@ -695,7 +695,7 @@ void UpdateLevel(game_main *g, float dt)
     auto *playerEntity = g->World.PlayerEntity;
     auto *playerShip = playerEntity->Ship;
     updateTime.Begin = g->Platform.GetMilliseconds();
-    
+
     dt *= Global_Game_TimeSpeed;
     l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
     l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
@@ -800,22 +800,22 @@ void UpdateLevel(game_main *g, float dt)
             ResolveCollision(*col);
         }
     }
-    
+
     Integrate(world.CollisionEntities, g->Gravity, dt);
     if (l->NumTrailCollisions == 0)
     {
         l->CurrentDraftTime -= dt;
     }
-    
+
     l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
     l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
     l->NumTrailCollisions = 0;
-    
+
     if (!Global_Camera_FreeCam)
     {
         UpdateCameraToPlayer(g->Camera, playerEntity, dt);
     }
-    
+
     if (l->DamageTimer > 0.0f)
     {
         int even = int(l->DamageTimer * 3);
@@ -946,7 +946,7 @@ void UpdateLevel(game_main *g, float dt)
             {
                 ent->Vel().y = playerEntity->Vel().y * 0.8f;
             }
-            
+
             if (ent->Pos().y < playerEntity->Pos().y)
             {
                 cp->State = CheckpointState_Active;
@@ -955,7 +955,7 @@ void UpdateLevel(game_main *g, float dt)
                     mat->Emission = 1.0f;
                     mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
                 }
-                
+
                 l->CheckpointNum++;
                 l->CurrentCheckpointFrame = 0;
                 PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 0.25f);
@@ -1033,7 +1033,7 @@ void UpdateLevel(game_main *g, float dt)
         FreeEntryFromData(l->SequencePool, introText->Sequence);
         FreeEntryFromData(l->IntroTextPool, introText);
     }
-    
+
     l->Health = std::max(l->Health, 0.0f);
     updateTime.End = g->Platform.GetMilliseconds();
 }
@@ -1047,6 +1047,7 @@ void RenderLevel(game_main *g, float dt)
     renderTime.Begin = g->Platform.GetMilliseconds();
     UpdateProjectionView(g->Camera);
     PostProcessBegin(g->RenderState);
+    RenderBackground(g, g->World);
     RenderBegin(g->RenderState, dt);
     RenderEntityWorld(g->RenderState, g->World, dt);
 
@@ -1061,12 +1062,13 @@ void RenderLevel(game_main *g, float dt)
         }
     }
 #endif
-    
+    UpdateFinalCamera(g);
+    RenderEnd(g->RenderState, g->FinalCamera);
+
     const float fontSize = GetRealPixels(g, 24);
     static auto hudFont = FindBitmapFont(g->AssetLoader, "unispace_24");
-    static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32"); 
-    RenderEnd(g->RenderState, g->Camera);
-    UpdateProjectionView(g->GUICamera);
+    static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+
     Begin(g->GUI, g->GUICamera, 1.0f);
     for (auto text : l->IntroTextList)
     {
