@@ -233,7 +233,7 @@ static void AddIntroText(game_main *g, level_state *l, const char *text, color c
 
 static void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
-    vec4 v = g->Camera.ProjectionView * vec4{pos, 1.0f};
+    vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(pos), 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
     screenPos.x = (g->Width/2) * screenPos.x + (g->Width/2);
     screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);

@@ -636,7 +636,6 @@ static void InitShaderProgram(shader_program &Program, const string &vsPath, con
 
 static void InitRenderState(render_state &r, uint32 width, uint32 height)
 {
-    glLineWidth(2);
     glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &r.MaxMultiSampleCount);
     if (r.MaxMultiSampleCount > 8)
     {
@@ -869,6 +868,11 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
         glBindVertexArray(rs.LastVAO = r.VAO);
     }
 
+    if (r.PrimitiveType == GL_LINES || r.PrimitiveType == GL_LINE_LOOP)
+    {
+        glLineWidth(r.LineWidth);
+    }
+
     auto &program = rs.ModelProgram;
     SetUniform(program.FogStart, Global_Renderer_FogStart);
     SetUniform(program.FogEnd, Global_Renderer_FogEnd);
@@ -964,19 +968,20 @@ void ApplyExplosionLight(render_state &rs, color c)
     rs.ExplosionLightTimer = Global_Game_ExplosionLightTime*0.5f;
 }
 
-void DrawMeshPart(render_state &RenderState, mesh &Mesh, mesh_part &Part, const transform &Transform)
+void DrawMeshPart(render_state &rs, mesh &Mesh, mesh_part &part, const transform &Transform)
 {
-    size_t Index = NextRenderable(RenderState);
-    auto &r = RenderState.Renderables[Index];
-    r.PrimitiveType = Part.PrimitiveType;
-    r.VertexOffset = Part.Offset;
-    r.VertexCount = Part.Count;
+    size_t Index = NextRenderable(rs);
+    auto &r = rs.Renderables[Index];
+    r.LineWidth = part.LineWidth;
+    r.PrimitiveType = part.PrimitiveType;
+    r.VertexOffset = part.Offset;
+    r.VertexCount = part.Count;
     r.VAO = Mesh.Buffer.VAO;
-    r.Material = &Part.Material;
+    r.Material = &part.Material;
     r.Transform = Transform;
     r.Bounds = BoundsFromMinMax(Mesh.Min*Transform.Scale, Mesh.Max*Transform.Scale);
     r.Bounds.Center += Transform.Position;
-    AddRenderable(RenderState, Index, &Part.Material);
+    AddRenderable(rs, Index, &part.Material);
 }
 
 void DrawModel(render_state &RenderState, model &Model, const transform &Transform)
@@ -993,6 +998,7 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
 
         size_t Index = NextRenderable(RenderState);
         auto &r = RenderState.Renderables[Index];
+        r.LineWidth = Part.LineWidth;
         r.PrimitiveType = Part.PrimitiveType;
         r.VertexOffset = Part.Offset;
         r.VertexCount = Part.Count;

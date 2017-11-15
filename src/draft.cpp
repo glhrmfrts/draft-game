@@ -50,7 +50,7 @@ extern "C"
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Texture,
-                "data/textures/grid1.png",
+                "data/textures/grid.png",
                 "grid",
                 (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
             )
@@ -58,7 +58,7 @@ extern "C"
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Texture,
-                "data/textures/space_dn.png",
+                "data/textures/space6.png",
                 "background",
                 (void *)(TextureFlag_WrapRepeat)
             )

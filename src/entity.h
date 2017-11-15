@@ -142,6 +142,17 @@ struct trail_piece
     entity *Owner;
 };
 
+struct background_instance
+{
+    float y;
+};
+
+struct background_state
+{
+    std::vector<background_instance> Instances;
+    texture *Texture;
+};
+
 struct entity_world
 {
     memory_arena Arena;
@@ -161,6 +172,8 @@ struct entity_world
     mesh *CheckpointMesh = NULL;
     mesh *BackgroundMesh = NULL;
 
+    background_state BackgroundState;
+
     std::vector<entity *> CheckpointEntities;
     std::vector<entity *> AsteroidEntities;
     std::vector<entity *> PowerupEntities;
@@ -177,6 +190,7 @@ struct entity_world
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
     entity *PlayerEntity;
+    entity *RoadEntity;
     int NumEntities = 0;
 };
 

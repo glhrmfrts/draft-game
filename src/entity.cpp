@@ -539,36 +539,48 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
 
-    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
+    auto ent = PushStruct<entity>(w.Arena);
+    ent->Transform.Position.z = 0.0f;
+    ent->Transform.Scale = vec3{ 2, 4, 1 };
+    ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
+    AddEntity(w, ent);
+    w.RoadEntity = ent;
+
+    auto tex = FindTexture(*loader, "background");
+    for (int i = 0; i < 2; i++)
     {
-        auto ent = PushStruct<entity>(w.Arena);
-        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
-        ent->Transform.Position.z = -0.25f;
-        ent->Transform.Scale = vec3{LEVEL_PLANE_SIZE*2, LEVEL_PLANE_SIZE, 0};
-        ent->Model = CreateModel(&w.Arena, GetFloorMesh(w));
-        ent->Repeat = PushStruct<entity_repeat>(w.Arena);
-        ent->Repeat->Count = LEVEL_PLANE_COUNT;
-        ent->Repeat->Size = LEVEL_PLANE_SIZE;
-        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE/2;
-        AddEntity(w, ent);
+        w.BackgroundState.Instances.push_back(background_instance{i*float(tex->Height)});
     }
-    for (int i = 0; i < LEVEL_PLANE_COUNT; i++)
-    {
-        auto ent = PushStruct<entity>(w.Arena);
-        ent->Transform.Position.y = LEVEL_PLANE_SIZE * i;
-        ent->Transform.Position.z = 0.0f;
-        ent->Transform.Scale = vec3{ 2, LEVEL_PLANE_SIZE, 1 };
-        ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
-        ent->Repeat = PushStruct<entity_repeat>(w.Arena);
-        ent->Repeat->Count = LEVEL_PLANE_COUNT;
-        ent->Repeat->Size = LEVEL_PLANE_SIZE;
-        ent->Repeat->DistanceFromCamera = LEVEL_PLANE_SIZE / 2;
-        AddEntity(w, ent);
-    }
+    w.BackgroundState.Texture = tex;
+}
+
+#define WORLD_ARC_RADIUS   500.0f
+#define WORLD_ARC_Y_FACTOR 0.005f
+vec3 WorldToRenderTransform(const vec3 &worldPos)
+{
+    float r = (WORLD_ARC_RADIUS - worldPos.z);
+    float d = worldPos.y*WORLD_ARC_Y_FACTOR;
+    vec3 result = worldPos;
+    result.y = std::cos(d) * r;
+    result.z = std::sin(d) * r;
+    return result;
 }
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
+    world.RoadEntity->Pos().y = world.Camera->Position.y;
+
+    float velY = world.PlayerEntity->Vel().y;
+    auto tex = world.BackgroundState.Texture;
+    for (auto &bg : world.BackgroundState.Instances)
+    {
+        if (bg.y+float(tex->Height) < 0)
+        {
+            bg.y += tex->Height*2;
+        }
+        bg.y -= velY * dt;
+    }
+
     for (auto ent : world.RemoveOffscreenEntities)
     {
         if (!ent) continue;
@@ -720,10 +732,20 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 
 void RenderBackground(game_main *g, entity_world &w)
 {
-    static auto background = FindTexture(*w.AssetLoader, "background");
+    auto &state = w.BackgroundState;
+    static auto tex = FindTexture(*w.AssetLoader, "background");
+    int numHorizontal = int(std::ceil(float(g->Width) / float(tex->Width)));
+
     UpdateProjectionView(g->GUICamera);
-    Begin(g->GUI, g->GUICamera, 1.0f);
-    DrawTexture(g->GUI, rect{0,0,float(g->Width),float(g->Height)}, background);
+    Begin(g->GUI, g->GUICamera, 0.0f);
+
+    for (auto &bg : state.Instances)
+    {
+        for (int i = 0; i < numHorizontal; i++)
+        {
+            DrawTexture(g->GUI, rect{i*float(tex->Width),bg.y,float(tex->Width),float(tex->Height)}, tex);
+        }
+    }
     End(g->GUI);
 }
 

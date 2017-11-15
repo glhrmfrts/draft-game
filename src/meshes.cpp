@@ -1,5 +1,7 @@
 // Copyright
 
+#define ASTEROID_COLOR  IntColor(0x00fa4f, 0.5f)
+
 static void AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
 {
     PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c, n });
@@ -121,41 +123,32 @@ static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, textur
     AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
 }
 
-#define LEVEL_PLANE_COUNT 32
-#define LEVEL_PLANE_SIZE  8
-#define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
-
-mesh *GetFloorMesh(entity_world &w)
+struct mesh_part_scope
 {
-    if (w.FloorMesh)
+    mesh *Mesh;
+    size_t Offset;
+
+    mesh_part_scope(mesh *m)
     {
-        return w.FloorMesh;
+        Mesh = m;
+        Offset = m->Buffer.VertexCount;
     }
 
-    auto *FloorMesh = PushStruct<mesh>(w.Arena);
-    InitMeshBuffer(FloorMesh->Buffer);
+    void Commit(const material &m, GLuint primType, float lineWidth = DEFAULT_LINE_WIDTH)
+    {
+        size_t count = Mesh->Buffer.VertexCount - Offset;
+        AddPart(this->Mesh, mesh_part{m, Offset, count, primType, lineWidth});
+    }
+};
 
-    material FloorMaterial = {
-        IntColor(SecondPalette.Colors[2]),
-        1.0f,
-        1,
-        FindTexture(*w.AssetLoader, "grid"),
-        0,
-        vec2{2,2}
-    };
+#define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-    float width = 1.0f;
-    float l = -width/2;
-    float r = width/2;
-    AddQuad(FloorMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
-    AddPart(FloorMesh, {FloorMaterial, 0, FloorMesh->Buffer.VertexCount, GL_TRIANGLES});
-    EndMesh(FloorMesh, GL_STATIC_DRAW);
-
-    return w.FloorMesh = FloorMesh;
-}
-
-#define ROAD_LANE_WIDTH 2
-#define ROAD_LANE_COUNT 5
+#define ROAD_SIZE         96
+#define ROAD_LANE_WIDTH   2
+#define ROAD_LANE_COUNT   5
+#define ROAD_BORDER_COLOR IntColor(FirstPalette.Colors[5])
+#define ROAD_FLOOR_COLOR  Color_black
+#define ROAD_LANE_COLOR   color{1,1,1,0.5f}
 
 mesh *GetRoadMesh(entity_world &w)
 {
@@ -164,24 +157,49 @@ mesh *GetRoadMesh(entity_world &w)
         return w.RoadMesh;
     }
 
-    auto *RoadMesh = PushStruct<mesh>(w.Arena);
-    InitMeshBuffer(RoadMesh->Buffer);
+    auto roadMesh = PushStruct<mesh>(w.Arena);
+    InitMeshBuffer(roadMesh->Buffer);
 
-    material RoadMaterial = {Color_black, 0, 0, NULL, 0, vec2{0, 0}};
-    material LaneMaterial = {Color_white, 1.0f, 0, NULL, 0, vec2{0, 0}};
+    auto roadTexture = FindTexture(*w.AssetLoader, "grid");
+    material roadMaterial = {ROAD_FLOOR_COLOR, 0, 0, NULL, 0, vec2{ROAD_LANE_COUNT, 0.5f}};
+    material borderMaterial = {ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{0, 0}};
+    material laneMaterial = {ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{0, 0}};
     float width = 5.0f;
     float l = -width/2;
     float r = width/2;
-    //AddQuad(RoadMesh->Buffer, vec3(l, l, 0), vec3(r, l, 0), vec3(r, r, 0), vec3(l, r, 0), Color_white, vec3(1, 1, 1));
-    //AddPart(RoadMesh, {RoadMaterial, 0, RoadMesh->Buffer.VertexCount, GL_TRIANGLES});
-    for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
-    {
-        AddLine(RoadMesh->Buffer, vec3{l + i, -0.5f, 0.05f}, vec3{l + i, 0.5f, 0.05f});
-    }
-    AddPart(RoadMesh, {LaneMaterial, 6, RoadMesh->Buffer.VertexCount-6, GL_LINES});
-    EndMesh(RoadMesh, GL_STATIC_DRAW);
 
-    return w.RoadMesh = RoadMesh;
+    mesh_part_scope roadScope(roadMesh);
+    for (int y = 0; y < ROAD_SIZE; y++)
+    {
+        AddQuad(roadMesh->Buffer, vec3{l, y, 0}, vec3{r, y, 0}, vec3{r, y+1, 0}, vec3{l, y+1, 0}, Color_white, vec3(1, 1, 1));
+    }
+    roadScope.Commit(roadMaterial, GL_TRIANGLES);
+
+    mesh_part_scope borderScope(roadMesh);
+    for (int y = 0; y < ROAD_SIZE; y++)
+    {
+        for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
+        {
+            if (i == 0 || i == ROAD_LANE_COUNT)
+            {
+                AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f});
+            }
+        }
+    }
+    borderScope.Commit(borderMaterial, GL_LINES, 4);
+
+    mesh_part_scope laneScope(roadMesh);
+    for (int y = 0; y < ROAD_SIZE; y++)
+    {
+        for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
+        {
+            AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f});
+        }
+    }
+    laneScope.Commit(laneMaterial, GL_LINES, 2);
+    EndMesh(roadMesh, GL_STATIC_DRAW);
+
+    return w.RoadMesh = roadMesh;
 }
 
 mesh *GetShipMesh(entity_world &w)
@@ -200,10 +218,10 @@ mesh *GetShipMesh(entity_world &w)
     AddTriangle(ShipMesh->Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, 0), vec3(0, 0.1f, h));
     AddTriangle(ShipMesh->Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
 
-    material ShipMaterial = {Color_white, 0, 0, NULL};
-    material ShipOutlineMaterial = {Color_white, 1, 0, NULL, MaterialFlag_PolygonLines};
-    AddPart(ShipMesh, {ShipMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
-    AddPart(ShipMesh, {ShipOutlineMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
+    material shipMaterial = {Color_white, 0, 0, NULL};
+    material shipOutlineMaterial = {Color_white, 1, 0, NULL, MaterialFlag_PolygonLines};
+    AddPart(ShipMesh, {shipMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
+    AddPart(ShipMesh, {shipOutlineMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
 
     EndMesh(ShipMesh, GL_STATIC_DRAW);
 
@@ -235,8 +253,6 @@ mesh *GetCrystalMesh(entity_world &w)
 
     return w.CrystalMesh = CrystalMesh;
 }
-
-#define ASTEROID_COLOR IntColor(0x00fa4f, 0.5f)
 
 mesh *GetAsteroidMesh(entity_world &w)
 {

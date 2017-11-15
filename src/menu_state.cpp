@@ -13,17 +13,8 @@ void UpdateFinalCamera(game_main *g)
 {
     auto &fc = g->FinalCamera;
     auto &c = g->Camera;
-
-    float r = (500.0f - c.Position.z);
-    float d = c.Position.y*0.005f;
-    fc.Position = c.Position;
-    fc.Position.y = std::cos(d) * r;
-    fc.Position.z = std::sin(d) * r;
-
-    float ld = c.LookAt.y * 0.005f;
-    fc.LookAt = c.LookAt;
-    fc.LookAt.y = std::cos(ld) * r;
-    fc.LookAt.z = std::sin(ld) * r;
+    fc.Position = WorldToRenderTransform(c.Position);
+    fc.LookAt = WorldToRenderTransform(c.LookAt);
 
     if (fc.LookAt.y < fc.Position.y)
     {

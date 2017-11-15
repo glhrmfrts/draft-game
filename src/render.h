@@ -9,6 +9,8 @@
 #define Color_gray    color(0.5, 0.5, 0.5, 1)
 #define Color_yellow  color(1, 1, 0, 1)
 
+#define DEFAULT_LINE_WIDTH 2
+
 struct color_palette
 {
     int Colors[5];
@@ -175,10 +177,11 @@ struct mesh_part
     size_t Offset;
     size_t Count;
     GLuint PrimitiveType;
+    float LineWidth = DEFAULT_LINE_WIDTH;
 
     mesh_part() {}
-    mesh_part(material m, size_t o, size_t c, GLuint p)
-        : Material(m), Offset(o), Count(c), PrimitiveType(p) {}
+    mesh_part(material m, size_t o, size_t c, GLuint p, float lw = DEFAULT_LINE_WIDTH)
+        : Material(m), Offset(o), Count(c), PrimitiveType(p), LineWidth(lw) {}
 };
 
 struct mesh
@@ -281,6 +284,7 @@ struct renderable
     size_t VertexCount;
     GLint VAO;
     GLuint PrimitiveType;
+    GLfloat LineWidth;
 };
 
 #define BloomBlurPassCount 3

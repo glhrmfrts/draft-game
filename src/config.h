@@ -4,9 +4,9 @@
 static bool  Global_DebugUI = false;
 
 static bool  Global_Camera_FreeCam = false;
-static float Global_Camera_OffsetY = -15.0f;
-static float Global_Camera_OffsetZ = 5.0f;
-static float Global_Camera_LookYOffset = 2.0f;
+static float Global_Camera_OffsetY = -3.0f;
+static float Global_Camera_OffsetZ = 3.0f;
+static float Global_Camera_LookYOffset = 10.0f;
 static float Global_Camera_LookZOffset = 0.0f;
 static float Global_Camera_FieldOfView = 75.0f;
 
