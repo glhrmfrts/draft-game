@@ -148,7 +148,7 @@ struct mesh_part_scope
 #define ROAD_LANE_COUNT   5
 #define ROAD_BORDER_COLOR IntColor(FirstPalette.Colors[5])
 #define ROAD_FLOOR_COLOR  Color_black
-#define ROAD_LANE_COLOR   color{1,1,1,0.5f}
+#define ROAD_LANE_COLOR   color{1,1,1,1.0f}
 
 mesh *GetRoadMesh(entity_world &w)
 {
@@ -161,7 +161,7 @@ mesh *GetRoadMesh(entity_world &w)
     InitMeshBuffer(roadMesh->Buffer);
 
     auto roadTexture = FindTexture(*w.AssetLoader, "grid");
-    material roadMaterial = {ROAD_FLOOR_COLOR, 0, 0, NULL, 0, vec2{ROAD_LANE_COUNT, 0.5f}};
+    material roadMaterial = {ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{1, 1}};
     material borderMaterial = {ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{0, 0}};
     material laneMaterial = {ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{0, 0}};
     float width = 5.0f;
@@ -248,7 +248,7 @@ mesh *GetCrystalMesh(entity_world &w)
     AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
     AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
 
-    AddPart(CrystalMesh, mesh_part{ material{ CRYSTAL_COLOR, 1.0f, 0, NULL }, 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
+    AddPart(CrystalMesh, mesh_part{ material{ CRYSTAL_COLOR, 1.0f, 0, NULL, MaterialFlag_TransformUniform }, 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
     EndMesh(CrystalMesh, GL_STATIC_DRAW);
 
     return w.CrystalMesh = CrystalMesh;

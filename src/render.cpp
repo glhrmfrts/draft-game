@@ -479,7 +479,7 @@ UnbindFramebuffer(render_state &RenderState)
 {
     // @TODO: un-hardcode this
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, 1280, 720);
+    glViewport(0, 0, GAME_BASE_WIDTH, GAME_BASE_HEIGHT);
 }
 
 void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
@@ -643,7 +643,7 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
     }
     r.Width = width;
     r.Height = height;
-    r.FogColor = IntColor(FirstPalette.Colors[3]) * 0.5f;
+    r.FogColor = IntColor(FirstPalette.Colors[3]) * 0.05f;
     r.FogColor.a = 1.0f;
 
     InitShaderProgram(
@@ -712,19 +712,20 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
 #endif
 }
 
-inline void RenderClear()
+inline void RenderClear(render_state &rs)
 {
-    glClearColor(0,0,0,0);
+    color c = rs.FogColor;
+    glClearColor(c.r, c.g, c.b, c.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void PostProcessBegin(render_state &r)
+void PostProcessBegin(render_state &rs)
 {
     if (Global_Renderer_DoPostFX)
     {
-        BindFramebuffer(r.MultisampledSceneFramebuffer);
+        BindFramebuffer(rs.MultisampledSceneFramebuffer);
     }
-    RenderClear();
+    RenderClear(rs);
 }
 
 enum blur_orientation

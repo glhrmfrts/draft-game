@@ -15,23 +15,16 @@
 #define SCORE_DRAFT             5
 #define SCORE_CRYSTAL           2
 
-#define GEN_PLAYER_OFFSET 200
+#define GEN_PLAYER_OFFSET 250
 
-#define SPAWN_CHECKPOINT_ONCE(g, l) { \
-        static bool cp = false; \
-        if (!cp) \
-        { \
-            cp = true; \
-            SpawnCheckpoint(g, l); \
-        } \
-    } \
+// TODO: make possible to share the entity-generation system with the menu
 
 struct audio_source
 {
     ALuint Source;
     float Gain = 1;
 };
-static audio_source *CreateAudioSource(memory_arena &arena, ALuint buffer)
+audio_source *CreateAudioSource(memory_arena &arena, ALuint buffer)
 {
     auto result = PushStruct<audio_source>(arena);
     alGenSources(1, &result->Source);
@@ -44,12 +37,12 @@ static audio_source *CreateAudioSource(memory_arena &arena, ALuint buffer)
     return result;
 }
 
-static void UpdateAudioParams(audio_source *audio)
+void UpdateAudioParams(audio_source *audio)
 {
     alSourcef(audio->Source, AL_GAIN, audio->Gain);
 }
 
-static int GetNextSpawnLane(level_state *l, bool isShip = false)
+int GetNextSpawnLane(level_state *l, bool isShip = false)
 {
     static int lastLane = 0;
     static int lastShipLane = 0;
@@ -66,7 +59,7 @@ static int GetNextSpawnLane(level_state *l, bool isShip = false)
     return lane;
 }
 
-static int GetNextShipColor(level_state *l)
+int GetNextShipColor(level_state *l)
 {
     static int lastColor = 0;
     int color = lastColor;
@@ -142,7 +135,62 @@ LEVEL_GEN_FUNC(GenerateAsteroid)
     AddEntity(g->World, ent);
 }
 
-static void InitLevel(game_main *g)
+LEVEL_GEN_FUNC(GenerateSideTrail)
+{
+    // TODO: create the side trail pool
+    auto ent = CreateEntity(&g->World.Arena);
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+    ent->Trail = CreateTrail(&g->World.Arena, ent, Color_white, 0.5f, true);
+    AddFlags(ent, EntityFlag_RemoveOffscreen | EntityFlag_UpdateMovement);
+    AddEntity(g->World, ent);
+
+    ent->Vel().y = RandomBetween(l->Entropy, -25.0f, -75.0f);
+    ent->Pos().x = RandomBetween(l->Entropy, 10.0f, 40.0f);
+    if (RandomBetween(l->Entropy, 0, 1) == 0)
+    {
+        ent->Pos().x = -ent->Pos().x;
+    }
+}
+
+LEVEL_GEN_FUNC(GenerateRandomGeometry)
+{
+    // TODO: create a pool for this
+    mesh *m = NULL;
+    vec3 scale = vec3(1.0f);
+    color c = Color_white;
+    if (RandomBetween(l->Entropy, 0, 1) == 0)
+    {
+        m = GetCrystalMesh(g->World);
+        c = CRYSTAL_COLOR;
+        scale = vec3{50.0f, 50.0f, 200.0f};
+    }
+    else
+    {
+        m = GetAsteroidMesh(g->World);
+        c = ASTEROID_COLOR;
+        scale = vec3(50.0f);
+    }
+
+    auto ent = CreateEntity(&g->World.Arena);
+    ent->Model = CreateModel(&g->World.Arena, m);
+    ent->FrameRotation = PushStruct<frame_rotation>(&g->World.Arena);
+    ent->FrameRotation->Rotation.x = RandomBetween(l->Entropy, -45.0f, 45.0f);
+    ent->FrameRotation->Rotation.y = RandomBetween(l->Entropy, -45.0f, 45.0f);
+    ent->FrameRotation->Rotation.z = RandomBetween(l->Entropy, -45.0f, 45.0f);
+    //ent->Trail = CreateTrail(&g->World.Arena, ent, c, 0.5f, true);
+
+    ent->Pos().x = RandomBetween(l->Entropy, -1000.0f, 1000.0f);
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2.0f;
+    ent->Pos().z = RandomBetween(l->Entropy, -100.0f, -600.0f);
+    ent->Vel().x = RandomBetween(l->Entropy, -20.0f, 20.0f);
+    ent->Vel().y = RandomBetween(l->Entropy, -1.0f, -50.0f);
+    ent->SetScl(scale);
+
+    AddFlags(ent, EntityFlag_RemoveOffscreen | EntityFlag_UpdateMovement);
+    AddEntity(g->World, ent);
+}
+
+void InitLevel(game_main *g)
 {
     g->State = GameState_Level;
 
@@ -180,17 +228,29 @@ static void InitLevel(game_main *g)
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateAsteroid;
 
+    gen = l->GenParams + LevelGenType_SideTrail;
+    gen->Flags = LevelGenFlag_Enabled | LevelGenFlag_Randomize;
+    gen->Interval = 0.5f;
+    gen->RandomOffset = 0.4f;
+    gen->Func = GenerateSideTrail;
+
+    gen = l->GenParams + LevelGenType_RandomGeometry;
+    gen->Flags = LevelGenFlag_Enabled | LevelGenFlag_Randomize;
+    gen->Interval = 0.5f;
+    gen->RandomOffset = 0.4f;
+    gen->Func = GenerateRandomGeometry;
+
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
     {
         l->ReservedLanes[i] = 0;
     }
 }
 
-static void DebugReset(game_main *g)
+void DebugReset(game_main *g)
 {
 }
 
-static void AddIntroText(game_main *g, level_state *l, const char *text, color c)
+void AddIntroText(game_main *g, level_state *l, const char *text, color c)
 {
     auto introText = PushStruct<level_intro_text>(GetEntry(l->IntroTextPool));
     introText->Color = color{c.r, c.g, c.b, 0.0f};
@@ -231,7 +291,7 @@ static void AddIntroText(game_main *g, level_state *l, const char *text, color c
     l->IntroTextList.push_back(introText);
 }
 
-static void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
+void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
     vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(pos), 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
@@ -272,7 +332,7 @@ struct find_entity_result
     entity *Found = NULL;
     entity *Other = NULL;
 };
-static find_entity_result FindEntityOfType(entity *first, entity *second, collider_type type)
+find_entity_result FindEntityOfType(entity *first, entity *second, collider_type type)
 {
     find_entity_result result;
     if (first->Collider->Type == type)
@@ -336,7 +396,7 @@ void PlayerEnemyCollision(level_state *l, entity_world &w,
     RemoveEntity(w, enemy);
 }
 
-static bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
+bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
 {
     auto l = &g->LevelState;
     auto shipEntity = FindEntityOfType(first, second, ColliderType_Ship).Found;
@@ -457,7 +517,7 @@ static bool HandleCollision(game_main *g, entity *first, entity *second, float d
     return false;
 }
 
-static void UpdateListener(camera &cam, vec3 PlayerPosition)
+void UpdateListener(camera &cam, vec3 PlayerPosition)
 {
     static float *orient = new float[6];
     orient[0] = cam.View[2][0];
@@ -471,7 +531,7 @@ static void UpdateListener(camera &cam, vec3 PlayerPosition)
     alListener3f(AL_VELOCITY, 0, 0, 0);
 }
 
-static void UpdateFreeCam(camera &cam, game_input &input, float dt)
+void UpdateFreeCam(camera &cam, game_input &input, float dt)
 {
     static float pitch;
     static float yaw;
@@ -498,29 +558,29 @@ static void UpdateFreeCam(camera &cam, game_input &input, float dt)
     cam.Position += vec3(sin(strafeYaw), cos(strafeYaw), 0) * hAxisValue * speed * dt;
 }
 
-static void KeepEntityInsideOfRoad(entity *ent)
+void KeepEntityInsideOfRoad(entity *ent)
 {
     const float limit = ROAD_LANE_COUNT * ROAD_LANE_WIDTH / 2;
     ent->Pos().x = glm::clamp(ent->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
-static void ResetGen(level_gen_params *p)
+void ResetGen(level_gen_params *p)
 {
     p->Interval = INITIAL_SHIP_INTERVAL;
     p->Timer = p->Interval;
 }
 
-static float GetNextTimer(level_gen_params *p, random_series random)
+float GetNextTimer(level_gen_params *p, random_series random)
 {
     if (p->Flags & LevelGenFlag_Randomize)
     {
-        const float offset = 1.5f;
+        const float offset = p->RandomOffset;
         return p->Interval + RandomBetween(random, -offset, offset);
     }
     return p->Interval;
 }
 
-static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float dt)
+void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float dt)
 {
     if (!(p->Flags & LevelGenFlag_Enabled))
     {
@@ -568,7 +628,7 @@ static void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float d
     p->Timer -= dt;
 }
 
-static void SpawnCheckpoint(game_main *g, level_state *l)
+void SpawnCheckpoint(game_main *g, level_state *l)
 {
     auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g->World));
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2;
@@ -579,7 +639,7 @@ static void SpawnCheckpoint(game_main *g, level_state *l)
 
 #define FrameSeconds(s) (s * 60)
 
-static void UpdateClassicMode(game_main *g, level_state *l)
+void UpdateClassicMode(game_main *g, level_state *l)
 {
     auto crystals = l->GenParams + LevelGenType_Crystal;
     auto ships = l->GenParams + LevelGenType_Ship;

@@ -55,7 +55,7 @@ enum checkpoint_state
     CheckpointState_Active,
 };
 
-#define CHECKPOINT_FADE_OUT_DURATION 1.0f
+#define CHECKPOINT_FADE_OUT_DURATION 4.0f
 struct checkpoint
 {
     float Timer = 0;
@@ -69,6 +69,7 @@ struct trail_piece;
 #define EntityFlag_Kinematic        0x1
 #define EntityFlag_IsPlayer         0x2
 #define EntityFlag_RemoveOffscreen  0x4
+#define EntityFlag_UpdateMovement   0x8
 enum collider_type
 {
     ColliderType_Crystal,
@@ -186,6 +187,7 @@ struct entity_world
     std::vector<entity *> RemoveOffscreenEntities;
     std::vector<entity *> LaneSlotEntities;
     std::vector<entity *> RotatingEntities;
+    std::vector<entity *> MovementEntities;
     asset_loader *AssetLoader = NULL;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;

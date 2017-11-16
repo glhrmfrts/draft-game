@@ -155,6 +155,7 @@ struct camera
 
 #define MaterialFlag_PolygonLines     0x1
 #define MaterialFlag_ForceTransparent 0x2
+#define MaterialFlag_TransformUniform 0x4
 struct material
 {
     color DiffuseColor = Color_white;

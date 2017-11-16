@@ -22,10 +22,10 @@ static float Global_Game_WallRaiseTime      = 0.5f;
 static float Global_Game_WallStartOffset    = -5.0f;
 static float Global_Game_WallHeight         = 10.0f;
 
-static bool  Global_Renderer_DoPostFX = true;
+static bool  Global_Renderer_DoPostFX = false;
 static bool  Global_Renderer_BloomEnabled = true;
 static float Global_Renderer_BloomBlurOffset = 1.8f;
-static float Global_Renderer_FogStart = 30.0f;
-static float Global_Renderer_FogEnd = 500.0f;
+static float Global_Renderer_FogStart = 500.0f;
+static float Global_Renderer_FogEnd = 1000.0f;
 
 #endif

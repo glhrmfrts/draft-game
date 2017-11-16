@@ -438,6 +438,10 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.CheckpointEntities, ent);
     }
+    if (ent->Flags & EntityFlag_UpdateMovement)
+    {
+        AddEntityToList(world.MovementEntities, ent);
+    }
     world.NumEntities++;
 }
 
@@ -523,6 +527,10 @@ void RemoveEntity(entity_world &world, entity *ent)
         RemoveEntityFromList(world.CheckpointEntities, ent);
         FreeEntry(world.CheckpointPool, ent->PoolEntry);
     }
+    if (ent->Flags & EntityFlag_UpdateMovement)
+    {
+        RemoveEntityFromList(world.MovementEntities, ent);
+    }
     world.NumEntities = std::max(0, world.NumEntities - 1);
 }
 
@@ -581,11 +589,16 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         bg.y -= velY * dt;
     }
 
+    for (auto ent : world.MovementEntities)
+    {
+        if (!ent) continue;
+        ent->Transform.Position += ent->Transform.Velocity * dt;
+    }
     for (auto ent : world.RemoveOffscreenEntities)
     {
         if (!ent) continue;
 
-        if (ent->Pos().y < world.Camera->Position.y)
+        if (ent->Pos().y < world.Camera->Position.y - 50.0f)
         {
             RemoveEntity(world, ent);
         }
@@ -743,7 +756,7 @@ void RenderBackground(game_main *g, entity_world &w)
     {
         for (int i = 0; i < numHorizontal; i++)
         {
-            DrawTexture(g->GUI, rect{i*float(tex->Width),bg.y,float(tex->Width),float(tex->Height)}, tex);
+            //DrawTexture(g->GUI, rect{i*float(tex->Width),bg.y,float(tex->Width),float(tex->Height)}, tex);
         }
     }
     End(g->GUI);

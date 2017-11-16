@@ -12,7 +12,6 @@ uniform vec4 u_DiffuseColor;
 uniform float u_Emission;
 uniform float u_TexWeight;
 uniform float u_FogWeight;
-uniform int u_MaterialFlags;
 uniform vec2 u_UvScale;
 uniform vec4 u_ExplosionLightColor;
 uniform float u_ExplosionLightTimer;

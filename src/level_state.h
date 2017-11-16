@@ -26,6 +26,8 @@ enum level_gen_type
     LevelGenType_Ship,
     LevelGenType_RedShip,
     LevelGenType_Asteroid,
+    LevelGenType_SideTrail,
+    LevelGenType_RandomGeometry,
     LevelGenType_MAX,
 };
 
@@ -42,6 +44,7 @@ struct level_gen_params
     level_gen_func *Func;
     float Interval;
     float Timer = 0;
+    float RandomOffset = 1.5f;
     int ReservedLane = NO_RESERVED_LANE;
 };
 
