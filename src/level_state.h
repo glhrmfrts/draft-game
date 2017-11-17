@@ -110,9 +110,9 @@ struct level_state
 
     std::vector<collision_result> CollisionCache;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
-    float Health = 1.0f;
     float TimeElapsed = 0;
     float DamageTimer = 0;
+    int Health = 100;
     int CurrentCheckpointFrame = 0;
     int CheckpointNum = 0;
     int PlayerLaneIndex = 0;

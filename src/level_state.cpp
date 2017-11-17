@@ -7,17 +7,20 @@
 #define SCORE_TEXT_DRAFT      "DRAFT"
 #define SCORE_TEXT_BLAST      "BLAST"
 #define SCORE_TEXT_MISS       "MISS"
-#define SCORE_TEXT_CRYSTAL    "CRYSTAL"
+#define SCORE_TEXT_HEALTH    "HEALTH"
 
 #define SCORE_CHECKPOINT        20
 #define SCORE_DESTROY_BLUE_SHIP 10
 #define SCORE_MISS_ORANGE_SHIP  10
 #define SCORE_DRAFT             5
-#define SCORE_CRYSTAL           2
+#define SCORE_HEALTH            2
 
 #define GEN_PLAYER_OFFSET 250
 
-// TODO: make possible to share the entity-generation system with the menu
+// TODO: make possible to share the entity-generation system with the
+// menu
+//
+// TODO: update asteroids velocity (or remove them?)
 
 struct audio_source
 {
@@ -121,16 +124,16 @@ LEVEL_GEN_FUNC(GenerateRedShip)
     AddEntity(g->World, ent);
 }
 
-#define ASTEROID_Z (SHIP_Z + 10)
+#define ASTEROID_Z (SHIP_Z + 80)
 LEVEL_GEN_FUNC(GenerateAsteroid)
 {
     //Println("I should be generating an asteroid");
     auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g->World));
     int lane = l->PlayerLaneIndex - 2;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y - 10.0f;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + (GEN_PLAYER_OFFSET/2) + (100.0f * (g->World.PlayerEntity->Vel().y/PLAYER_MAX_VEL_LIMIT));
     ent->Pos().z = ASTEROID_Z;
-    ent->Vel().y = g->World.PlayerEntity->Vel().y * 1.5f;
+    //ent->Vel().y = g->World.PlayerEntity->Vel().y * 1.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
 }
@@ -362,7 +365,7 @@ inline static void ApplyBoostToShip(entity *ent, float Boost, float Max)
 #define SHIP_IS_ORANGE(s) (s->ColorIndex == 1)
 #define SHIP_IS_RED(s)    (s->ColorIndex == 2)
 
-void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player, float health)
+void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player, int health)
 {
     l->DamageTimer = PLAYER_DAMAGE_TIMER;
     l->Health -= health;
@@ -379,7 +382,7 @@ void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player,
 }
 
 void PlayerEnemyCollision(level_state *l, entity_world &w,
-                          entity *player, entity *enemy, float health)
+                          entity *player, entity *enemy, int health)
 {
     PlayerExplodeAndLoseHealth(l, w, player, health);
     player->Vel().y = std::min(PLAYER_MIN_VEL, enemy->Vel().y);
@@ -450,7 +453,7 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
             }
             else if (SHIP_IS_ORANGE(entityToExplode->Ship))
             {
-                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 0.25f);
+                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 25);
             }
 
             auto exp = CreateExplosionEntity(
@@ -469,7 +472,7 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
         {
             if (otherEntity->Flags & EntityFlag_IsPlayer)
             {
-                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 0.25f);
+                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 25);
                 return false;
             }
         }
@@ -481,8 +484,8 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
     {
         if (shipEntity->Flags & EntityFlag_IsPlayer)
         {
-            l->Score += SCORE_CRYSTAL;
-            AddScoreText(g, l, SCORE_TEXT_CRYSTAL, SCORE_CRYSTAL, crystalEntity->Pos(), CRYSTAL_COLOR);
+            l->Health += SCORE_HEALTH;
+            AddScoreText(g, l, SCORE_TEXT_HEALTH, SCORE_HEALTH, crystalEntity->Pos(), CRYSTAL_COLOR);
 
             auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool),
                                            g->LevelState.Entropy,
@@ -734,10 +737,15 @@ void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
         }
+        if (frame == FrameSeconds(2))
+        {
+            AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
+        }
         if (frame == FrameSeconds(5))
         {
             l->ForceShipColor = -1;
             Enable(ships);
+            Enable(asteroids);
         }
         break;
     }
@@ -766,14 +774,12 @@ void UpdateLevel(game_main *g, float dt)
     static bool paused = false;
     if (IsJustPressed(g, Action_debugPause))
     {
-        paused = !paused;
+        l->CheckpointNum++;
+        l->CurrentCheckpointFrame = 0;
+        //paused = !paused;
     }
     if (paused) return;
 
-    if (g->Input.Keys[SDL_SCANCODE_R])
-    {
-        DebugReset(g);
-    }
     if (Global_Camera_FreeCam)
     {
         UpdateFreeCam(cam, input, dt);
@@ -962,14 +968,7 @@ void UpdateLevel(game_main *g, float dt)
 
         if (ent->Pos().z > 0.0f && !ent->Asteroid->Exploded)
         {
-            if (ent->Pos().y > playerEntity->Pos().y)
-            {
-                ent->Vel().z -= 30.0f * dt;
-            }
-            else
-            {
-                ent->Vel().z -= 8.0f * dt;
-            }
+            ent->Vel().z -= 80.0f * dt;
             //ent->Vel().y = playerEntity->Vel().y * 1.2f;
         }
         else
@@ -1018,7 +1017,7 @@ void UpdateLevel(game_main *g, float dt)
 
                 l->CheckpointNum++;
                 l->CurrentCheckpointFrame = 0;
-                PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 0.25f);
+                PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 25);
             }
             break;
 
@@ -1094,7 +1093,7 @@ void UpdateLevel(game_main *g, float dt)
         FreeEntryFromData(l->IntroTextPool, introText);
     }
 
-    l->Health = std::max(l->Health, 0.0f);
+    l->Health = std::max(l->Health, 0);
     updateTime.End = g->Platform.GetMilliseconds();
 }
 
@@ -1133,7 +1132,6 @@ void RenderLevel(game_main *g, float dt)
     for (auto text : l->IntroTextList)
     {
         vec2 p = text->Pos;
-        Println(text->Color.a);
         DrawTextCentered(g->GUI, textFont, text->Text, rect{p.x,p.y,0,0}, text->Color);
     }
     for (auto text : l->ScoreTextList)
@@ -1156,7 +1154,7 @@ void RenderLevel(game_main *g, float dt)
     float left = GetRealPixels(g, 10.0f);
     float top = g->Height - GetRealPixels(g, 10.0f);
     DrawText(g->GUI, hudFont, Format(l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
-    DrawText(g->GUI, hudFont, Format(l->HealthFormat, int(l->Health * 100)), rect{left + 400, top - fontSize, 0, 0}, Color_white);
+    DrawText(g->GUI, hudFont, Format(l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();

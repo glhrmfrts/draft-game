@@ -143,12 +143,13 @@ struct mesh_part_scope
 
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-#define ROAD_SIZE         96
-#define ROAD_LANE_WIDTH   2
-#define ROAD_LANE_COUNT   5
-#define ROAD_BORDER_COLOR IntColor(FirstPalette.Colors[5])
-#define ROAD_FLOOR_COLOR  Color_black
-#define ROAD_LANE_COLOR   color{1,1,1,1.0f}
+#define ROAD_SEGMENT_COUNT 10
+#define ROAD_SEGMENT_SIZE  24
+#define ROAD_LANE_WIDTH    2
+#define ROAD_LANE_COUNT    5
+#define ROAD_BORDER_COLOR  IntColor(FirstPalette.Colors[5])
+#define ROAD_FLOOR_COLOR   Color_black
+#define ROAD_LANE_COLOR    color{1,1,1,1.0f}
 
 mesh *GetRoadMesh(entity_world &w)
 {
@@ -169,14 +170,14 @@ mesh *GetRoadMesh(entity_world &w)
     float r = width/2;
 
     mesh_part_scope roadScope(roadMesh);
-    for (int y = 0; y < ROAD_SIZE; y++)
+    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
     {
         AddQuad(roadMesh->Buffer, vec3{l, y, 0}, vec3{r, y, 0}, vec3{r, y+1, 0}, vec3{l, y+1, 0}, Color_white, vec3(1, 1, 1));
     }
     roadScope.Commit(roadMaterial, GL_TRIANGLES);
 
     mesh_part_scope borderScope(roadMesh);
-    for (int y = 0; y < ROAD_SIZE; y++)
+    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
     {
         for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
         {
@@ -189,11 +190,19 @@ mesh *GetRoadMesh(entity_world &w)
     borderScope.Commit(borderMaterial, GL_LINES, 4);
 
     mesh_part_scope laneScope(roadMesh);
-    for (int y = 0; y < ROAD_SIZE; y++)
+    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
     {
         for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
         {
-            AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f});
+            if (y % 2 == 0)
+            {
+                color c = Color_white;
+                if (y % 4 == 0)
+                {
+                    c = Color_red;
+                }
+                AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f}, c);
+            }
         }
     }
     laneScope.Commit(laneMaterial, GL_LINES, 2);
@@ -284,7 +293,7 @@ mesh *GetAsteroidMesh(entity_world &w)
         }
     }
 
-    AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 0.0f, 0, NULL}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
+    AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 0.0f, 0, NULL, MaterialFlag_TransformUniform}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
     EndMesh(astMesh, GL_STATIC_DRAW);
     return w.AsteroidMesh = astMesh;
 }

@@ -547,12 +547,19 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
 
-    auto ent = PushStruct<entity>(w.Arena);
-    ent->Transform.Position.z = 0.0f;
-    ent->Transform.Scale = vec3{ 2, 4, 1 };
-    ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
-    AddEntity(w, ent);
-    w.RoadEntity = ent;
+    for (int i = 0; i < ROAD_SEGMENT_COUNT; i++)
+    {
+        auto ent = PushStruct<entity>(w.Arena);
+        ent->Pos().y = i*ROAD_SEGMENT_SIZE;
+        ent->Pos().z = 0.0f;
+        ent->Transform.Scale = vec3{ 2, 2, 1 };
+        ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
+        ent->Repeat = PushStruct<entity_repeat>(&w.Arena);
+        ent->Repeat->Count = ROAD_SEGMENT_COUNT;
+        ent->Repeat->Size = ROAD_SEGMENT_SIZE;
+        ent->Repeat->DistanceFromCamera = ROAD_SEGMENT_SIZE;
+        AddEntity(w, ent);
+    }
 
     auto tex = FindTexture(*loader, "background");
     for (int i = 0; i < 2; i++)
@@ -576,8 +583,6 @@ vec3 WorldToRenderTransform(const vec3 &worldPos)
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
-    world.RoadEntity->Pos().y = world.Camera->Position.y;
-
     float velY = world.PlayerEntity->Vel().y;
     auto tex = world.BackgroundState.Texture;
     for (auto &bg : world.BackgroundState.Instances)
