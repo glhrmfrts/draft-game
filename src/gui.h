@@ -31,6 +31,12 @@ struct gui_draw_command
         : DiffuseColor(c), PrimitiveType(p), Offset(o), Count(cnt), TexWeight(tw), Texture(t) {}
 };
 
+struct menu_axis
+{
+    uint8 Type;
+    float Timer = 0.0f;
+};
+
 struct game_input;
 struct gui
 {
@@ -40,6 +46,12 @@ struct gui
     shader_program Program;
     game_input *Input;
     float EmissionValue;
+    
+    // menu stuff
+    tween_sequence MenuChangeSequence;
+    menu_axis HorizontalAxis;
+    menu_axis VerticalAxis;
+    float MenuChangeTimer = 0;
 
     // uniforms
     int ProjectionView;
@@ -47,6 +59,32 @@ struct gui
     int Sampler;
     int TexWeight;
     int Emission;
+};
+
+enum menu_item_type
+{
+    MenuItemType_Text,
+};
+struct menu_item
+{
+    const char *Text;
+    menu_item_type Type;
+    bool Enabled = true;
+};
+
+struct game_main;
+struct menu_data;
+
+#define MENU_FUNC(name) void name(game_main *g, menu_data *menu, int itemIndex)
+typedef MENU_FUNC(menu_func);
+
+struct menu_data
+{
+    const char *Title;
+    int NumItems;
+    menu_func *SelectFunc; // function called when an item in the submenu is selected
+    menu_item Items[8];
+    int HotItem=0;
 };
 
 #endif

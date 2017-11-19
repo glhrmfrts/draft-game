@@ -40,7 +40,7 @@ extern "C"
         ImGui_ImplSdlGL3_Init(g->Window);
 
         RegisterInputActions(g->Input);
-        InitGUI(g->GUI, g->Input);
+        InitGUI(g->GUI, g->TweenState, g->Input);
         MakeCameraOrthographic(g->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
@@ -93,6 +93,14 @@ extern "C"
                 "data/fonts/unispace.ttf",
                 "unispace_32",
                 (void *)int(GetRealPixels(g, 32.0f))
+            )
+        );
+        g->Assets.push_back(
+            CreateAssetEntry(
+                AssetType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_48",
+                (void *)int(GetRealPixels(g, 48.0f))
             )
         );
         g->Assets.push_back(

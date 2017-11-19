@@ -643,8 +643,7 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
     }
     r.Width = width;
     r.Height = height;
-    r.FogColor = IntColor(FirstPalette.Colors[3]) * 0.05f;
-    r.FogColor.a = 1.0f;
+    r.FogColor = Color_black;
 
     InitShaderProgram(
         r.ModelProgram,

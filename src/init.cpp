@@ -10,6 +10,7 @@ void RegisterInputActions(game_input &input)
     input.Actions[Action_debugUI] = action_state{ SDL_SCANCODE_GRAVE, 0, 0, 0, Axis_Invalid, Button_Invalid };
     input.Actions[Action_debugPause] = action_state{ SDL_SCANCODE_P, 0, 0, 0, Axis_Invalid, Button_Invalid };
     input.Actions[Action_select] = action_state{ SDL_SCANCODE_RETURN, 0, 0, 0, Axis_Invalid, XboxButton_A };
+    input.Actions[Action_pause] = action_state{ SDL_SCANCODE_ESCAPE, 0, 0, 0, Axis_Invalid, XboxButton_Start };
 }
 
 static void InitLoadingScreen(game_main *Game)

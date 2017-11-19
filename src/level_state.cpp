@@ -22,6 +22,16 @@
 //
 // TODO: update asteroids velocity (or remove them?)
 
+void PauseMenuCallback(game_main *, menu_data *, int);
+
+static menu_data pauseMenu = {
+    "PAUSED", 2, PauseMenuCallback,
+    {
+        menu_item{"CONTINUE", MenuItemType_Text},
+        menu_item{"EXIT", MenuItemType_Text},
+    }
+};
+
 struct audio_source
 {
     ALuint Source;
@@ -513,7 +523,7 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
                 vec3{ 0, 1, 1 }
             );
             AddEntity(g->World, exp);
-            RemoveEntity(g->World, shipEntity);
+            PlayerExplodeAndLoseHealth(l, g->World, shipEntity, 50);
         }
         return false;
     }
@@ -763,162 +773,251 @@ void UpdateLevel(game_main *g, float dt)
     auto *playerEntity = g->World.PlayerEntity;
     auto *playerShip = playerEntity->Ship;
     updateTime.Begin = g->Platform.GetMilliseconds();
-
-    dt *= Global_Game_TimeSpeed;
-    l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
-    l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
-    l->TimeElapsed += dt;
-    l->DamageTimer -= dt;
-    l->DamageTimer = std::max(l->DamageTimer, 0.0f);
-
-    static bool paused = false;
-    if (IsJustPressed(g, Action_debugPause))
+    
+    if (IsJustPressed(g, Action_pause))
     {
-        l->CheckpointNum++;
-        l->CurrentCheckpointFrame = 0;
-        //paused = !paused;
-    }
-    if (paused) return;
-
-    if (Global_Camera_FreeCam)
-    {
-        UpdateFreeCam(cam, input, dt);
-    }
-
-    if (g->Input.Keys[SDL_SCANCODE_E])
-    {
-        auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
-                                         playerEntity->Transform.Position,
-                                         playerEntity->Transform.Velocity,
-                                         playerEntity->Ship->Color,
-                                         playerEntity->Ship->OutlineColor,
-                                         vec3{ 0, 1, 1 });
-        AddEntity(world, exp);
-    }
-
-    UpdateClassicMode(g, l);
-    for (int i = 0; i < LevelGenType_MAX; i++)
-    {
-        UpdateGen(g, l, l->GenParams + i, dt);
-    }
-
-    {
-        // player movement
-        float moveX = GetAxisValue(input, Action_horizontal);
-        float moveY = GetAxisValue(input, Action_vertical);
-        if (moveY > 0.0f)
+        if (l->GameplayState == GameplayState_Playing)
         {
-            moveY = 0.0f;
-        }
-        MoveShipEntity(playerEntity, moveX, moveY, l->PlayerMaxVel, dt);
-
-        float &playerX = playerEntity->Pos().x;
-        float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);
-        nearestLane = glm::clamp(nearestLane, -2.0f, 2.0f);
-        float targetX = nearestLane * ROAD_LANE_WIDTH;
-        if (moveX == 0.0f)
-        {
-            float dif = targetX - playerX;
-            if (std::abs(dif) > ROAD_LANE_WIDTH)
-            {
-                playerEntity->Vel().x += ROAD_LANE_WIDTH * glm::normalize(dif);
-            }
-            else if (std::abs(dif) > 0.05f)
-            {
-                playerEntity->Vel().x += dif;
-            }
-        }
-
-        if (l->DraftCharge == 1.0f && IsPressed(g, Action_boost))
-        {
-            l->Score += SCORE_DRAFT;
-            l->CurrentDraftTime = 0.0f;
-            l->DraftActive = true;
-            if (l->DraftTarget->Checkpoint)
-            {
-                if (l->DraftTarget->Checkpoint->State == CheckpointState_Initial)
-                {
-                    l->DraftTarget->Checkpoint->State = CheckpointState_Drafted;
-                }
-                l->DraftTarget = NULL;
-            }
-            else if (l->DraftTarget->Ship)
-            {
-                l->DraftTarget->Ship->HasBeenDrafted = true;
-                AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
-            }
-            ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
-        }
-
-        l->PlayerLaneIndex = int(nearestLane)+2;
-    }
-
-    size_t frameCollisionCount = 0;
-    DetectCollisions(world.CollisionEntities, l->CollisionCache, frameCollisionCount);
-    for (size_t i = 0; i < frameCollisionCount; i++)
-    {
-        auto col = &l->CollisionCache[i];
-        col->First->NumCollisions++;
-        col->Second->NumCollisions++;
-
-        if (HandleCollision(g, col->First, col->Second, dt))
-        {
-            ResolveCollision(*col);
-        }
-    }
-
-    Integrate(world.CollisionEntities, g->Gravity, dt);
-    if (l->NumTrailCollisions == 0)
-    {
-        l->CurrentDraftTime -= dt;
-    }
-
-    l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
-    l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
-    l->NumTrailCollisions = 0;
-
-    if (!Global_Camera_FreeCam)
-    {
-        UpdateCameraToPlayer(g->Camera, playerEntity, dt);
-    }
-
-    if (l->DamageTimer > 0.0f)
-    {
-        int even = int(l->DamageTimer * 3);
-        playerEntity->Model->Visible = (even % 2) == 1;
-    }
-    else
-    {
-        playerEntity->Model->Visible = true;
-    }
-
-    UpdateLogiclessEntities(world, dt);
-    for (int i = 0; i < ROAD_LANE_COUNT; i++)
-    {
-        l->LaneSlots[i] = 0;
-    }
-    for (auto ent : world.LaneSlotEntities)
-    {
-        if (!ent) continue;
-
-        l->LaneSlots[ent->LaneSlot->Index]++;
-    }
-    for (auto ent : world.ShipEntities)
-    {
-        if (!ent) continue;
-
-        // red ship goes backwards
-        if (SHIP_IS_RED(ent->Ship))
-        {
-            ent->Rot().z = 180.0f;
-            ent->Vel().y = -PLAYER_MIN_VEL;
+            l->GameplayState = GameplayState_Paused;
         }
         else
         {
-            if (!(l->DraftTarget == ent && l->DraftActive) ||
-                (ent->Pos().y < playerEntity->Pos().y && playerEntity->Vel().y < ent->Ship->PassedVelocity))
+            l->GameplayState = GameplayState_Playing;
+        }
+    }
+
+    dt *= Global_Game_TimeSpeed;
+    if (l->GameplayState != GameplayState_Paused)
+    {
+        l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+        l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
+        l->TimeElapsed += dt;
+        l->DamageTimer -= dt;
+        l->DamageTimer = std::max(l->DamageTimer, 0.0f);
+
+        if (IsJustPressed(g, Action_debugPause))
+        {
+            l->CheckpointNum++;
+            l->CurrentCheckpointFrame = 0;
+        }
+
+        if (Global_Camera_FreeCam)
+        {
+            UpdateFreeCam(cam, input, dt);
+        }
+
+        if (g->Input.Keys[SDL_SCANCODE_E])
+        {
+            auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+                                             playerEntity->Transform.Position,
+                                             playerEntity->Transform.Velocity,
+                                             playerEntity->Ship->Color,
+                                             playerEntity->Ship->OutlineColor,
+                                             vec3{ 0, 1, 1 });
+            AddEntity(world, exp);
+        }
+
+        UpdateClassicMode(g, l);
+        for (int i = 0; i < LevelGenType_MAX; i++)
+        {
+            UpdateGen(g, l, l->GenParams + i, dt);
+        }
+
+        {
+            // player movement
+            float moveX = GetAxisValue(input, Action_horizontal);
+            float moveY = GetAxisValue(input, Action_vertical);
+            if (moveY > 0.0f)
             {
-                ent->Ship->PassedVelocity = playerEntity->Vel().y;
+                moveY = 0.0f;
+            }
+            MoveShipEntity(playerEntity, moveX, moveY, l->PlayerMaxVel, dt);
+
+            float &playerX = playerEntity->Pos().x;
+            float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);
+            nearestLane = glm::clamp(nearestLane, -2.0f, 2.0f);
+            float targetX = nearestLane * ROAD_LANE_WIDTH;
+            if (moveX == 0.0f)
+            {
+                float dif = targetX - playerX;
+                if (std::abs(dif) > ROAD_LANE_WIDTH)
+                {
+                    playerEntity->Vel().x += ROAD_LANE_WIDTH * glm::normalize(dif);
+                }
+                else if (std::abs(dif) > 0.05f)
+                {
+                    playerEntity->Vel().x += dif;
+                }
+            }
+
+            if (l->DraftCharge == 1.0f && IsPressed(g, Action_boost))
+            {
+                l->Score += SCORE_DRAFT;
+                l->CurrentDraftTime = 0.0f;
+                l->DraftActive = true;
+                if (l->DraftTarget->Checkpoint)
+                {
+                    if (l->DraftTarget->Checkpoint->State == CheckpointState_Initial)
+                    {
+                        l->DraftTarget->Checkpoint->State = CheckpointState_Drafted;
+                    }
+                    l->DraftTarget = NULL;
+                }
+                else if (l->DraftTarget->Ship)
+                {
+                    l->DraftTarget->Ship->HasBeenDrafted = true;
+                    AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
+                }
+                ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
+            }
+
+            l->PlayerLaneIndex = int(nearestLane)+2;
+        }
+
+        size_t frameCollisionCount = 0;
+        DetectCollisions(world.CollisionEntities, l->CollisionCache, frameCollisionCount);
+        for (size_t i = 0; i < frameCollisionCount; i++)
+        {
+            auto col = &l->CollisionCache[i];
+            col->First->NumCollisions++;
+            col->Second->NumCollisions++;
+
+            if (HandleCollision(g, col->First, col->Second, dt))
+            {
+                ResolveCollision(*col);
+            }
+        }
+
+        Integrate(world.CollisionEntities, g->Gravity, dt);
+        if (l->NumTrailCollisions == 0)
+        {
+            l->CurrentDraftTime -= dt;
+        }
+
+        l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
+        l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
+        l->NumTrailCollisions = 0;
+
+        if (!Global_Camera_FreeCam)
+        {
+            UpdateCameraToPlayer(g->Camera, playerEntity, dt);
+        }
+
+        if (l->DamageTimer > 0.0f)
+        {
+            int even = int(l->DamageTimer * 3);
+            playerEntity->Model->Visible = (even % 2) == 1;
+        }
+        else
+        {
+            playerEntity->Model->Visible = true;
+        }
+
+        UpdateLogiclessEntities(world, dt);
+        for (int i = 0; i < ROAD_LANE_COUNT; i++)
+        {
+            l->LaneSlots[i] = 0;
+        }
+        for (auto ent : world.LaneSlotEntities)
+        {
+            if (!ent) continue;
+
+            l->LaneSlots[ent->LaneSlot->Index]++;
+        }
+        for (auto ent : world.ShipEntities)
+        {
+            if (!ent) continue;
+
+            // red ship goes backwards
+            if (SHIP_IS_RED(ent->Ship))
+            {
+                ent->Rot().z = 180.0f;
+                ent->Vel().y = -PLAYER_MIN_VEL;
+            }
+            else
+            {
+                if (!(l->DraftTarget == ent && l->DraftActive) ||
+                    (ent->Pos().y < playerEntity->Pos().y && playerEntity->Vel().y < ent->Ship->PassedVelocity))
+                {
+                    ent->Ship->PassedVelocity = playerEntity->Vel().y;
+                    if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
+                    {
+                        ent->Vel().y = playerEntity->Vel().y * 0.2f;
+                    }
+                    else
+                    {
+                        ent->Vel().y = playerEntity->Vel().y * 0.8f;
+                    }
+                }
+                if (SHIP_IS_ORANGE(ent->Ship) &&
+                    ent->Pos().y+1.0f < playerEntity->Pos().y &&
+                    ent->Ship->HasBeenDrafted &&
+                    !ent->Ship->Scored)
+                {
+                    l->Score += SCORE_MISS_ORANGE_SHIP;
+                    ent->Ship->Scored = true;
+                    AddScoreText(g, l, SCORE_TEXT_MISS, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+                }
+
+                KeepEntityInsideOfRoad(ent);
+            }
+        }
+        for (auto ent : world.PowerupEntities)
+        {
+            if (!ent) continue;
+
+            vec3 distToPlayer = (playerEntity->Pos() + playerEntity->Vel()*dt) - ent->Pos();
+            vec3 dirToPlayer = glm::normalize(distToPlayer);
+            ent->SetVel(ent->Vel() + dirToPlayer * (1.0f/dt) * dt);
+            ent->SetPos(ent->Pos() + ent->Vel() * dt);
+            for (auto &meshPart : ent->Trail->Mesh.Parts)
+            {
+                float &alpha = meshPart.Material.DiffuseColor.a;
+                alpha -= 1.0f * dt;
+                alpha = std::max(alpha, 0.0f);
+            }
+
+            // TODO: temporary i hope
+            if (ent->Pos().z < 0.0f)
+            {
+                RemoveEntity(g->World, ent);
+            }
+        }
+        for (auto ent : world.AsteroidEntities)
+        {
+            if (!ent) continue;
+
+            if (ent->Pos().z > 0.0f && !ent->Asteroid->Exploded)
+            {
+                ent->Vel().z -= 80.0f * dt;
+                //ent->Vel().y = playerEntity->Vel().y * 1.2f;
+            }
+            else
+            {
+                ent->Pos().z = SHIP_Z;
+                ent->Vel().y = 0;
+                ent->Vel().z = 0;
+                if (!ent->Asteroid->Exploded)
+                {
+                    ent->Asteroid->Exploded = true;
+                    auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+                                                     ent->Pos(),
+                                                     vec3(0.0f),
+                                                     ASTEROID_COLOR,
+                                                     ASTEROID_COLOR,
+                                                     vec3(0.0f));
+                    AddEntity(g->World, exp);
+                }
+            }
+        }
+        for (auto ent : world.CheckpointEntities)
+        {
+            if (!ent) continue;
+
+            auto cp = ent->Checkpoint;
+            switch (cp->State)
+            {
+            case CheckpointState_Initial:
                 if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
                 {
                     ent->Vel().y = playerEntity->Vel().y * 0.2f;
@@ -927,143 +1026,78 @@ void UpdateLevel(game_main *g, float dt)
                 {
                     ent->Vel().y = playerEntity->Vel().y * 0.8f;
                 }
-            }
-            if (SHIP_IS_ORANGE(ent->Ship) &&
-                ent->Pos().y+1.0f < playerEntity->Pos().y &&
-                ent->Ship->HasBeenDrafted &&
-                !ent->Ship->Scored)
+
+                if (ent->Pos().y < playerEntity->Pos().y)
+                {
+                    cp->State = CheckpointState_Active;
+                    for (auto &mat : ent->Model->Materials)
+                    {
+                        mat->Emission = 1.0f;
+                        mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
+                    }
+
+                    l->CheckpointNum++;
+                    l->CurrentCheckpointFrame = 0;
+                    PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 25);
+                }
+                break;
+
+            case CheckpointState_Drafted:
+                if (ent->Pos().y < playerEntity->Pos().y)
+                {
+                    cp->State = CheckpointState_Active;
+                    for (auto &mat : ent->Model->Materials)
+                    {
+                        mat->Emission = 1.0f;
+                        mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
+                    }
+
+                    l->CheckpointNum++;
+                    l->CurrentCheckpointFrame = 0;
+                    l->Score += SCORE_CHECKPOINT;
+                    AddScoreText(g, l, SCORE_TEXT_CHECKPOINT, SCORE_CHECKPOINT, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
+                }
+                break;
+
+            case CheckpointState_Active:
             {
-                l->Score += SCORE_MISS_ORANGE_SHIP;
-                ent->Ship->Scored = true;
-                AddScoreText(g, l, SCORE_TEXT_MISS, SCORE_MISS_ORANGE_SHIP, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+                ent->Vel().y = playerEntity->Vel().y * 2.0f;
+                if (cp->Timer >= CHECKPOINT_FADE_OUT_DURATION)
+                {
+                    RemoveEntity(g->World, ent);
+                }
+                else
+                {
+                    float alpha = CHECKPOINT_FADE_OUT_DURATION - cp->Timer;
+                    for (auto &material : ent->Model->Materials)
+                    {
+                        material->DiffuseColor.a = alpha;
+                    }
+                    for (auto &meshPart : ent->Trail->Mesh.Parts)
+                    {
+                        meshPart.Material.DiffuseColor.a = alpha;
+                    }
+                }
+
+                cp->Timer += dt;
+                break;
+            }
             }
 
-            KeepEntityInsideOfRoad(ent);
+            ent->Pos().y += ent->Vel().y * dt;
+        }
+        
+        l->Health = std::max(l->Health, 0);
+        if (l->Health == 0 && l->GameplayState == GameplayState_Playing)
+        {
+            RemoveEntity(g->World, playerEntity);
+            l->GameplayState = GameplayState_GameOver;
         }
     }
-    for (auto ent : world.PowerupEntities)
+    else
     {
-        if (!ent) continue;
-
-        vec3 distToPlayer = (playerEntity->Pos() + playerEntity->Vel()*dt) - ent->Pos();
-        vec3 dirToPlayer = glm::normalize(distToPlayer);
-        ent->SetVel(ent->Vel() + dirToPlayer * (1.0f/dt) * dt);
-        ent->SetPos(ent->Pos() + ent->Vel() * dt);
-        for (auto &meshPart : ent->Trail->Mesh.Parts)
-        {
-            float &alpha = meshPart.Material.DiffuseColor.a;
-            alpha -= 1.0f * dt;
-            alpha = std::max(alpha, 0.0f);
-        }
-
-        // TODO: temporary i hope
-        if (ent->Pos().z < 0.0f)
-        {
-            RemoveEntity(g->World, ent);
-        }
-    }
-    for (auto ent : world.AsteroidEntities)
-    {
-        if (!ent) continue;
-
-        if (ent->Pos().z > 0.0f && !ent->Asteroid->Exploded)
-        {
-            ent->Vel().z -= 80.0f * dt;
-            //ent->Vel().y = playerEntity->Vel().y * 1.2f;
-        }
-        else
-        {
-            ent->Pos().z = SHIP_Z;
-            ent->Vel().y = 0;
-            ent->Vel().z = 0;
-            if (!ent->Asteroid->Exploded)
-            {
-                ent->Asteroid->Exploded = true;
-                auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
-                                                 ent->Pos(),
-                                                 vec3(0.0f),
-                                                 ASTEROID_COLOR,
-                                                 ASTEROID_COLOR,
-                                                 vec3(0.0f));
-                AddEntity(g->World, exp);
-            }
-        }
-    }
-    for (auto ent : world.CheckpointEntities)
-    {
-        if (!ent) continue;
-
-        auto cp = ent->Checkpoint;
-        switch (cp->State)
-        {
-        case CheckpointState_Initial:
-            if (ent->Pos().y - playerEntity->Pos().y >= 20.0f + (0.1f * playerEntity->Vel().y))
-            {
-                ent->Vel().y = playerEntity->Vel().y * 0.2f;
-            }
-            else
-            {
-                ent->Vel().y = playerEntity->Vel().y * 0.8f;
-            }
-
-            if (ent->Pos().y < playerEntity->Pos().y)
-            {
-                cp->State = CheckpointState_Active;
-                for (auto &mat : ent->Model->Materials)
-                {
-                    mat->Emission = 1.0f;
-                    mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
-                }
-
-                l->CheckpointNum++;
-                l->CurrentCheckpointFrame = 0;
-                PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 25);
-            }
-            break;
-
-        case CheckpointState_Drafted:
-            if (ent->Pos().y < playerEntity->Pos().y)
-            {
-                cp->State = CheckpointState_Active;
-                for (auto &mat : ent->Model->Materials)
-                {
-                    mat->Emission = 1.0f;
-                    mat->DiffuseColor = CHECKPOINT_OUTLINE_COLOR;
-                }
-
-                l->CheckpointNum++;
-                l->CurrentCheckpointFrame = 0;
-                l->Score += SCORE_CHECKPOINT;
-                AddScoreText(g, l, SCORE_TEXT_CHECKPOINT, SCORE_CHECKPOINT, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
-            }
-            break;
-
-        case CheckpointState_Active:
-        {
-            ent->Vel().y = playerEntity->Vel().y * 2.0f;
-            if (cp->Timer >= CHECKPOINT_FADE_OUT_DURATION)
-            {
-                RemoveEntity(g->World, ent);
-            }
-            else
-            {
-                float alpha = CHECKPOINT_FADE_OUT_DURATION - cp->Timer;
-                for (auto &material : ent->Model->Materials)
-                {
-                    material->DiffuseColor.a = alpha;
-                }
-                for (auto &meshPart : ent->Trail->Mesh.Parts)
-                {
-                    meshPart.Material.DiffuseColor.a = alpha;
-                }
-            }
-
-            cp->Timer += dt;
-            break;
-        }
-        }
-
-        ent->Pos().y += ent->Vel().y * dt;
+        float moveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
+        UpdateMenuSelection(g, pauseMenu, moveY);
     }
 
     auto playerPosition = playerEntity->Pos();
@@ -1093,8 +1127,26 @@ void UpdateLevel(game_main *g, float dt)
         FreeEntryFromData(l->IntroTextPool, introText);
     }
 
-    l->Health = std::max(l->Health, 0);
     updateTime.End = g->Platform.GetMilliseconds();
+}
+
+void PauseMenuCallback(game_main *g, menu_data *menu, int itemIndex)
+{
+    auto l = &g->LevelState;
+    switch (itemIndex)
+    {
+    case 0:
+    {
+        l->GameplayState = GameplayState_Playing;
+        break;
+    }
+    
+    case 1:
+    {
+        Println("EXIT GAME");
+        break;
+    }
+    }
 }
 
 void RenderLevel(game_main *g, float dt)
@@ -1102,6 +1154,7 @@ void RenderLevel(game_main *g, float dt)
     auto l = &g->LevelState;
     auto &renderTime = g->RenderTime;
     auto &world = g->World;
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
 
     renderTime.Begin = g->Platform.GetMilliseconds();
     UpdateProjectionView(g->Camera);
@@ -1155,6 +1208,12 @@ void RenderLevel(game_main *g, float dt)
     float top = g->Height - GetRealPixels(g, 10.0f);
     DrawText(g->GUI, hudFont, Format(l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
     DrawText(g->GUI, hudFont, Format(l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
+    
+    if (l->GameplayState == GameplayState_Paused)
+    {
+        DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, false);
+    }
+    
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();

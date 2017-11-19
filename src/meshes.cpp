@@ -147,7 +147,7 @@ struct mesh_part_scope
 #define ROAD_SEGMENT_SIZE  24
 #define ROAD_LANE_WIDTH    2
 #define ROAD_LANE_COUNT    5
-#define ROAD_BORDER_COLOR  IntColor(FirstPalette.Colors[5])
+#define ROAD_BORDER_COLOR  Color_blue
 #define ROAD_FLOOR_COLOR   Color_black
 #define ROAD_LANE_COLOR    color{1,1,1,1.0f}
 

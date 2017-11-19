@@ -263,6 +263,11 @@ int main(int argc, char **argv)
                 }
                 break;
             }
+            
+            case SDL_JOYBUTTONDOWN: {
+                printf("%d\n", Event.jbutton.button);
+                break;
+            }
             }
         }
 

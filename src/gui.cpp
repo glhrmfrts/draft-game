@@ -42,7 +42,7 @@ void main() {
 }
 )FOO";
 
-static uint32 CheckElementState(game_input &Input, rect Rect)
+uint32 CheckElementState(game_input &Input, rect Rect)
 {
     uint32 Result = GUIElementState_none;
     auto &MouseState = Input.MouseState;
@@ -61,7 +61,7 @@ static uint32 CheckElementState(game_input &Input, rect Rect)
     return Result;
 }
 
-static void CompileGUIShader(gui &g)
+void CompileGUIShader(gui &g)
 {
     g.Program.VertexShader = glCreateShader(GL_VERTEX_SHADER);
     g.Program.FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -82,7 +82,7 @@ static void CompileGUIShader(gui &g)
 
 #define GUIVertexSize 8
 
-static void InitGUI(gui &g, game_input &Input)
+void InitGUI(gui &g, tween_state &tweenState, game_input &Input)
 {
     g.Input = &Input;
     CompileGUIShader(g);
@@ -90,9 +90,22 @@ static void InitGUI(gui &g, game_input &Input)
                vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
                vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
+               
+    g.MenuChangeTimer = 1.0f;
+    g.MenuChangeSequence.Tweens.push_back(
+        tween(&g.MenuChangeTimer)
+        .SetFrom(0.0f)
+        .SetTo(1.0f)
+        .SetDuration(0.25f)
+        .SetEasing(TweenEasing_Linear)
+    );
+    AddSequences(tweenState, &g.MenuChangeSequence, 1);
+
+    g.HorizontalAxis.Type = Action_horizontal;
+    g.VerticalAxis.Type = Action_vertical;
 }
 
-static void Begin(gui &g, camera &Camera, float emission = 0.0f)
+void Begin(gui &g, camera &Camera, float emission = 0.0f)
 {
     assert(g.Program.ID);
     assert(Camera.Updated);
@@ -106,13 +119,13 @@ static void Begin(gui &g, camera &Camera, float emission = 0.0f)
     g.EmissionValue = emission;
 }
 
-static gui_draw_command NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
+gui_draw_command NextDrawCommand(gui &g, GLuint PrimType, float TexWeight, color DiffuseColor, texture *Texture)
 {
     gui_draw_command Command{DiffuseColor, PrimType, g.Buffer.VertexCount, 0, TexWeight, Texture};
     return Command;
 }
 
-static void PushDrawCommand(gui &g)
+void PushDrawCommand(gui &g)
 {
     if (!g.Buffer.VertexCount) return;
 
@@ -121,7 +134,7 @@ static void PushDrawCommand(gui &g)
     g.DrawCommandList.push_back(Curr);
 }
 
-static void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
+void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
 {
     auto &curr = g.CurrentDrawCommand;
     if (curr.PrimitiveType != GL_LINES)
@@ -134,7 +147,7 @@ static void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
     PushVertex(g.Buffer, {p2.x, p2.y, 0,0, c.r, c.g, c.b, c.a});
 }
 
-static uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
+uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
                 texture *Texture, texture_rect TexRect, float TexWeight = 0.0f,
                 bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
@@ -195,17 +208,17 @@ static uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
     return GUIElementState_none;
 }
 
-static uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return DrawRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
-static uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
+uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
 }
 
-static vec2 MeasureText(bitmap_font *font, const char *text)
+vec2 MeasureText(bitmap_font *font, const char *text)
 {
     vec2 result = {};
     int curX = 0;
@@ -229,7 +242,7 @@ static vec2 MeasureText(bitmap_font *font, const char *text)
     return result;
 }
 
-static uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
+uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
@@ -274,7 +287,7 @@ static uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, colo
     return GUIElementState_none;
 }
 
-static uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
+uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
 {
     vec2 size = MeasureText(font, text);
     r.X -= size.x/2;
@@ -282,7 +295,7 @@ static uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect
     return DrawText(g, font, text, r, c, checkState);
 }
 
-static void End(gui &g)
+void End(gui &g)
 {
     PushDrawCommand(g);
 
@@ -312,4 +325,117 @@ static void End(gui &g)
     glBindVertexArray(0);
     UnbindShaderProgram();
     glDisable(GL_BLEND);
+}
+
+static color textColor = Color_white;
+static color textSelectedColor = IntColor(ShipPalette.Colors[SHIP_ORANGE]);
+
+void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
+                  float centerX, float baseY, bool selected = false,
+                  float changeTimer = 0.0f)
+{
+    float textPadding = GetRealPixels(g, 10.0f);
+    color col = textColor;
+    if (selected)
+    {
+        col = Lerp(col, changeTimer, textSelectedColor);
+    }
+    if (!item.Enabled)
+    {
+        col.a = 0.25f;
+    }
+    DrawTextCentered(g->GUI, font, item.Text, rect{centerX,baseY + textPadding,0,0}, col);
+}
+
+static menu_item backItem = {"BACK", MenuItemType_Text};
+
+void DrawMenu(game_main *g, menu_data &menu, float changeTimer, bool drawBackItem = false)
+{
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
+    static auto menuItemFont = FindBitmapFont(g->AssetLoader, "unispace_24");
+    
+    float halfX = g->Width*0.5f;
+    float halfY = g->Height*0.5f;
+    float baseY = 660.0f;
+    float lineWidth = g->Width*0.75f;
+    DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f});
+    DrawTextCentered(g->GUI, titleFont, menu.Title, rect{halfX, GetRealPixels(g, baseY), 0, 0}, textColor);
+    DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, textColor);
+
+    float height = g->Height*0.05f;
+    baseY = GetRealPixels(g, baseY);
+    baseY -= height + GetRealPixels(g, 40.0f);
+    for (int i = 0; i < menu.NumItems; i++)
+    {
+        auto &item = menu.Items[i];
+        bool selected = (i == menu.HotItem);
+        DrawMenuItem(g, menuItemFont, item, halfX, baseY, selected, changeTimer);
+        baseY -= height + GetRealPixels(g, 10.0f);
+    }
+    
+    if (drawBackItem)
+    {
+        bool backSelected = menu.HotItem == menu.NumItems;
+        DrawMenuItem(g, menuItemFont, backItem, halfX, baseY, backSelected, changeTimer);
+    }
+}
+
+float GetMenuAxisValue(game_input &input, menu_axis &axis, float dt)
+{
+    const float moveInterval = 0.05f;
+    float value = GetAxisValue(input, (action_type)axis.Type);
+    
+    if (value == 0.0f)
+    {
+        axis.Timer += dt;
+    }
+    else if (axis.Timer >= moveInterval)
+    {
+        axis.Timer = 0.0f;
+        return value;
+    }
+    return 0.0f;
+}
+
+bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputY, bool backItemEnabled = false)
+{
+    int prevHotItem = menu.HotItem;
+    auto item = menu.Items + menu.HotItem;
+    do {
+        if (inputY < 0.0f)
+        {
+            menu.HotItem++;
+        }
+        else if (inputY > 0.0f)
+        {
+            menu.HotItem--;
+        }
+        
+        int max = menu.NumItems;
+        if (!backItemEnabled)
+        {
+            max -= 1;
+        }
+        menu.HotItem = glm::clamp(menu.HotItem, 0, max);
+        item = menu.Items + menu.HotItem;
+    } while (!item->Enabled);
+    
+    if (prevHotItem != menu.HotItem)
+    {
+        PlaySequence(g->TweenState, &g->GUI.MenuChangeSequence, true);
+    }
+    
+    bool backSelected = menu.HotItem == menu.NumItems;
+    if (IsJustPressed(g, Action_select))
+    {
+        if (backSelected)
+        {
+            return true;
+        }
+        else if (menu.SelectFunc)
+        {
+            menu.SelectFunc(g, &menu, menu.HotItem);
+        }
+    }
+    return false;
 }

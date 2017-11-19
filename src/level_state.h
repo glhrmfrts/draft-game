@@ -94,6 +94,13 @@ struct level_intro_text
     tween_sequence *PosSequence = NULL;
 };
 
+enum gameplay_state
+{
+    GameplayState_Playing,
+    GameplayState_Paused,
+    GameplayState_GameOver,
+};
+
 struct level_state
 {
     memory_arena Arena;
@@ -117,6 +124,7 @@ struct level_state
     int CheckpointNum = 0;
     int PlayerLaneIndex = 0;
     int ForceShipColor = -1;
+    gameplay_state GameplayState = GameplayState_Playing;
 
     entity *DraftTarget;
     float CurrentDraftTime = 0;

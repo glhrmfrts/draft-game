@@ -83,6 +83,8 @@ enum game_controller_button_id
     XboxButton_Y = 3,
     XboxButton_Left = 4,
     XboxButton_Right = 5,
+    XboxButton_Back = 6,
+    XboxButton_Start = 7,
 #endif
 };
 struct game_controller
@@ -101,6 +103,7 @@ enum action_type
 	Action_debugUI,
     Action_debugPause,
     Action_select,
+    Action_pause,
     Action_count,
 };
 struct action_state
@@ -150,6 +153,12 @@ struct profile_time
     uint64 End;
 };
 
+struct game_menu_context
+{
+    tween_sequence ChangeSequence;
+    float ChangeTimer = 0;
+};
+
 enum game_state
 {
 	GameState_LoadingScreen,
@@ -161,6 +170,7 @@ struct game_main
 	game_state State;
     game_input Input;
     game_input PrevInput;
+    game_menu_context MenuContext;
 
     profile_time UpdateTime;
     profile_time RenderTime;
