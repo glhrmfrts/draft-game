@@ -332,7 +332,7 @@ static color textSelectedColor = IntColor(ShipPalette.Colors[SHIP_ORANGE]);
 
 void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
                   float centerX, float baseY, bool selected = false,
-                  float changeTimer = 0.0f)
+                  float changeTimer = 0.0f, float alpha = 1.0f)
 {
     float textPadding = GetRealPixels(g, 10.0f);
     color col = textColor;
@@ -344,12 +344,13 @@ void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
     {
         col.a = 0.25f;
     }
+    col.a *= alpha;
     DrawTextCentered(g->GUI, font, item.Text, rect{centerX,baseY + textPadding,0,0}, col);
 }
 
 static menu_item backItem = {"BACK", MenuItemType_Text};
 
-void DrawMenu(game_main *g, menu_data &menu, float changeTimer, bool drawBackItem = false)
+void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.0f, bool drawBackItem = false)
 {
     static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
     static auto menuItemFont = FindBitmapFont(g->AssetLoader, "unispace_24");
@@ -358,9 +359,13 @@ void DrawMenu(game_main *g, menu_data &menu, float changeTimer, bool drawBackIte
     float halfY = g->Height*0.5f;
     float baseY = 660.0f;
     float lineWidth = g->Width*0.75f;
-    DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f});
-    DrawTextCentered(g->GUI, titleFont, menu.Title, rect{halfX, GetRealPixels(g, baseY), 0, 0}, textColor);
-    DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, textColor);
+    
+    color _textColor = textColor;
+    _textColor.a *= alpha;
+    
+    DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f * alpha});
+    DrawTextCentered(g->GUI, titleFont, menu.Title, rect{halfX, GetRealPixels(g, baseY), 0, 0}, _textColor);
+    DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, _textColor);
 
     float height = g->Height*0.05f;
     baseY = GetRealPixels(g, baseY);
@@ -369,14 +374,14 @@ void DrawMenu(game_main *g, menu_data &menu, float changeTimer, bool drawBackIte
     {
         auto &item = menu.Items[i];
         bool selected = (i == menu.HotItem);
-        DrawMenuItem(g, menuItemFont, item, halfX, baseY, selected, changeTimer);
+        DrawMenuItem(g, menuItemFont, item, halfX, baseY, selected, changeTimer, alpha);
         baseY -= height + GetRealPixels(g, 10.0f);
     }
     
     if (drawBackItem)
     {
         bool backSelected = menu.HotItem == menu.NumItems;
-        DrawMenuItem(g, menuItemFont, backItem, halfX, baseY, backSelected, changeTimer);
+        DrawMenuItem(g, menuItemFont, backItem, halfX, baseY, backSelected, changeTimer, alpha);
     }
 }
 

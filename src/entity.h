@@ -156,6 +156,7 @@ struct background_state
 
 struct entity_world
 {
+    memory_arena PersistentArena;
     memory_arena Arena;
 
     memory_pool ShipPool;

@@ -3,6 +3,8 @@
 
 struct menu_state
 {
+    tween_sequence FadeOutSequence;
+    float Alpha = 1;
     int SelectedMainMenu = -1;
     int HotMainMenu = 0;
 };

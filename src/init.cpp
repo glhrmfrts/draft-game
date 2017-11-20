@@ -13,7 +13,7 @@ void RegisterInputActions(game_input &input)
     input.Actions[Action_pause] = action_state{ SDL_SCANCODE_ESCAPE, 0, 0, 0, Axis_Invalid, XboxButton_Start };
 }
 
-static void InitLoadingScreen(game_main *Game)
+void InitLoadingScreen(game_main *Game)
 {
     Game->State = GameState_LoadingScreen;
     InitAssetLoader(Game->AssetLoader, Game->Platform);
@@ -34,7 +34,7 @@ static void InitLoadingScreen(game_main *Game)
 
 typedef void init_func(game_main *Game);
 
-static void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
+void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
 {
     if (Update(g->AssetLoader))
     {
@@ -42,7 +42,7 @@ static void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
     }
 }
 
-static void RenderLoadingScreen(game_main *Game, float DeltaTime)
+void RenderLoadingScreen(game_main *Game, float DeltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 

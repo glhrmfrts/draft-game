@@ -560,6 +560,13 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.CollisionEntities.clear();
     w.ShipEntities.clear();
     w.TrailEntities.clear();
+    
+    ResetPool(w.AsteroidPool);
+    ResetPool(w.CheckpointPool);
+    ResetPool(w.CrystalPool);
+    ResetPool(w.ExplosionPool);
+    ResetPool(w.ShipPool);
+    ResetPool(w.PowerupPool);
 
     w.AssetLoader = loader;
     w.Camera = cam;

@@ -111,7 +111,7 @@ memory_pool_entry *GetEntry(memory_pool &pool)
     return entry;
 }
 
-static void PutEntry(memory_pool &pool, memory_pool_entry *entry, memory_pool_entry *prev)
+void PutEntry(memory_pool &pool, memory_pool_entry *entry, memory_pool_entry *prev)
 {
     auto next = entry->Next;
     entry->Next = pool.FirstFree;
@@ -160,6 +160,12 @@ void FreeEntryFromData(memory_pool &pool, void *data)
         prev = entry;
         entry = entry->Next;
     }
+}
+
+void ResetPool(memory_pool &pool)
+{
+    pool.First = NULL;
+    pool.FirstFree = NULL;
 }
 
 void *PushSize(memory_pool_entry *entry, size_t size, const char *name)

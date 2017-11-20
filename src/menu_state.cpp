@@ -31,6 +31,22 @@ void InitMenu(game_main *g)
 {
     g->State = GameState_Menu;
     InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
+    
+    auto m = &g->MenuState;
+    if (m->FadeOutSequence.Tweens.size() == 0)
+    {
+        m->FadeOutSequence.Tweens.push_back(
+            tween(&m->Alpha)
+                .SetFrom(1.0f)
+                .SetTo(0.0f)
+                .SetDuration(1.0f)
+                .SetEasing(TweenEasing_Linear)
+        );
+        AddSequences(g->TweenState, &m->FadeOutSequence, 1);
+    }
+    
+    m->Alpha = 1.0f;
+    m->FadeOutSequence.Complete = false;
 }
 
 MENU_FUNC(PlayMenuCallback)
@@ -38,8 +54,10 @@ MENU_FUNC(PlayMenuCallback)
     switch (itemIndex)
     {
     case 0: // classic mode
-        InitLevel(g);
+    {
+        PlaySequence(g->TweenState, &g->MenuState.FadeOutSequence, true);
         break;
+    }
     }
 }
 
@@ -109,6 +127,11 @@ void UpdateMenu(game_main *g, float dt)
             m->SelectedMainMenu = -1;
         }
     }
+    
+    if (m->FadeOutSequence.Complete)
+    {
+        InitLevel(g);
+    }
 }
 
 void RenderMenu(game_main *g, float dt)
@@ -143,7 +166,7 @@ void RenderMenu(game_main *g, float dt)
     else
     {
         auto &subMenu = menus[m->SelectedMainMenu];
-        DrawMenu(g, subMenu, g->GUI.MenuChangeTimer, true);
+        DrawMenu(g, subMenu, g->GUI.MenuChangeTimer, m->Alpha, true);
     }
     End(g->GUI);
 }

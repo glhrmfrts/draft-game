@@ -219,6 +219,10 @@ void InitLevel(game_main *g)
 
     auto l = &g->LevelState;
     FreeArena(l->Arena);
+    ResetPool(l->IntroTextPool);
+    ResetPool(l->ScoreTextPool);
+    ResetPool(l->SequencePool);
+    
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
     l->IntroTextPool.Arena = &l->Arena;
     l->ScoreTextPool.Arena = &l->Arena;
@@ -842,11 +846,6 @@ void UpdateLevel(game_main *g, float dt)
         {
             UpdateClassicMode(g, l);
         }
-        else
-        {
-            float moveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
-            UpdateMenuSelection(g, gameOverMenu, moveY);
-        }
         
         for (int i = 0; i < LevelGenType_MAX; i++)
         {
@@ -1124,10 +1123,15 @@ void UpdateLevel(game_main *g, float dt)
             l->GameplayState = GameplayState_GameOver;
         }
     }
-    else
+    
+    float menuMoveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
+    if (l->GameplayState == GameplayState_Paused)
     {
-        float moveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
-        UpdateMenuSelection(g, pauseMenu, moveY);
+        UpdateMenuSelection(g, pauseMenu, menuMoveY);
+    }
+    if (l->GameplayState == GameplayState_GameOver)
+    {
+        UpdateMenuSelection(g, gameOverMenu, menuMoveY);
     }
 
     auto playerPosition = playerEntity->Pos();
@@ -1222,11 +1226,11 @@ void RenderLevel(game_main *g, float dt)
     
     if (l->GameplayState == GameplayState_Paused)
     {
-        DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, false);
+        DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, 1.0f, false);
     }
     else if (l->GameplayState == GameplayState_GameOver)
     {
-        DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, false);
+        DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, 1.0f, false);
     }
     
     End(g->GUI);
@@ -1276,7 +1280,7 @@ MENU_FUNC(PauseMenuCallback)
     
     case 1:
     {
-        Println("EXIT GAME");
+        InitMenu(g);
         break;
     }
     }

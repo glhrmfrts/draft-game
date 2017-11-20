@@ -950,7 +950,7 @@ void RenderEnd(render_state &RenderState, camera &Camera)
     glDisable(GL_DEPTH_TEST);
 }
 
-static void AddRenderable(render_state &rs, size_t index, material *material)
+void AddRenderable(render_state &rs, size_t index, material *material)
 {
     if (material->DiffuseColor.a < 1.0f || (material->Flags & MaterialFlag_ForceTransparent))
     {

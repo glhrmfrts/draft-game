@@ -158,7 +158,7 @@ mesh *GetRoadMesh(entity_world &w)
         return w.RoadMesh;
     }
 
-    auto roadMesh = PushStruct<mesh>(w.Arena);
+    auto roadMesh = PushStruct<mesh>(w.PersistentArena);
     InitMeshBuffer(roadMesh->Buffer);
 
     auto roadTexture = FindTexture(*w.AssetLoader, "grid");
@@ -218,7 +218,7 @@ mesh *GetShipMesh(entity_world &w)
         return w.ShipMesh;
     }
 
-    auto *ShipMesh = PushStruct<mesh>(w.Arena);
+    auto *ShipMesh = PushStruct<mesh>(w.PersistentArena);
     float h = 0.5f;
 
     InitMeshBuffer(ShipMesh->Buffer);
@@ -244,7 +244,7 @@ mesh *GetCrystalMesh(entity_world &w)
         return w.CrystalMesh;
     }
 
-    auto *CrystalMesh = PushStruct<mesh>(w.Arena);
+    auto *CrystalMesh = PushStruct<mesh>(w.PersistentArena);
     InitMeshBuffer(CrystalMesh->Buffer);
 
     AddTriangle(CrystalMesh->Buffer, vec3{ -1, -1, 0 }, vec3{ 1, -1, 0 }, vec3{ 0, 0, 1 });
@@ -270,7 +270,7 @@ mesh *GetAsteroidMesh(entity_world &w)
         return w.AsteroidMesh;
     }
 
-    auto astMesh = PushStruct<mesh>(w.Arena);
+    auto astMesh = PushStruct<mesh>(w.PersistentArena);
     InitMeshBuffer(astMesh->Buffer);
 
     const int p = 8;
@@ -308,7 +308,7 @@ mesh *GetCheckpointMesh(entity_world &w)
         return w.CheckpointMesh;
     }
 
-    auto cpMesh = PushStruct<mesh>(w.Arena);
+    auto cpMesh = PushStruct<mesh>(w.PersistentArena);
     InitMeshBuffer(cpMesh->Buffer);
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{-1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
@@ -326,7 +326,7 @@ mesh *GetBackgroundMesh(entity_world &w)
         return w.BackgroundMesh;
     }
 
-    auto bgMesh = PushStruct<mesh>(w.Arena);
+    auto bgMesh = PushStruct<mesh>(w.PersistentArena);
     auto mat = material{Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background")};
     mat.FogWeight = 0.0f;
 
