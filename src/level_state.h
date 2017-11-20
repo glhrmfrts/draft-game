@@ -125,7 +125,10 @@ struct level_state
     int PlayerLaneIndex = 0;
     int ForceShipColor = -1;
     gameplay_state GameplayState = GameplayState_Playing;
-
+    
+    tween_sequence *GameOverMenuSequence;
+    float GameOverAlpha;
+    
     entity *DraftTarget;
     float CurrentDraftTime = 0;
     float DraftCharge = 0;

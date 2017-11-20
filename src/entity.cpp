@@ -137,7 +137,7 @@ entity *CreateCrystalEntity(allocator *alloc, mesh *crystalMesh)
 #define MaxExplosionVel 4.0f
 #define RandomRotation(Series)  RandomBetween(Series, MinExplosionRot, MaxExplosionRot)
 #define RandomVel(Series, Sign) (Sign * RandomBetween(Series, MinExplosionVel, MaxExplosionVel))
-inline static float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
+float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
 {
     if (Sign[i] == 0)
     {

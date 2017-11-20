@@ -56,7 +56,7 @@ inline static vec3 GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
     return glm::normalize(glm::cross(v1, v2));
 }
 
-static void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
 {
     color c2 = c1;
     color c3 = c1;
@@ -66,13 +66,13 @@ static void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n
     PushVertex(Buffer, mesh_vertex{ p3, vec2{ 0, 0 }, c3, n });
 }
 
-static void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
+void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3)
 {
     AddTriangle(Buffer, p1, p2, p3, GenerateNormal(p1, p2, p3));
 }
 
-static void AddCubeWithRotation(vertex_buffer &Buffer, color c, bool NoLight, vec3 Center,
-                                vec3 Scale, float Angle)
+void AddCubeWithRotation(vertex_buffer &Buffer, color c, bool NoLight, vec3 Center,
+                         vec3 Scale, float Angle)
 {
     float z = -0.5f;
     float h = 0.5f;
@@ -147,7 +147,7 @@ struct mesh_part_scope
 #define ROAD_SEGMENT_SIZE  24
 #define ROAD_LANE_WIDTH    2
 #define ROAD_LANE_COUNT    5
-#define ROAD_BORDER_COLOR  Color_blue
+#define ROAD_BORDER_COLOR  IntColor(FirstPalette.Colors[2])
 #define ROAD_FLOOR_COLOR   Color_black
 #define ROAD_LANE_COLOR    color{1,1,1,1.0f}
 
@@ -197,10 +197,6 @@ mesh *GetRoadMesh(entity_world &w)
             if (y % 2 == 0)
             {
                 color c = Color_white;
-                if (y % 4 == 0)
-                {
-                    c = Color_red;
-                }
                 AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f}, c);
             }
         }

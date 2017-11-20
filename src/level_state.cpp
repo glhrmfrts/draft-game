@@ -17,10 +17,10 @@
 
 #define GEN_PLAYER_OFFSET 250
 
-// TODO: make possible to share the entity-generation system with the
+// TODO(14/11/2017): make possible to share the entity-generation system with the
 // menu
 //
-// TODO: update asteroids velocity (or remove them?)
+// TODO(20/11/2017): asteroids can stay in the game, but not with high velocity
 
 MENU_FUNC(PauseMenuCallback);
 MENU_FUNC(GameOverMenuCallback);
@@ -227,6 +227,15 @@ void InitLevel(game_main *g)
     l->IntroTextPool.Arena = &l->Arena;
     l->ScoreTextPool.Arena = &l->Arena;
     l->SequencePool.Arena = &l->Arena;
+    l->GameOverMenuSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+    l->GameOverMenuSequence->Tweens.push_back(
+        tween(&l->GameOverAlpha)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(1.0f)
+            .SetEasing(TweenEasing_Linear)
+    );
+    AddSequences(g->TweenState, l->GameOverMenuSequence, 1);
 
     g->Gravity = vec3(0, 0, 0);
     g->World.Camera = &g->Camera;
@@ -273,6 +282,7 @@ void InitLevel(game_main *g)
         l->ReservedLanes[i] = 0;
     }
     
+    l->Health = 50;
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
     l->GameplayState = GameplayState_Playing;
@@ -1121,6 +1131,7 @@ void UpdateLevel(game_main *g, float dt)
         {
             RemoveEntity(g->World, playerEntity);
             l->GameplayState = GameplayState_GameOver;
+            PlaySequence(g->TweenState, l->GameOverMenuSequence, true);
         }
     }
     
@@ -1230,7 +1241,7 @@ void RenderLevel(game_main *g, float dt)
     }
     else if (l->GameplayState == GameplayState_GameOver)
     {
-        DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, 1.0f, false);
+        DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, l->GameOverAlpha, false);
     }
     
     End(g->GUI);
@@ -1314,6 +1325,7 @@ MENU_FUNC(GameOverMenuCallback)
     
     case 2:
     {
+        DestroySequences(g->TweenState, l->GameOverMenuSequence, 1);
         InitMenu(g);
         break;
     }

@@ -53,7 +53,7 @@ MENU_FUNC(PlayMenuCallback)
 {
     switch (itemIndex)
     {
-    case 0: // classic mode
+    case 0: // campaign mode
     {
         PlaySequence(g->TweenState, &g->MenuState.FadeOutSequence, true);
         break;
@@ -70,8 +70,8 @@ static rect mainMenuPositions[] = {
 static menu_data menus[] = {
     {"PLAY", 2, PlayMenuCallback,
      {
-         menu_item{"CLASSIC MODE", MenuItemType_Text, true},
-         menu_item{"SCORE MODE", MenuItemType_Text, false}
+         menu_item{"CAMPAIGN MODE", MenuItemType_Text, true},
+         menu_item{"INFINITE MODE", MenuItemType_Text, false}
      }
     },
     {"OPTS", 0, NULL, {}},
