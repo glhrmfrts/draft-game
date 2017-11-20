@@ -350,15 +350,20 @@ void InitEntityWorld(entity_world &world)
     world.ExplosionPool.ElemSize = EXPLOSION_ENTITY_SIZE;
     world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
     world.CheckpointPool.ElemSize = CHECKPOINT_ENTITY_SIZE;
+    
+    world.ShipPool.Arena = &world.Arena;
+    world.CrystalPool.Arena = &world.Arena;
+    world.PowerupPool.Arena = &world.Arena;
+    world.ExplosionPool.Arena = &world.Arena;
+    world.AsteroidPool.Arena = &world.Arena;
+    world.CheckpointPool.Arena = &world.Arena;
 
-#ifdef DRAFT_DEBUG
-    world.ShipPool.DEBUGName = "ShipPool";
-    world.CrystalPool.DEBUGName = "CrystalPool";
-    world.PowerupPool.DEBUGName = "PowerupPool";
-    world.ExplosionPool.DEBUGName = "ExplosionPool";
-    world.AsteroidPool.DEBUGName = "AsteroidPool";
-    world.CheckpointPool.DEBUGName = "CheckpointPool";
-#endif
+    world.ShipPool.Name = "ShipPool";
+    world.CrystalPool.Name = "CrystalPool";
+    world.PowerupPool.Name = "PowerupPool";
+    world.ExplosionPool.Name = "ExplosionPool";
+    world.AsteroidPool.Name = "AsteroidPool";
+    world.CheckpointPool.Name = "CheckpointPool";
 }
 
 // Finds the first free slot on the list and insert the entity
@@ -433,6 +438,10 @@ void AddEntity(entity_world &world, entity *ent)
     if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
     {
         AddEntityToList(world.AsteroidEntities, ent);
+    }
+    if (ent->Collider && ent->Collider->Type == ColliderType_Crystal)
+    {
+        AddEntityToList(world.CrystalEntities, ent);
     }
     if (ent->Checkpoint)
     {
@@ -515,6 +524,7 @@ void RemoveEntity(entity_world &world, entity *ent)
     }
     if (ent->Collider && ent->Collider->Type == ColliderType_Crystal)
     {
+        RemoveEntityFromList(world.CrystalEntities, ent);
         FreeEntry(world.CrystalPool, ent->PoolEntry);
     }
     if (ent->Collider && ent->Collider->Type == ColliderType_Asteroid)
@@ -537,6 +547,19 @@ void RemoveEntity(entity_world &world, entity *ent)
 void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 {
     FreeArena(w.Arena);
+    w.AsteroidEntities.clear();
+    w.CrystalEntities.clear();
+    w.CheckpointEntities.clear();
+    w.ExplosionEntities.clear();
+    w.LaneSlotEntities.clear();
+    w.ModelEntities.clear();
+    w.MovementEntities.clear();
+    w.RotatingEntities.clear();
+    w.RemoveOffscreenEntities.clear();
+    w.RepeatingEntities.clear();
+    w.CollisionEntities.clear();
+    w.ShipEntities.clear();
+    w.TrailEntities.clear();
 
     w.AssetLoader = loader;
     w.Camera = cam;

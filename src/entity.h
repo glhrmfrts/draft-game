@@ -175,6 +175,7 @@ struct entity_world
 
     background_state BackgroundState;
 
+    std::vector<entity *> CrystalEntities;
     std::vector<entity *> CheckpointEntities;
     std::vector<entity *> AsteroidEntities;
     std::vector<entity *> PowerupEntities;

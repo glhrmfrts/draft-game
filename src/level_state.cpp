@@ -7,7 +7,7 @@
 #define SCORE_TEXT_DRAFT      "DRAFT"
 #define SCORE_TEXT_BLAST      "BLAST"
 #define SCORE_TEXT_MISS       "MISS"
-#define SCORE_TEXT_HEALTH    "HEALTH"
+#define SCORE_TEXT_HEALTH     "HEALTH"
 
 #define SCORE_CHECKPOINT        20
 #define SCORE_DESTROY_BLUE_SHIP 10
@@ -22,12 +22,22 @@
 //
 // TODO: update asteroids velocity (or remove them?)
 
-void PauseMenuCallback(game_main *, menu_data *, int);
+MENU_FUNC(PauseMenuCallback);
+MENU_FUNC(GameOverMenuCallback);
 
 static menu_data pauseMenu = {
     "PAUSED", 2, PauseMenuCallback,
     {
         menu_item{"CONTINUE", MenuItemType_Text},
+        menu_item{"EXIT", MenuItemType_Text},
+    }
+};
+
+static menu_data gameOverMenu = {
+    "GAME OVER", 3, GameOverMenuCallback,
+    {
+        menu_item{"CONTINUE", MenuItemType_Text},
+        menu_item{"RESTART", MenuItemType_Text},
         menu_item{"EXIT", MenuItemType_Text},
     }
 };
@@ -210,12 +220,13 @@ void InitLevel(game_main *g)
     auto l = &g->LevelState;
     FreeArena(l->Arena);
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
-
-    ApplyExplosionLight(g->RenderState, IntColor(FirstPalette.Colors[3]));
+    l->IntroTextPool.Arena = &l->Arena;
+    l->ScoreTextPool.Arena = &l->Arena;
+    l->SequencePool.Arena = &l->Arena;
 
     g->Gravity = vec3(0, 0, 0);
     g->World.Camera = &g->Camera;
-    l->DraftBoostAudio = CreateAudioSource(g->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
+    l->DraftBoostAudio = CreateAudioSource(l->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
 
     InitFormat(l->HealthFormat, "Health: %d\n", 24, &l->Arena);
     InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
@@ -257,6 +268,10 @@ void InitLevel(game_main *g)
     {
         l->ReservedLanes[i] = 0;
     }
+    
+    l->CheckpointNum = 0;
+    l->CurrentCheckpointFrame = 0;
+    l->GameplayState = GameplayState_Playing;
 }
 
 void DebugReset(game_main *g)
@@ -395,7 +410,7 @@ void PlayerEnemyCollision(level_state *l, entity_world &w,
                           entity *player, entity *enemy, int health)
 {
     PlayerExplodeAndLoseHealth(l, w, player, health);
-    player->Vel().y = std::min(PLAYER_MIN_VEL, enemy->Vel().y);
+    player->Vel().y = std::min(PLAYER_MIN_VEL, player->Vel().y);
 
     auto enemyExp = CreateExplosionEntity(
         GetEntry(w.ExplosionPool),
@@ -464,6 +479,12 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
             else if (SHIP_IS_ORANGE(entityToExplode->Ship))
             {
                 PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 25);
+                return false;
+            }
+            else if (ENTITY_IS_PLAYER(otherEntity) && SHIP_IS_RED(entityToExplode->Ship))
+            {
+                PlayerEnemyCollision(l, g->World, otherEntity, entityToExplode, 50);
+                return false;
             }
 
             auto exp = CreateExplosionEntity(
@@ -817,7 +838,16 @@ void UpdateLevel(game_main *g, float dt)
             AddEntity(world, exp);
         }
 
-        UpdateClassicMode(g, l);
+        if (l->GameplayState == GameplayState_Playing)
+        {
+            UpdateClassicMode(g, l);
+        }
+        else
+        {
+            float moveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
+            UpdateMenuSelection(g, gameOverMenu, moveY);
+        }
+        
         for (int i = 0; i < LevelGenType_MAX; i++)
         {
             UpdateGen(g, l, l->GenParams + i, dt);
@@ -1130,25 +1160,6 @@ void UpdateLevel(game_main *g, float dt)
     updateTime.End = g->Platform.GetMilliseconds();
 }
 
-void PauseMenuCallback(game_main *g, menu_data *menu, int itemIndex)
-{
-    auto l = &g->LevelState;
-    switch (itemIndex)
-    {
-    case 0:
-    {
-        l->GameplayState = GameplayState_Playing;
-        break;
-    }
-    
-    case 1:
-    {
-        Println("EXIT GAME");
-        break;
-    }
-    }
-}
-
 void RenderLevel(game_main *g, float dt)
 {
     auto l = &g->LevelState;
@@ -1213,8 +1224,94 @@ void RenderLevel(game_main *g, float dt)
     {
         DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, false);
     }
+    else if (l->GameplayState == GameplayState_GameOver)
+    {
+        DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, false);
+    }
     
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();
+}
+
+void RemoveGameplayEntities(entity_world &w)
+{
+    for (auto ent : w.CheckpointEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.AsteroidEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.PowerupEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.ShipEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.CrystalEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+}
+
+MENU_FUNC(PauseMenuCallback)
+{
+    auto l = &g->LevelState;
+    switch (itemIndex)
+    {
+    case 0:
+    {
+        l->GameplayState = GameplayState_Playing;
+        break;
+    }
+    
+    case 1:
+    {
+        Println("EXIT GAME");
+        break;
+    }
+    }
+}
+
+MENU_FUNC(GameOverMenuCallback)
+{
+    auto l = &g->LevelState;
+    switch (itemIndex)
+    {
+    case 0:
+    {
+        // continue from last checkpoint
+        l->CurrentCheckpointFrame = 0;
+        l->GameplayState = GameplayState_Playing;
+        l->Health = 50;
+        RemoveGameplayEntities(g->World);
+        AddEntity(g->World, g->World.PlayerEntity);
+        break;
+    }
+    
+    case 1:
+    {
+        // restart from the beginning
+        l->Health = 50;
+        RemoveGameplayEntities(g->World);
+        AddEntity(g->World, g->World.PlayerEntity);
+        InitLevel(g);
+        break;
+    }
+    
+    case 2:
+    {
+        InitMenu(g);
+        break;
+    }
+    }
 }

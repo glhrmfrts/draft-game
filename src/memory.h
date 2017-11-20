@@ -3,11 +3,11 @@
 
 struct memory_block
 {
+    const char *Name;
     memory_block *Prev = NULL;
     void *Base;
     size_t Used;
     size_t Size;
-    const char *Name;
 };
 
 struct allocator
@@ -29,13 +29,11 @@ struct memory_pool_entry : allocator
 
 struct memory_pool
 {
+    const char *Name;
+    memory_arena *Arena = NULL;
     memory_pool_entry *First = NULL;
     memory_pool_entry *FirstFree = NULL;
     size_t ElemSize = 0;
-
-#ifdef DRAFT_DEBUG
-    const char *DEBUGName;
-#endif
 };
 
 template<typename T>
@@ -44,9 +42,7 @@ struct generic_pool : memory_pool
     generic_pool()
     {
         this->ElemSize = sizeof(T);
-#ifdef DRAFT_DEBUG
-        this->DEBUGName = typeid(T).name();
-#endif
+        this->Name = typeid(T).name();
     }
 };
 

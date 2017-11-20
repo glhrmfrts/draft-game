@@ -29,8 +29,6 @@ void UpdateFinalCamera(game_main *g)
 
 void InitMenu(game_main *g)
 {
-    auto m = &g->MenuState;
-
     g->State = GameState_Menu;
     InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
 }
