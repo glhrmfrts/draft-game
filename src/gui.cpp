@@ -90,7 +90,7 @@ void InitGUI(gui &g, tween_state &tweenState, game_input &Input)
                vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
                vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
-               
+
     g.MenuChangeTimer = 1.0f;
     g.MenuChangeSequence.Tweens.push_back(
         tween(&g.MenuChangeTimer)
@@ -246,7 +246,7 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bo
 {
     int CurX = r.X;
     int CurY = r.Y;
-    for (size_t i = 0; i < text[i]; i++)
+    for (size_t i = 0; text[i]; i++)
     {
         if (text[i] == '\n')
         {
@@ -354,15 +354,15 @@ void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.
 {
     static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
     static auto menuItemFont = FindBitmapFont(g->AssetLoader, "unispace_24");
-    
+
     float halfX = g->Width*0.5f;
     float halfY = g->Height*0.5f;
     float baseY = 660.0f;
     float lineWidth = g->Width*0.75f;
-    
+
     color _textColor = textColor;
     _textColor.a *= alpha;
-    
+
     DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f * alpha});
     DrawTextCentered(g->GUI, titleFont, menu.Title, rect{halfX, GetRealPixels(g, baseY), 0, 0}, _textColor);
     DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, _textColor);
@@ -377,7 +377,7 @@ void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.
         DrawMenuItem(g, menuItemFont, item, halfX, baseY, selected, changeTimer, alpha);
         baseY -= height + GetRealPixels(g, 10.0f);
     }
-    
+
     if (drawBackItem)
     {
         bool backSelected = menu.HotItem == menu.NumItems;
@@ -389,7 +389,7 @@ float GetMenuAxisValue(game_input &input, menu_axis &axis, float dt)
 {
     const float moveInterval = 0.05f;
     float value = GetAxisValue(input, (action_type)axis.Type);
-    
+
     if (value == 0.0f)
     {
         axis.Timer += dt;
@@ -415,7 +415,7 @@ bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputY, bool backI
         {
             menu.HotItem--;
         }
-        
+
         int max = menu.NumItems;
         if (!backItemEnabled)
         {
@@ -424,12 +424,12 @@ bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputY, bool backI
         menu.HotItem = glm::clamp(menu.HotItem, 0, max);
         item = menu.Items + menu.HotItem;
     } while (!item->Enabled);
-    
+
     if (prevHotItem != menu.HotItem)
     {
         PlaySequence(g->TweenState, &g->GUI.MenuChangeSequence, true);
     }
-    
+
     bool backSelected = menu.HotItem == menu.NumItems;
     if (IsJustPressed(g, Action_select))
     {

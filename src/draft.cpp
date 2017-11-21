@@ -68,7 +68,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/vcr.ttf",
                 "vcr_16",
-                (void *)int(GetRealPixels(g, 32.0f))
+                (void *)long(GetRealPixels(g, 32.0f))
             )
         );
         g->Assets.push_back(
@@ -76,7 +76,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
                 "unispace_16",
-                (void *)int(GetRealPixels(g, 16.0f))
+                (void *)long(GetRealPixels(g, 16.0f))
             )
         );
         g->Assets.push_back(
@@ -84,7 +84,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
                 "unispace_24",
-                (void *)int(GetRealPixels(g, 24.0f))
+                (void *)long(GetRealPixels(g, 24.0f))
             )
         );
         g->Assets.push_back(
@@ -92,7 +92,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
                 "unispace_32",
-                (void *)int(GetRealPixels(g, 32.0f))
+                (void *)long(GetRealPixels(g, 32.0f))
             )
         );
         g->Assets.push_back(
@@ -100,7 +100,7 @@ extern "C"
                 AssetType_Font,
                 "data/fonts/unispace.ttf",
                 "unispace_48",
-                (void *)int(GetRealPixels(g, 48.0f))
+                (void *)long(GetRealPixels(g, 48.0f))
             )
         );
         g->Assets.push_back(
