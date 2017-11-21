@@ -18,7 +18,7 @@ void DrawDebugUI(game_main *g, float dt)
     auto &updateTime = g->UpdateTime;
     auto &renderTime = g->RenderTime;
     auto playerEntity = g->World.PlayerEntity;
-    auto lanes = g->LevelState.LaneSlots;
+    auto lanes = g->World.GenState->LaneSlots;
     ImGui::Text("ms: %.2f", dt * 1000.0f);
     ImGui::Text("FPS: %.5f", 1.0f/dt);
     ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);

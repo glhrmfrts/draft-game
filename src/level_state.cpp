@@ -1,8 +1,5 @@
 // Copyright
 
-#define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
-#define PLAYER_MAX_VEL_LIMIT           170.0f
-
 #define SCORE_TEXT_CHECKPOINT "CHECKPOINT"
 #define SCORE_TEXT_DRAFT      "DRAFT"
 #define SCORE_TEXT_BLAST      "BLAST"
@@ -14,8 +11,6 @@
 #define SCORE_MISS_ORANGE_SHIP  10
 #define SCORE_DRAFT             5
 #define SCORE_HEALTH            2
-
-#define GEN_PLAYER_OFFSET 250
 
 // TODO(14/11/2017): make possible to share the entity-generation system with the
 // menu
@@ -65,154 +60,6 @@ void UpdateAudioParams(audio_source *audio)
     alSourcef(audio->Source, AL_GAIN, audio->Gain);
 }
 
-int GetNextSpawnLane(level_state *l, bool isShip = false)
-{
-    static int lastLane = 0;
-    static int lastShipLane = 0;
-    int lane = lastLane;
-    while (lane == lastLane || (isShip && lane == lastShipLane) || (l->ReservedLanes[lane+2] == 1))
-    {
-        lane = RandomBetween(l->Entropy, -2, 2);
-    }
-    lastLane = lane;
-    if (isShip)
-    {
-        lastShipLane = lane;
-    }
-    return lane;
-}
-
-int GetNextShipColor(level_state *l)
-{
-    static int lastColor = 0;
-    int color = lastColor;
-    if (l->ForceShipColor > -1)
-    {
-        return lastColor = l->ForceShipColor;
-    }
-    while (color == lastColor)
-    {
-        color = RandomBetween(l->Entropy, 0, 1);
-    }
-    lastColor = color;
-    return color;
-}
-
-LEVEL_GEN_FUNC(GenerateCrystal)
-{
-    int lane = GetNextSpawnLane(l);
-    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g->World));
-    ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
-    ent->Pos().z = SHIP_Z + 0.4f;
-    ent->Scl().x = 0.3f;
-    ent->Scl().y = 0.3f;
-    ent->Scl().z = 0.5f;
-    ent->Vel().y = PLAYER_MIN_VEL * 0.2f;
-    AddEntity(g->World, ent);
-}
-
-LEVEL_GEN_FUNC(GenerateShip)
-{
-    int colorIndex = GetNextShipColor(l);
-    color c = IntColor(ShipPalette.Colors[colorIndex]);
-    int lane = GetNextSpawnLane(l, true);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, colorIndex);
-    ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
-    ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
-    ent->Pos().z = SHIP_Z;
-    ent->Ship->ColorIndex = colorIndex;
-    AddFlags(ent, EntityFlag_RemoveOffscreen);
-    AddEntity(g->World, ent);
-}
-
-LEVEL_GEN_FUNC(GenerateRedShip)
-{
-    color c = IntColor(ShipPalette.Colors[SHIP_RED]);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, SHIP_RED);
-    int lane = l->PlayerLaneIndex - 2;
-    if (p->Flags & LevelGenFlag_ReserveLane)
-    {
-        lane = p->ReservedLane;
-    }
-    ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
-    ent->Pos().z = SHIP_Z;
-    ent->Ship->ColorIndex = SHIP_RED;
-    AddFlags(ent, EntityFlag_RemoveOffscreen);
-    AddEntity(g->World, ent);
-}
-
-#define ASTEROID_Z (SHIP_Z + 80)
-LEVEL_GEN_FUNC(GenerateAsteroid)
-{
-    //Println("I should be generating an asteroid");
-    auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g->World));
-    int lane = l->PlayerLaneIndex - 2;
-    ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + (GEN_PLAYER_OFFSET/2) + (100.0f * (g->World.PlayerEntity->Vel().y/PLAYER_MAX_VEL_LIMIT));
-    ent->Pos().z = ASTEROID_Z;
-    //ent->Vel().y = g->World.PlayerEntity->Vel().y * 1.5f;
-    AddFlags(ent, EntityFlag_RemoveOffscreen);
-    AddEntity(g->World, ent);
-}
-
-LEVEL_GEN_FUNC(GenerateSideTrail)
-{
-    // TODO: create the side trail pool
-    auto ent = CreateEntity(&g->World.Arena);
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
-    ent->Trail = CreateTrail(&g->World.Arena, ent, Color_white, 0.5f, true);
-    AddFlags(ent, EntityFlag_RemoveOffscreen | EntityFlag_UpdateMovement);
-    AddEntity(g->World, ent);
-
-    ent->Vel().y = RandomBetween(l->Entropy, -25.0f, -75.0f);
-    ent->Pos().x = RandomBetween(l->Entropy, 10.0f, 40.0f);
-    if (RandomBetween(l->Entropy, 0, 1) == 0)
-    {
-        ent->Pos().x = -ent->Pos().x;
-    }
-}
-
-LEVEL_GEN_FUNC(GenerateRandomGeometry)
-{
-    // TODO: create a pool for this
-    mesh *m = NULL;
-    vec3 scale = vec3(1.0f);
-    color c = Color_white;
-    if (RandomBetween(l->Entropy, 0, 1) == 0)
-    {
-        m = GetCrystalMesh(g->World);
-        c = CRYSTAL_COLOR;
-        scale = vec3{50.0f, 50.0f, 200.0f};
-    }
-    else
-    {
-        m = GetAsteroidMesh(g->World);
-        c = ASTEROID_COLOR;
-        scale = vec3(50.0f);
-    }
-
-    auto ent = CreateEntity(&g->World.Arena);
-    ent->Model = CreateModel(&g->World.Arena, m);
-    ent->FrameRotation = PushStruct<frame_rotation>(&g->World.Arena);
-    ent->FrameRotation->Rotation.x = RandomBetween(l->Entropy, -45.0f, 45.0f);
-    ent->FrameRotation->Rotation.y = RandomBetween(l->Entropy, -45.0f, 45.0f);
-    ent->FrameRotation->Rotation.z = RandomBetween(l->Entropy, -45.0f, 45.0f);
-    //ent->Trail = CreateTrail(&g->World.Arena, ent, c, 0.5f, true);
-
-    ent->Pos().x = RandomBetween(l->Entropy, -1000.0f, 1000.0f);
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2.0f;
-    ent->Pos().z = RandomBetween(l->Entropy, -100.0f, -600.0f);
-    ent->Vel().x = RandomBetween(l->Entropy, -20.0f, 20.0f);
-    ent->Vel().y = RandomBetween(l->Entropy, -1.0f, -50.0f);
-    ent->SetScl(scale);
-
-    AddFlags(ent, EntityFlag_RemoveOffscreen | EntityFlag_UpdateMovement);
-    AddEntity(g->World, ent);
-}
-
 void InitLevel(game_main *g)
 {
     g->State = GameState_Level;
@@ -244,43 +91,6 @@ void InitLevel(game_main *g)
     InitFormat(l->HealthFormat, "Health: %d\n", 24, &l->Arena);
     InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
     InitFormat(l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
-
-    auto gen = l->GenParams + LevelGenType_Crystal;
-    gen->Flags = LevelGenFlag_Randomize;
-    gen->Interval = BASE_CRYSTAL_INTERVAL;
-    gen->Func = GenerateCrystal;
-
-    gen = l->GenParams + LevelGenType_Ship;
-    gen->Flags = LevelGenFlag_BasedOnVelocity;
-    gen->Interval = INITIAL_SHIP_INTERVAL;
-    gen->Func = GenerateShip;
-
-    gen = l->GenParams + LevelGenType_RedShip;
-    gen->Flags = LevelGenFlag_BasedOnVelocity | LevelGenFlag_ReserveLane;
-    gen->Interval = INITIAL_SHIP_INTERVAL;
-    gen->Func = GenerateRedShip;
-
-    gen = l->GenParams + LevelGenType_Asteroid;
-    gen->Flags = LevelGenFlag_BasedOnVelocity;// | LevelGenFlag_ReserveLane;
-    gen->Interval = INITIAL_SHIP_INTERVAL;
-    gen->Func = GenerateAsteroid;
-
-    gen = l->GenParams + LevelGenType_SideTrail;
-    gen->Flags = LevelGenFlag_Enabled | LevelGenFlag_Randomize;
-    gen->Interval = 0.5f;
-    gen->RandomOffset = 0.4f;
-    gen->Func = GenerateSideTrail;
-
-    gen = l->GenParams + LevelGenType_RandomGeometry;
-    gen->Flags = LevelGenFlag_Enabled | LevelGenFlag_Randomize;
-    gen->Interval = 0.5f;
-    gen->RandomOffset = 0.4f;
-    gen->Func = GenerateRandomGeometry;
-
-    for (int i = 0; i < ROAD_LANE_COUNT; i++)
-    {
-        l->ReservedLanes[i] = 0;
-    }
     
     l->Health = 50;
     l->CheckpointNum = 0;
@@ -288,8 +98,41 @@ void InitLevel(game_main *g)
     l->GameplayState = GameplayState_Playing;
 }
 
-void DebugReset(game_main *g)
+void RemoveGameplayEntities(entity_world &w)
 {
+    for (auto ent : w.CheckpointEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.AsteroidEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.PowerupEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.ShipEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+    for (auto ent : w.CrystalEntities)
+    {
+        if (!ent) continue;
+        RemoveEntity(w, ent);
+    }
+}
+
+void RestartLevel(game_main *g)
+{
+    g->LevelState.Health = 50;
+    RemoveGameplayEntities(g->World);
+    AddEntity(g->World, g->World.PlayerEntity);
+    InitLevel(g);
 }
 
 void AddIntroText(game_main *g, level_state *l, const char *text, color c)
@@ -612,70 +455,6 @@ void KeepEntityInsideOfRoad(entity *ent)
     ent->Pos().x = glm::clamp(ent->Pos().x, -limit + 0.5f, limit - 0.5f);
 }
 
-void ResetGen(level_gen_params *p)
-{
-    p->Interval = INITIAL_SHIP_INTERVAL;
-    p->Timer = p->Interval;
-}
-
-float GetNextTimer(level_gen_params *p, random_series random)
-{
-    if (p->Flags & LevelGenFlag_Randomize)
-    {
-        const float offset = p->RandomOffset;
-        return p->Interval + RandomBetween(random, -offset, offset);
-    }
-    return p->Interval;
-}
-
-void UpdateGen(game_main *g, level_state *l, level_gen_params *p, float dt)
-{
-    if (!(p->Flags & LevelGenFlag_Enabled))
-    {
-        return;
-    }
-
-    if (p->Timer <= 0)
-    {
-        p->Func(p, g, l);
-        p->Timer = GetNextTimer(p, l->Entropy);
-        if (p->Flags & LevelGenFlag_BasedOnVelocity)
-        {
-            p->Timer -= (p->Timer * 0.9f) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
-        }
-        l->ReservedLanes[p->ReservedLane + 2] = 0;
-        p->ReservedLane = NO_RESERVED_LANE;
-    }
-
-    if (p->Flags & LevelGenFlag_ReserveLane)
-    {
-        if (p->Timer <= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
-        {
-            const int maxTries = 5;
-            int i = 0;
-            int laneIndex = l->PlayerLaneIndex;
-
-            // get the first non-occupied lane, or give up for this frame
-            while (l->LaneSlots[laneIndex] > 0 && i < maxTries)
-            {
-                laneIndex = RandomBetween(l->Entropy, 0, 4);
-                i++;
-            }
-            if (i >= maxTries)
-            {
-                p->Timer = GetNextTimer(p, l->Entropy);
-            }
-            else
-            {
-                p->ReservedLane = laneIndex - 2;
-                l->ReservedLanes[laneIndex] = 1;
-            }
-        }
-    }
-
-    p->Timer -= dt;
-}
-
 void SpawnCheckpoint(game_main *g, level_state *l)
 {
     auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g->World));
@@ -689,10 +468,10 @@ void SpawnCheckpoint(game_main *g, level_state *l)
 
 void UpdateClassicMode(game_main *g, level_state *l)
 {
-    auto crystals = l->GenParams + LevelGenType_Crystal;
-    auto ships = l->GenParams + LevelGenType_Ship;
-    auto redShips = l->GenParams + LevelGenType_RedShip;
-    auto asteroids = l->GenParams + LevelGenType_Asteroid;
+    auto crystals = g->World.GenState->GenParams + GenType_Crystal;
+    auto ships = g->World.GenState->GenParams + GenType_Ship;
+    auto redShips = g->World.GenState->GenParams + GenType_RedShip;
+    auto asteroids = g->World.GenState->GenParams + GenType_Asteroid;
     int frame = l->CurrentCheckpointFrame;
     switch (l->CheckpointNum)
     {
@@ -761,7 +540,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
         }
         if (frame == FrameSeconds(5))
         {
-            RemoveFlags(redShips, LevelGenFlag_ReserveLane);
+            RemoveFlags(redShips, GenFlag_ReserveLane);
             Enable(redShips);
         }
         if (frame == FrameSeconds(25))
@@ -836,11 +615,11 @@ void UpdateLevel(game_main *g, float dt)
             l->CurrentCheckpointFrame = 0;
         }
 
+#ifdef DRAFT_DEBUG
         if (Global_Camera_FreeCam)
         {
             UpdateFreeCam(cam, input, dt);
         }
-
         if (g->Input.Keys[SDL_SCANCODE_E])
         {
             auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
@@ -851,17 +630,19 @@ void UpdateLevel(game_main *g, float dt)
                                              vec3{ 0, 1, 1 });
             AddEntity(world, exp);
         }
+        if (g->Input.Keys[SDL_SCANCODE_R])
+        {
+            RestartLevel(g);
+        }
+#endif
 
         if (l->GameplayState == GameplayState_Playing)
         {
             UpdateClassicMode(g, l);
         }
         
-        for (int i = 0; i < LevelGenType_MAX; i++)
-        {
-            UpdateGen(g, l, l->GenParams + i, dt);
-        }
-
+        UpdateGenState(g, world.GenState, (void *)l, dt);
+        
         {
             // player movement
             float moveX = GetAxisValue(input, Action_horizontal);
@@ -910,7 +691,7 @@ void UpdateLevel(game_main *g, float dt)
                 ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
             }
 
-            l->PlayerLaneIndex = int(nearestLane)+2;
+            world.GenState->PlayerLaneIndex = int(nearestLane)+2;
         }
 
         size_t frameCollisionCount = 0;
@@ -953,16 +734,6 @@ void UpdateLevel(game_main *g, float dt)
         }
 
         UpdateLogiclessEntities(world, dt);
-        for (int i = 0; i < ROAD_LANE_COUNT; i++)
-        {
-            l->LaneSlots[i] = 0;
-        }
-        for (auto ent : world.LaneSlotEntities)
-        {
-            if (!ent) continue;
-
-            l->LaneSlots[ent->LaneSlot->Index]++;
-        }
         for (auto ent : world.ShipEntities)
         {
             if (!ent) continue;
@@ -1249,35 +1020,6 @@ void RenderLevel(game_main *g, float dt)
     renderTime.End = g->Platform.GetMilliseconds();
 }
 
-void RemoveGameplayEntities(entity_world &w)
-{
-    for (auto ent : w.CheckpointEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.AsteroidEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.PowerupEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.ShipEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.CrystalEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-}
-
 MENU_FUNC(PauseMenuCallback)
 {
     auto l = &g->LevelState;
@@ -1316,10 +1058,7 @@ MENU_FUNC(GameOverMenuCallback)
     case 1:
     {
         // restart from the beginning
-        l->Health = 50;
-        RemoveGameplayEntities(g->World);
-        AddEntity(g->World, g->World.PlayerEntity);
-        InitLevel(g);
+        RestartLevel(g);
         break;
     }
     

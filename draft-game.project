@@ -154,5 +154,7 @@
     <File Name="src/asset.h"/>
     <File Name="src/common.h"/>
     <File Name="src/tween.h"/>
+    <File Name="src/generate.cpp"/>
+    <File Name="src/generate.h"/>
   </VirtualDirectory>
 </CodeLite_Project>

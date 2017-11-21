@@ -88,6 +88,7 @@ void UpdateMenu(game_main *g, float dt)
     g->World.PlayerEntity->Pos().y += g->World.PlayerEntity->Vel().y * dt;
     UpdateLogiclessEntities(g->World, dt);
     UpdateCameraToPlayer(g->Camera, g->World.PlayerEntity, dt);
+    UpdateGenState(g, g->World.GenState, NULL, dt);
 
     if (m->SelectedMainMenu == -1)
     {

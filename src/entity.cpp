@@ -568,6 +568,9 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     ResetPool(w.ShipPool);
     ResetPool(w.PowerupPool);
 
+    w.GenState = PushStruct<gen_state>(w.Arena);
+    InitGenState(w.GenState);
+    
     w.AssetLoader = loader;
     w.Camera = cam;
     w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
@@ -613,6 +616,17 @@ vec3 WorldToRenderTransform(const vec3 &worldPos)
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
+    for (int i = 0; i < ROAD_LANE_COUNT; i++)
+    {
+        world.GenState->LaneSlots[i] = 0;
+    }
+    for (auto ent : world.LaneSlotEntities)
+    {
+        if (!ent) continue;
+
+        world.GenState->LaneSlots[ent->LaneSlot->Index]++;
+    }
+        
     float velY = world.PlayerEntity->Vel().y;
     auto tex = world.BackgroundState.Texture;
     for (auto &bg : world.BackgroundState.Instances)

@@ -19,6 +19,7 @@
 #include "debug_ui.cpp"
 #include "meshes.cpp"
 #include "entity.cpp"
+#include "generate.cpp"
 #include "init.cpp"
 #include "menu_state.cpp"
 #include "level_state.cpp"

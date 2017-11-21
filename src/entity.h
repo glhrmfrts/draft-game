@@ -154,6 +154,8 @@ struct background_state
     texture *Texture;
 };
 
+struct gen_state;
+
 struct entity_world
 {
     memory_arena PersistentArena;
@@ -175,6 +177,7 @@ struct entity_world
     mesh *BackgroundMesh = NULL;
 
     background_state BackgroundState;
+    gen_state *GenState;
 
     std::vector<entity *> CrystalEntities;
     std::vector<entity *> CheckpointEntities;

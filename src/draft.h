@@ -16,6 +16,7 @@
 #include "gui.h"
 #include "random.h"
 #include "entity.h"
+#include "generate.h"
 #include "menu_state.h"
 #include "level_state.h"
 
