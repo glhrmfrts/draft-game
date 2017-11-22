@@ -12,9 +12,6 @@
 #define SCORE_DRAFT             5
 #define SCORE_HEALTH            2
 
-// TODO(14/11/2017): make possible to share the entity-generation system with the
-// menu
-//
 // TODO(20/11/2017): asteroids can stay in the game, but not with high velocity
 
 MENU_FUNC(PauseMenuCallback);
@@ -458,7 +455,7 @@ void KeepEntityInsideOfRoad(entity *ent)
 void SpawnCheckpoint(game_main *g, level_state *l)
 {
     auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g->World));
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET*2;
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z * 0.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
@@ -477,6 +474,9 @@ void UpdateClassicMode(game_main *g, level_state *l)
     {
     case 0:
     {
+        l->PlayerMinVel = PLAYER_MIN_VEL;
+        l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
+        
         if (frame == 0)
         {
             AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
@@ -534,6 +534,9 @@ void UpdateClassicMode(game_main *g, level_state *l)
 
     case 3:
     {
+        l->PlayerMinVel = PLAYER_MIN_VEL + 15.0f;
+        l->PlayerMaxVel = PLAYER_MIN_VEL + 50.0f;
+        
         if (frame == 0)
         {
             AddIntroText(g, l, "DODGE", IntColor(ShipPalette.Colors[SHIP_RED]));
@@ -553,6 +556,30 @@ void UpdateClassicMode(game_main *g, level_state *l)
 
     case 4:
     {
+        l->PlayerMinVel = PLAYER_MIN_VEL;
+        l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
+        
+        if (frame == 0)
+        {
+            AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
+        }
+        if (frame == FrameSeconds(5))
+        {
+            Enable(asteroids);
+        }
+        if (frame == FrameSeconds(25))
+        {
+            Disable(asteroids);
+            SpawnCheckpoint(g, l);
+        }
+        break;
+    }
+    
+    case 5:
+    {
+        l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
+        l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
+        
         if (frame == 0)
         {
             AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
@@ -561,17 +588,11 @@ void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
         }
-        if (frame == FrameSeconds(2))
-        {
-            AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
-        }
         if (frame == FrameSeconds(5))
         {
             l->ForceShipColor = -1;
             Enable(ships);
-            Enable(asteroids);
         }
-        break;
     }
     }
     l->CurrentCheckpointFrame++;
@@ -603,8 +624,12 @@ void UpdateLevel(game_main *g, float dt)
     dt *= Global_Game_TimeSpeed;
     if (l->GameplayState != GameplayState_Paused)
     {
-        l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
-        l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
+        if (false/*is infinite mode*/)
+        {
+            l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
+            l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
+        }
+        
         l->TimeElapsed += dt;
         l->DamageTimer -= dt;
         l->DamageTimer = std::max(l->DamageTimer, 0.0f);
@@ -651,7 +676,7 @@ void UpdateLevel(game_main *g, float dt)
             {
                 moveY = 0.0f;
             }
-            MoveShipEntity(playerEntity, moveX, moveY, l->PlayerMaxVel, dt);
+            MoveShipEntity(playerEntity, moveX, moveY, l->PlayerMinVel, l->PlayerMaxVel, dt);
 
             float &playerX = playerEntity->Pos().x;
             float nearestLane = std::floor(std::ceil(playerX)/ROAD_LANE_WIDTH);

@@ -90,7 +90,7 @@ GEN_FUNC(GenerateAsteroid)
     auto ent = CreateAsteroidEntity(GetEntry(g->World.AsteroidPool), GetAsteroidMesh(g->World));
     int lane = state->PlayerLaneIndex - 2;
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
-    ent->Pos().y = g->World.PlayerEntity->Pos().y + (GEN_PLAYER_OFFSET/2) + (100.0f * (g->World.PlayerEntity->Vel().y/PLAYER_MAX_VEL_LIMIT));
+    ent->Pos().y = g->World.PlayerEntity->Pos().y + (GEN_PLAYER_OFFSET/4) + (100.0f * (g->World.PlayerEntity->Vel().y/PLAYER_MAX_VEL_LIMIT));
     ent->Pos().z = ASTEROID_Z;
     //ent->Vel().y = g->World.PlayerEntity->Vel().y * 1.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);

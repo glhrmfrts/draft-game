@@ -282,20 +282,19 @@ static float Interp(float c, float t, float a, float dt)
     return (dir == std::copysign(1, t - c)) ? c : t;
 }
 
-#define ShipMinVel              40.0f
-#define PLAYER_MIN_VEL          50.0f
-#define PLAYER_MIN_VEL_BREAKING 20.0f
-#define ShipAcceleration        20.0f
-#define ShipBreakAcceleration   30.0f
-#define ShipSteerSpeed          20.0f
-#define ShipSteerAcceleration   80.0f
-#define ShipFriction            10.0f
-void MoveShipEntity(entity *ent, float moveX, float moveY, float maxVel, float dt)
+#define SHIP_MIN_VEL            40.0f
+#define SHIP_ACCELERATION       20.0f
+#define SHIP_BREAK_ACCELERATION 30.0f
+#define SHIP_STEER_SPEED        20.0f
+#define SHIP_STEER_ACCELERATION 80.0f
+#define SHIP_FRICTION           10.0f
+
+void MoveShipEntity(entity *ent, float moveX, float moveY, float minVelArg, float maxVel, float dt)
 {
-    float minVel = ShipMinVel;
+    float minVel = SHIP_MIN_VEL;
     if (ent->Flags & EntityFlag_IsPlayer)
     {
-        minVel = PLAYER_MIN_VEL;
+        minVel = minVelArg;
     }
     if (moveY < 0.0f)
     {
@@ -306,17 +305,17 @@ void MoveShipEntity(entity *ent, float moveX, float moveY, float maxVel, float d
         moveY = 0.1f;
     }
 
-    ent->Transform.Velocity.y += moveY * ShipAcceleration * dt;
+    ent->Transform.Velocity.y += moveY * SHIP_ACCELERATION * dt;
     if ((moveY <= 0.0f && ent->Transform.Velocity.y > 0) || ent->Transform.Velocity.y > maxVel)
     {
-        ent->Transform.Velocity.y -= ShipFriction * dt;
+        ent->Transform.Velocity.y -= SHIP_FRICTION * dt;
     }
 
-    float steerTarget = moveX * ShipSteerSpeed;
+    float steerTarget = moveX * SHIP_STEER_SPEED;
     ent->Transform.Velocity.y = std::min(ent->Transform.Velocity.y, maxVel);
     ent->Transform.Velocity.x = Interp(ent->Transform.Velocity.x,
                                           steerTarget,
-                                          ShipSteerAcceleration,
+                                          SHIP_STEER_ACCELERATION,
                                           dt);
 
     ent->Transform.Rotation.y = 20.0f * (moveX / 1.0f);

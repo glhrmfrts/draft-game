@@ -23,6 +23,8 @@ void DrawDebugUI(game_main *g, float dt)
     ImGui::Text("FPS: %.5f", 1.0f/dt);
     ImGui::Text("Update time: %dms", updateTime.End - updateTime.Begin);
     ImGui::Text("Render time: %dms", renderTime.End - renderTime.Begin);
+    ImGui::Text("Time elapsed: %.2f", g->LevelState.TimeElapsed);
+    ImGui::Text("Player min vel: %.2f", g->LevelState.PlayerMinVel);
     ImGui::Text("Player max vel: %.2f", g->LevelState.PlayerMaxVel);
     ImGui::Text("Player vel: %s", ToString(playerEntity->Vel()).c_str());
     ImGui::Text("Checkpoint: %d", g->LevelState.CheckpointNum);

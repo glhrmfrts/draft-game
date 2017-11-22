@@ -8,6 +8,9 @@ struct audio_source;
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
 #define PLAYER_MAX_VEL_LIMIT           170.0f
 
+#define PLAYER_MIN_VEL          50.0f
+#define PLAYER_MIN_VEL_BREAKING 20.0f
+
 #define MAX_INTRO_TEXTS  8
 
 struct game_main;
@@ -52,6 +55,7 @@ struct level_state
     generic_pool<level_intro_text> IntroTextPool;
 
     std::vector<collision_result> CollisionCache;
+    float PlayerMinVel = PLAYER_MIN_VEL;
     float PlayerMaxVel = PLAYER_INITIAL_MAX_VEL;
     float TimeElapsed = 0;
     float DamageTimer = 0;
