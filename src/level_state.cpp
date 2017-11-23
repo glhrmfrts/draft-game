@@ -85,9 +85,9 @@ void InitLevel(game_main *g)
     g->World.Camera = &g->Camera;
     l->DraftBoostAudio = CreateAudioSource(l->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
 
-    InitFormat(l->HealthFormat, "Health: %d\n", 24, &l->Arena);
-    InitFormat(l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
-    InitFormat(l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
+    InitFormat(&l->HealthFormat, "Health: %d\n", 24, &l->Arena);
+    InitFormat(&l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
+    InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
     
     l->Health = 50;
     l->CheckpointNum = 0;
@@ -945,28 +945,34 @@ void UpdateLevel(game_main *g, float dt)
     alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
     UpdateListener(g->Camera, playerPosition);
 
-    auto scoreText = l->ScoreTextList.front();
-    if (scoreText && scoreText->Sequence->Complete)
-    {
-        l->ScoreTextList.pop_front();
-        DestroySequences(g->TweenState, scoreText->Sequence, 1);
-        FreeEntryFromData(l->SequencePool, scoreText->Sequence);
-        FreeEntryFromData(l->ScoreTextPool, scoreText);
-    }
+	if (l->ScoreTextList.size() > 0)
+	{
+		auto scoreText = l->ScoreTextList.front();
+		if (scoreText && scoreText->Sequence->Complete)
+		{
+			l->ScoreTextList.pop_front();
+			DestroySequences(g->TweenState, scoreText->Sequence, 1);
+			FreeEntryFromData(l->SequencePool, scoreText->Sequence);
+			FreeEntryFromData(l->ScoreTextPool, scoreText);
+		}
+	}
 
-    auto introText = l->IntroTextList.front();
-    if (introText && introText->Sequence->Complete)
-    {
-        l->IntroTextList.pop_front();
-        DestroySequences(g->TweenState, introText->Sequence, 1);
-        if (introText->PosSequence)
-        {
-            DestroySequences(g->TweenState, introText->PosSequence, 1);
-            FreeEntryFromData(l->SequencePool, introText->PosSequence);
-        }
-        FreeEntryFromData(l->SequencePool, introText->Sequence);
-        FreeEntryFromData(l->IntroTextPool, introText);
-    }
+	if (l->IntroTextList.size() > 0)
+	{
+		auto introText = l->IntroTextList.front();
+		if (introText && introText->Sequence->Complete)
+		{
+			l->IntroTextList.pop_front();
+			DestroySequences(g->TweenState, introText->Sequence, 1);
+			if (introText->PosSequence)
+			{
+				DestroySequences(g->TweenState, introText->PosSequence, 1);
+				FreeEntryFromData(l->SequencePool, introText->PosSequence);
+			}
+			FreeEntryFromData(l->SequencePool, introText->Sequence);
+			FreeEntryFromData(l->IntroTextPool, introText);
+		}
+	}
 
     updateTime.End = g->Platform.GetMilliseconds();
 }
@@ -1014,7 +1020,7 @@ void RenderLevel(game_main *g, float dt)
         vec2 p = text->Pos;
         p += (text->TargetPos - p) * text->TweenPosValue;
         text->Color.a = text->TweenAlphaValue;
-        DrawTextCentered(g->GUI, textFont, Format(l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
+        DrawTextCentered(g->GUI, textFont, Format(&l->ScoreNumberFormat, text->Text, text->Score), rect{p.x, p.y, 0, 0}, text->Color);
     }
     End(g->GUI);
     PostProcessEnd(g->RenderState);
@@ -1028,8 +1034,8 @@ void RenderLevel(game_main *g, float dt)
 
     float left = GetRealPixels(g, 10.0f);
     float top = g->Height - GetRealPixels(g, 10.0f);
-    DrawText(g->GUI, hudFont, Format(l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
-    DrawText(g->GUI, hudFont, Format(l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
+    DrawText(g->GUI, hudFont, Format(&l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
+    DrawText(g->GUI, hudFont, Format(&l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
     
     if (l->GameplayState == GameplayState_Paused)
     {

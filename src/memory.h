@@ -50,6 +50,7 @@ struct string_format
 {
     const char *Format = NULL;
     char *Result = NULL;
+	size_t Size = 0;
 };
 
 #endif

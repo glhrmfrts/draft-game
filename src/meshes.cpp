@@ -259,6 +259,10 @@ mesh *GetCrystalMesh(entity_world &w)
     return w.CrystalMesh = CrystalMesh;
 }
 
+#ifndef M_PI_2
+#define M_PI_2 (M_PI/2)
+#endif
+
 mesh *GetAsteroidMesh(entity_world &w)
 {
     if (w.AsteroidMesh)

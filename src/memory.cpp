@@ -223,19 +223,29 @@ T *PushStruct(allocator *alloc)
     return NULL;
 }
 
-void InitFormat(string_format &format, const char *str, size_t size, allocator *alloc)
+void InitFormat(string_format *format, const char *str, size_t size, allocator *alloc)
 {
-    format.Format = str;
-    format.Result = static_cast<char *>(PushSize(alloc, size, str));
+	format->Size = size;
+    format->Format = str;
+    format->Result = static_cast<char *>(PushSize(alloc, size, str));
 }
 
-char *Format(string_format &format, ...)
+void Sprintf(char *result, size_t size, const char *format, std::va_list args)
 {
-    assert(format.Result);
+#ifdef _WIN32
+	vsprintf_s(result, size, format, args);
+#else
+	vsprintf(result, format, args);
+#endif
+}
+
+char *Format(string_format *format, ...)
+{
+    assert(format->Result);
 
     std::va_list args;
     va_start(args, format);
-    vsprintf(format.Result, format.Format, args);
+    Sprintf(format->Result, format->Size, format->Format, args);
     va_end(args);
-    return format.Result;
+    return format->Result;
 }

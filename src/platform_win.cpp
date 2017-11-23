@@ -75,20 +75,22 @@ static void LoadGameLibrary(game_library &Lib, const char *Path, const char *Tem
     CopyFile(Path, TempPath, FALSE);
     Lib.Path = Path;
     Lib.Library = LoadLibrary(TempPath);
+
+	Println(TempPath);
     if (Lib.Library)
     {
         Lib.LoadTime = PlatformGetFileLastWriteTime(Path);
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)GetProcAddress(Lib.Library, "GameInit");
-        Lib.GameUpdate = (game_render_func *)GetProcAddress(Lib.Library, "GameUpdate");
+        Lib.GameUpdate = (game_update_func *)GetProcAddress(Lib.Library, "GameUpdate");
         Lib.GameRender = (game_render_func *)GetProcAddress(Lib.Library, "GameRender");
         Lib.GameDestroy = (game_destroy_func *)GetProcAddress(Lib.Library, "GameDestroy");
         Lib.GameProcessEvent = (game_process_event_func *)GetProcAddress(Lib.Library, "GameProcessEvent");
     }
     else
     {
-        Println("Missing game library");
+		printf("Missing game library: %d", GetLastError());
         exit(EXIT_FAILURE);
     }
 }

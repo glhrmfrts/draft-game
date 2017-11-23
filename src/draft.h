@@ -77,6 +77,7 @@ enum game_controller_button_id
 	XboxButton_Y = 13,
 	XboxButton_Left = 8,
 	XboxButton_Right = 9,
+	XboxButton_Start = 654,
 #else
     XboxButton_A = 0,
     XboxButton_B = 1,
@@ -99,7 +100,6 @@ enum action_type
     Action_camVertical,
     Action_horizontal,
     Action_vertical,
-    Action_navVertical,
     Action_boost,
 	Action_debugUI,
     Action_debugPause,
@@ -109,8 +109,8 @@ enum action_type
 };
 struct action_state
 {
-    int Positive;
-    int Negative;
+    int Positive = 0;
+    int Negative = 0;
     int Pressed = 0;
     float AxisValue = 0;
     game_controller_axis_id AxisID = Axis_Invalid;

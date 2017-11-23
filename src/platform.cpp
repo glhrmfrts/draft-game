@@ -271,6 +271,8 @@ int main(int argc, char **argv)
             }
         }
 
+		Println(accul);
+
         int i = 0;
         while (accul >= deltaTime)
         {
@@ -287,7 +289,7 @@ int main(int argc, char **argv)
 
         Lib.GameRender(&game, elapsed);
         SDL_GL_SwapWindow(Window);
-        SDL_Delay(10);
+        //SDL_Delay(10);
         previousTime = currentTime;
     }
 

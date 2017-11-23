@@ -51,7 +51,7 @@ extern "C"
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Texture,
-                "data/textures/hex.png",
+                "data/textures/grid.png",
                 "grid",
                 (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
             )
