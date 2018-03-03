@@ -37,7 +37,32 @@ static collider *CreateCollider(allocator *alloc, collider_type type, vec3 scale
 }
 
 #define TRAIL_SIZE (sizeof(trail) + (sizeof(trail_piece)+sizeof(collider))*TRAIL_COUNT)
-static trail *CreateTrail(allocator *alloc, entity *Owner, color Color, float radius = 0.5f, bool renderOnly = false)
+static trail *CreateSharedMeshTrail(allocator *alloc, entity *owner, color c,
+                                    float radius = 0.5f, bool renderOnly = false, size_t count = 1)
+{
+    trail_group *result = PushStruct<trail_group>(alloc);
+    result->RenderOnly = renderOnly;
+    result->Radius = radius;
+
+    InitMeshBuffer(result->Mesh.Buffer);
+    result->Model.Mesh = &result->Mesh;
+
+    const size_t LineCount = count*TRAIL_COUNT*2;
+    const size_t PlaneCount = count*TRAIL_COUNT*6;
+    const float emission = 4.0f;
+
+    // planes
+    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, PlaneCount, GL_TRIANGLES});
+    
+    // left line
+    AddPart(&result->Mesh, {{color, emission, 0, NULL}, PlaneCount, LineCount, GL_LINES});
+
+    // right line
+    AddPart(&result->Mesh, {{color, emission, 0, NULL}, PlaneCount + LineCount, LineCount, GL_LINES});
+}
+
+static trail *CreateTrail(allocator *alloc, entity *Owner, color Color,
+                          float radius = 0.5f, bool renderOnly = false)
 {
     trail *result = PushStruct<trail>(alloc);
     result->RenderOnly = renderOnly;
@@ -70,6 +95,18 @@ static trail *CreateTrail(allocator *alloc, entity *Owner, color Color, float ra
         ent->Transform.Position = vec3(0.0f);
         if (!renderOnly)
         {
+            Entity entity = em->spawn_entity();
+
+            auto entity = scene->spawn_entity();
+            scene->add_trail_piece(entity, owner);
+            scene->add_collider(entity, ColliderType::TRAIL_PIECE);
+            scene->add_model(entity, mesh);
+
+            scene->set_parent(entity1, entity2);
+
+            physics->step(scene, dt);
+            renderer->render(scene, camera);
+
             ent->TrailPiece = PushStruct<trail_piece>(alloc);
             ent->TrailPiece->Owner = Owner;
             ent->Collider = PushStruct<collider>(alloc);
@@ -613,6 +650,133 @@ vec3 WorldToRenderTransform(const vec3 &worldPos)
     return result;
 }
 
+static void UpdateTrailGroupEntities(entity_world &world, float dt)
+{
+    static vec3 PointCache[TRAIL_COUNT*4];
+    for (auto ent : world.TrailGroupEntities)
+    {
+        if (!ent) continue;
+
+        auto tg = ent->TrailGroup;
+        if (tg->FirstFrame)
+        {
+            tg->FirstFrame = false;
+            for (int j = 0; j < tg->Count; j++)
+            {
+                auto tr = tg->Entities[j]->Trail;
+                for (int i = 0; i < TRAIL_COUNT; i++)
+                {
+                    tr->Entities[i].Transform.Position = ent->Transform.Position;
+                }
+            }
+        }
+
+        tg->Timer -= dt;
+        if (tg->Timer <= 0)
+        {
+            tg->Timer = Global_Game_TrailRecordTimer;
+            for (int i = 0; i < tg->Count; i++)
+            {
+                PushPosition(tg->Entities[i]->Trail, tg->Entities[i].Pos());
+            }
+        }
+
+        auto &m = tg->Mesh;
+        ResetBuffer(m.Buffer);
+
+        for (int j = 0; j < tg->Count; j++)
+        {
+            // First store the quads, then the lines
+            for (int i = 0; i < TRAIL_COUNT; i++)
+            {
+                auto pieceEntity = tr->Entities + i;
+                vec3 c1 = pieceEntity->Transform.Position;
+                vec3 c2;
+                if (i == TRAIL_COUNT - 1)
+                {
+                    c2 = ent->Transform.Position;
+                }
+                else
+                {
+                    c2 = tr->Entities[i + 1].Transform.Position;
+                }
+
+                float currentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
+                if (i == 0)
+                {
+                    c1 -= (c2 - c1) * currentTrailTime;
+                }
+
+                float r = tr->Radius;
+                float rm = tr->Radius * 0.8f;
+                float min2 =  rm * ((TRAIL_COUNT - i) / (float)TRAIL_COUNT);
+                float min1 =  rm * ((TRAIL_COUNT - i+1) / (float)TRAIL_COUNT);
+                vec3 p1 = c2 - vec3(r - min2, 0, 0);
+                vec3 p2 = c2 + vec3(r - min2, 0, 0);
+                vec3 p3 = c1 - vec3(r - min1, 0, 0);
+                vec3 p4 = c1 + vec3(r - min1, 0, 0);
+                color cl2 = color{ 1, 1, 1, 1.0f - (min2/tr->Radius) };
+                color cl1 = color{ 1, 1, 1, 1.0f - (min1/tr->Radius) };
+                AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
+
+                const float lo = 0.05f;
+                tg->PointCache[j][i*4] = p1 - vec3(lo, 0, 0);
+                tg->PointCache[j][i*4 + 1] = p3 - vec3(lo, 0, 0);
+                tg->PointCache[j][i*4 + 2] = p2 + vec3(lo, 0, 0);
+                tg->PointCache[j][i*4 + 3] = p4 + vec3(lo, 0, 0);
+                if (pieceEntity->Collider)
+                {
+                    auto &box = pieceEntity->Collider->Box;
+                    box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
+                    box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
+                }
+            }
+        }
+
+        for (int j = 0; j < tg->Count; j++)
+        {
+            for (int i = 0; i < TRAIL_COUNT; i++)
+            {
+                vec3 *p = tg->PointCache[j] + i*4;
+                AddLine(m.Buffer, *p++, *p++);
+            }
+            for (int i = 0; i < TRAIL_COUNT; i++)
+            {
+                vec3 *p = tg->PointCache[j] + i*4 + 2;
+                AddLine(m.Buffer, *p++, *p++);
+            }
+        }
+    }
+}
+
+static void UpdateTrailEntities(entity_world &world, float dt)
+{
+    static vec3 PointCache[TRAIL_COUNT*4];
+    for (auto ent : world.TrailEntities)
+    {
+        if (!ent) continue;
+
+        auto tr = ent->Trail;
+        if (tr->FirstFrame)
+        {
+            tr->FirstFrame = false;
+            
+        }
+
+        tr->Timer -= dt;
+        if (tr->Timer <= 0)
+        {
+            tr->Timer = Global_Game_TrailRecordTimer;
+            PushPosition(tr, ent->Transform.Position);
+        }
+
+        auto &m = tr->Mesh;
+        ResetBuffer(m.Buffer);
+
+        
+    }
+}
+
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
@@ -665,87 +829,8 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 
         ent->Transform.Rotation += ent->FrameRotation->Rotation * dt;
     }
-    static vec3 PointCache[TRAIL_COUNT*4];
-    for (auto ent : world.TrailEntities)
-    {
-        if (!ent) continue;
 
-        auto tr = ent->Trail;
-        if (tr->FirstFrame)
-        {
-            tr->FirstFrame = false;
-            for (int i = 0; i < TRAIL_COUNT; i++)
-            {
-                tr->Entities[i].Transform.Position = ent->Transform.Position;
-            }
-        }
-
-        tr->Timer -= dt;
-        if (tr->Timer <= 0)
-        {
-            tr->Timer = Global_Game_TrailRecordTimer;
-            PushPosition(tr, ent->Transform.Position);
-        }
-
-        auto &m = tr->Mesh;
-        ResetBuffer(m.Buffer);
-
-        // First store the quads, then the lines
-        for (int i = 0; i < TRAIL_COUNT; i++)
-        {
-            auto pieceEntity = tr->Entities + i;
-            vec3 c1 = pieceEntity->Transform.Position;
-            vec3 c2;
-            if (i == TRAIL_COUNT - 1)
-            {
-                c2 = ent->Transform.Position;
-            }
-            else
-            {
-                c2 = tr->Entities[i + 1].Transform.Position;
-            }
-
-            float currentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
-            if (i == 0)
-            {
-                c1 -= (c2 - c1) * currentTrailTime;
-            }
-
-            float r = tr->Radius;
-            float rm = tr->Radius * 0.8f;
-            float min2 =  rm * ((TRAIL_COUNT - i) / (float)TRAIL_COUNT);
-            float min1 =  rm * ((TRAIL_COUNT - i+1) / (float)TRAIL_COUNT);
-            vec3 p1 = c2 - vec3(r - min2, 0, 0);
-            vec3 p2 = c2 + vec3(r - min2, 0, 0);
-            vec3 p3 = c1 - vec3(r - min1, 0, 0);
-            vec3 p4 = c1 + vec3(r - min1, 0, 0);
-            color cl2 = color{ 1, 1, 1, 1.0f - (min2/tr->Radius) };
-            color cl1 = color{ 1, 1, 1, 1.0f - (min1/tr->Radius) };
-            AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
-
-            const float lo = 0.05f;
-            PointCache[i*4] = p1 - vec3(lo, 0, 0);
-            PointCache[i*4 + 1] = p3 - vec3(lo, 0, 0);
-            PointCache[i*4 + 2] = p2 + vec3(lo, 0, 0);
-            PointCache[i*4 + 3] = p4 + vec3(lo, 0, 0);
-            if (pieceEntity->Collider)
-            {
-                auto &box = pieceEntity->Collider->Box;
-                box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
-                box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
-            }
-        }
-        for (int i = 0; i < TRAIL_COUNT; i++)
-        {
-            vec3 *p = PointCache + i*4;
-            AddLine(m.Buffer, *p++, *p++);
-        }
-        for (int i = 0; i < TRAIL_COUNT; i++)
-        {
-            vec3 *p = PointCache + i*4 + 2;
-            AddLine(m.Buffer, *p++, *p++);
-        }
-    }
+    UpdateTrailEntities(world, dt);
 
     for (auto ent : world.ExplosionEntities)
     {
@@ -762,32 +847,14 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         float alpha = exp->LifeTime / Global_Game_ExplosionLifeTime;
         for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
         {
-            auto partEnt = exp->Entities + i;
+            auto partEnt = exp->TrailGroup->Entities[i];
             partEnt->Transform.Position += partEnt->Transform.Velocity * dt;
-
-            for (auto &meshPart : partEnt->Trail->Mesh.Parts)
-            {
-                meshPart.Material.DiffuseColor.a = alpha;
-            }
-        }/*
-        ResetBuffer(exp->Mesh.Buffer);
-        for (size_t i = 0; i < exp->Pieces.size(); i++)
-        {
-            auto &Piece = exp->Pieces[i];
-            Piece.Position += Piece.Velocity * dt;
-            mat4 Transform = GetTransformMatrix(Piece);
-
-            size_t TriangleIndex = i * 3;
-            vec3 p1 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex], 1.0f });
-            vec3 p2 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex + 1], 1.0f });
-            vec3 p3 = vec3(Transform * vec4{ exp->Triangles[TriangleIndex + 2], 1.0f });
-            AddTriangle(exp->Mesh.Buffer, p1, p2, p3, vec3{ 1, 1, 1 }, color{1, 1, 1, alpha});
         }
-        UploadVertices(exp->Mesh.Buffer, GL_DYNAMIC_DRAW);
 
-        DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[0], transform{});
-        DrawMeshPart(rs, exp->Mesh, exp->Mesh.Parts[1], transform{});
-*/
+        for (auto &meshPart : exp->TrailGroup->Mesh.Parts)
+        {
+            meshPart.Material.DiffuseColor.a = alpha;
+        }
     }
 }
 
