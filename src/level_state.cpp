@@ -805,7 +805,7 @@ void UpdateLevel(game_main *g, float dt)
             vec3 dirToPlayer = glm::normalize(distToPlayer);
             ent->SetVel(ent->Vel() + dirToPlayer * (1.0f/dt) * dt);
             ent->SetPos(ent->Pos() + ent->Vel() * dt);
-            for (auto &meshPart : ent->Trail->Mesh.Parts)
+            for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
             {
                 float &alpha = meshPart.Material.DiffuseColor.a;
                 alpha -= 1.0f * dt;
@@ -832,6 +832,7 @@ void UpdateLevel(game_main *g, float dt)
                 ent->Pos().z = SHIP_Z;
                 ent->Vel().y = 0;
                 ent->Vel().z = 0;
+
                 if (!ent->Asteroid->Exploded)
                 {
                     ent->Asteroid->Exploded = true;
@@ -908,7 +909,7 @@ void UpdateLevel(game_main *g, float dt)
                     {
                         material->DiffuseColor.a = alpha;
                     }
-                    for (auto &meshPart : ent->Trail->Mesh.Parts)
+                    for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
                     {
                         meshPart.Material.DiffuseColor.a = alpha;
                     }
@@ -989,6 +990,8 @@ void RenderLevel(game_main *g, float dt)
     PostProcessBegin(g->RenderState);
     RenderBackground(g, g->World);
     RenderBegin(g->RenderState, dt);
+
+	WaitUpdate(g->World);
     RenderEntityWorld(g->RenderState, g->World, dt);
 
 #ifdef DRAFT_DEBUG

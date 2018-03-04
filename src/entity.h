@@ -64,6 +64,7 @@ struct checkpoint
 
 struct explosion;
 struct trail;
+struct trail_group;
 struct trail_piece;
 
 #define EntityFlag_Kinematic        0x1
@@ -84,12 +85,25 @@ struct collider
     vec3 Scale = vec3(1.0f);
 };
 
+enum entity_type
+{
+	EntityType_Invalid,
+	EntityType_Crystal,
+	EntityType_Ship,
+	EntityType_Explosion,
+	EntityType_Powerup,
+	EntityType_Asteroid,
+	EntityType_Checkpoint,
+	EntityType_MAX,
+};
+
 struct entity
 {
     transform Transform;
     uint32 Flags = 0;
     int NumCollisions = 0;
     memory_pool_entry *PoolEntry = NULL;
+	entity_type Type = EntityType_Invalid;
 
     // entity components
     checkpoint *Checkpoint = NULL;
@@ -97,7 +111,8 @@ struct entity
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
     ship *Ship = NULL;
-    trail *Trail = NULL;
+	trail *Trail = NULL;
+	trail_group *TrailGroup = NULL;
     trail_piece *TrailPiece = NULL;
     entity_repeat *Repeat = NULL;
     collider *Collider = NULL;
@@ -122,20 +137,30 @@ struct explosion
     mesh Mesh;
     color Color;
     float LifeTime;
-    entity Entities[EXPLOSION_PARTS_COUNT];
 };
 
 #define TRAIL_COUNT 24
 struct trail
 {
     entity Entities[TRAIL_COUNT];
-    mesh Mesh;
-    model Model;
     float Timer = 0;
     float Radius = 0;
     int PositionStackIndex = 0;
     bool FirstFrame = true;
     bool RenderOnly = false;
+};
+
+struct trail_group
+{
+	mesh Mesh;
+	model Model;
+	std::vector<entity *> Entities;
+	std::vector<vec3 *> PointCache;
+	size_t Count;
+	float Radius;
+	float Timer = 0;
+	bool FirstFrame = true;
+	bool RenderOnly;
 };
 
 struct trail_piece
@@ -155,9 +180,20 @@ struct background_state
 };
 
 struct gen_state;
+struct entity_world;
+
+struct entity_update_args
+{
+	entity_world *World;
+	entity *Entity;
+	memory_pool_entry *Entry;
+	float DeltaTime;
+};
 
 struct entity_world
 {
+	thread_pool UpdateThreadPool;
+
     memory_arena PersistentArena;
     memory_arena Arena;
 
@@ -167,6 +203,7 @@ struct entity_world
     memory_pool PowerupPool;
     memory_pool AsteroidPool;
     memory_pool CheckpointPool;
+	generic_pool<entity_update_args> UpdateArgsPool;
 
     mesh *FloorMesh = NULL;
     mesh *ShipMesh = NULL;
@@ -185,7 +222,7 @@ struct entity_world
     std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;
     std::vector<entity *> CollisionEntities;
-    std::vector<entity *> TrailEntities;
+    std::vector<entity *> TrailGroupEntities;
     std::vector<entity *> ShipEntities;
     std::vector<entity *> ExplosionEntities;
     std::vector<entity *> RepeatingEntities;

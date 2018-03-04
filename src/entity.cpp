@@ -37,13 +37,40 @@ static collider *CreateCollider(allocator *alloc, collider_type type, vec3 scale
 }
 
 #define TRAIL_SIZE (sizeof(trail) + (sizeof(trail_piece)+sizeof(collider))*TRAIL_COUNT)
-static trail *CreateSharedMeshTrail(allocator *alloc, entity *owner, color c,
-                                    float radius = 0.5f, bool renderOnly = false, size_t count = 1)
+static trail *CreateTrail(allocator *alloc, entity *Owner, color Color,
+						  float radius = 0.5f, bool renderOnly = false)
+{
+	trail *result = PushStruct<trail>(alloc);
+	result->RenderOnly = renderOnly;
+	result->Radius = radius;
+
+	for (int i = 0; i < TRAIL_COUNT; i++)
+	{
+		auto ent = result->Entities + i;
+		ent->Transform.Position = vec3(0.0f);
+		if (!renderOnly)
+		{
+			ent->TrailPiece = PushStruct<trail_piece>(alloc);
+			ent->TrailPiece->Owner = Owner;
+			ent->Collider = PushStruct<collider>(alloc);
+			ent->Collider->Type = ColliderType_TrailPiece;
+			AddFlags(ent, EntityFlag_Kinematic);
+		}
+	}
+	return result;
+}
+
+#define TRAIL_GROUP_SIZE(n) (sizeof(trail_group) + (sizeof(entity)*n) + (TRAIL_SIZE*n) + (TRAIL_COUNT*4*sizeof(vec3)*n))
+static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
+                                     float radius = 0.5f, bool renderOnly = false, size_t count = 1)
 {
     trail_group *result = PushStruct<trail_group>(alloc);
     result->RenderOnly = renderOnly;
     result->Radius = radius;
-
+	result->Count = count;
+	result->Entities.resize(count);
+	result->PointCache.resize(count);
+	
     InitMeshBuffer(result->Mesh.Buffer);
     result->Model.Mesh = &result->Mesh;
 
@@ -52,69 +79,27 @@ static trail *CreateSharedMeshTrail(allocator *alloc, entity *owner, color c,
     const float emission = 4.0f;
 
     // planes
-    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, PlaneCount, GL_TRIANGLES});
+    AddPart(&result->Mesh, {{c, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, PlaneCount, GL_TRIANGLES});
     
     // left line
-    AddPart(&result->Mesh, {{color, emission, 0, NULL}, PlaneCount, LineCount, GL_LINES});
+    AddPart(&result->Mesh, {{c, emission, 0, NULL}, PlaneCount, LineCount, GL_LINES});
 
     // right line
-    AddPart(&result->Mesh, {{color, emission, 0, NULL}, PlaneCount + LineCount, LineCount, GL_LINES});
-}
+    AddPart(&result->Mesh, {{c, emission, 0, NULL}, PlaneCount + LineCount, LineCount, GL_LINES});
 
-static trail *CreateTrail(allocator *alloc, entity *Owner, color Color,
-                          float radius = 0.5f, bool renderOnly = false)
-{
-    trail *result = PushStruct<trail>(alloc);
-    result->RenderOnly = renderOnly;
-    result->Radius = radius;
+	ReserveVertices(result->Mesh.Buffer, PlaneCount + LineCount * 2, GL_DYNAMIC_DRAW);
 
-    InitMeshBuffer(result->Mesh.Buffer);
-    result->Model.Mesh = &result->Mesh;
+	for (size_t i = 0; i < count; i++)
+	{
+		auto ent = PushStruct<entity>(alloc);
+		ent->Transform.Position = vec3(0.0f);
+		ent->Trail = CreateTrail(alloc, owner, c, radius, renderOnly);
 
-    const size_t LineCount = TRAIL_COUNT*2;
-    const size_t PlaneCount = TRAIL_COUNT*6;
-    const float emission = 4.0f;
+		result->Entities[i] = ent;
+		result->PointCache[i] = (vec3 *)PushSize(alloc, TRAIL_COUNT*4*sizeof(vec3), "trail group point cache");
+	}
 
-    // Plane parts
-    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, 6, GL_TRIANGLES});
-    AddPart(&result->Mesh, {{Color, 0, 0, NULL, MaterialFlag_ForceTransparent}, 6, TRAIL_COUNT*6 - 6, GL_TRIANGLES});
-
-    // Left line parts
-    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount, 2, GL_LINES});
-    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + 2, LineCount - 2, GL_LINES});
-
-    // Right line parts
-    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount, 2, GL_LINES});
-    AddPart(&result->Mesh, {{Color, emission, 0, NULL}, PlaneCount + LineCount + 2, LineCount - 2, GL_LINES});
-
-    ReserveVertices(result->Mesh.Buffer, PlaneCount + LineCount*2, GL_DYNAMIC_DRAW);
-
-    for (int i = 0; i < TRAIL_COUNT; i++)
-    {
-        auto ent = result->Entities + i;
-        ent->Transform.Position = vec3(0.0f);
-        if (!renderOnly)
-        {
-            Entity entity = em->spawn_entity();
-
-            auto entity = scene->spawn_entity();
-            scene->add_trail_piece(entity, owner);
-            scene->add_collider(entity, ColliderType::TRAIL_PIECE);
-            scene->add_model(entity, mesh);
-
-            scene->set_parent(entity1, entity2);
-
-            physics->step(scene, dt);
-            renderer->render(scene, camera);
-
-            ent->TrailPiece = PushStruct<trail_piece>(alloc);
-            ent->TrailPiece->Owner = Owner;
-            ent->Collider = PushStruct<collider>(alloc);
-            ent->Collider->Type = ColliderType_TrailPiece;
-            AddFlags(ent, EntityFlag_Kinematic);
-        }
-    }
-    return result;
+	return result;
 }
 
 static lane_slot *CreateLaneSlot(allocator *alloc, int lane)
@@ -133,10 +118,11 @@ entity *CreateEntity(allocator *alloc)
     return result;
 }
 
-#define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + TRAIL_SIZE + sizeof(lane_slot) + (sizeof(material)*2))
+#define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + TRAIL_GROUP_SIZE(1) + sizeof(lane_slot) + (sizeof(material)*2))
 entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false, int colorIndex = 0)
 {
     auto ent = CreateEntity(alloc);
+	ent->Type = EntityType_Ship;
     ent->Model = CreateModel(alloc, shipMesh);
     ent->Model->Materials.push_back(CreateMaterial(alloc, vec4(c.r, c.g, c.b, 1), 0, 0, NULL));
     ent->Model->Materials.push_back(CreateMaterial(alloc, outlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
@@ -148,7 +134,7 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
     bool trailRenderOnly = isPlayer || (colorIndex == SHIP_RED);
-    ent->Trail = CreateTrail(alloc, ent, outlineColor, 0.5f, trailRenderOnly);
+    ent->TrailGroup = CreateTrailGroup(alloc, ent, outlineColor, 0.5f, trailRenderOnly);
     if (isPlayer)
     {
         AddFlags(ent, EntityFlag_IsPlayer);
@@ -160,6 +146,7 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
 entity *CreateCrystalEntity(allocator *alloc, mesh *crystalMesh)
 {
     auto ent = CreateEntity(alloc);
+	ent->Type = EntityType_Crystal;
     ent->Flags |= EntityFlag_RemoveOffscreen;
     ent->Model = CreateModel(alloc, crystalMesh);
     ent->Collider = CreateCollider(alloc, ColliderType_Crystal);
@@ -192,14 +179,15 @@ float RandomExplosionVel(random_series &Series, vec3 Sign, int i)
     }
 }
 
-#define POWERUP_ENTITY_SIZE (sizeof(entity) + sizeof(powerup) + TRAIL_SIZE)
+#define POWERUP_ENTITY_SIZE (sizeof(entity) + sizeof(powerup) + TRAIL_GROUP_SIZE(1))
 entity *CreatePowerupEntity(allocator *alloc, random_series &series, float timeSpawn, vec3 pos, vec3 vel, color c)
 {
     auto result = CreateEntity(alloc);
+	result->Type = EntityType_Powerup;
     result->Powerup = PushStruct<powerup>(alloc);
     result->Powerup->Color = c;
     result->Powerup->TimeSpawn = timeSpawn;
-    result->Trail = CreateTrail(alloc, result, c, 0.1f, true);
+    result->TrailGroup = CreateTrailGroup(alloc, result, c, 0.1f, true);
     result->SetPos(pos);
     result->Vel().x = RandomBetween(series, -20.0f, 20.0f);
     result->Vel().y = vel.y + (vel.y * 0.3f);
@@ -207,10 +195,11 @@ entity *CreatePowerupEntity(allocator *alloc, random_series &series, float timeS
     return result;
 }
 
-#define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(explosion) + (TRAIL_SIZE*EXPLOSION_PARTS_COUNT))
+#define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(explosion) + TRAIL_GROUP_SIZE(EXPLOSION_PARTS_COUNT))
 entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, color outlineColor, vec3 sign)
 {
     auto exp = PushStruct<explosion>(alloc);
+	auto tg = CreateTrailGroup(alloc, NULL, c, 0.2, true, EXPLOSION_PARTS_COUNT);
     exp->LifeTime = Global_Game_ExplosionLifeTime;
     exp->Color = c;
     InitMeshBuffer(exp->Mesh.Buffer);
@@ -222,88 +211,42 @@ entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, col
     {
         angle += theta;
 
-        auto ent = exp->Entities + i;
-        ent->Trail = CreateTrail(alloc, ent, outlineColor, 0.2f, true);
+        auto ent = tg->Entities[i];
         ent->SetPos(pos);
         ent->Vel().x = std::cos(angle)*10.0f;
         ent->Vel().y = vel.y + std::sin(angle)*10.0f;
     }
-    /*
-    size_t pieceCount = part.Count / 3;
-    static vector<vec3> normals;
-    if (normals.size() < PieceCount)
-    {
-        normals.resize(PieceCount);
-    }
-
-    exp->Pieces.resize(pieceCount);
-    exp->Triangles.resize(part.Count);
-    auto &Vertices = baseMesh.Buffer.Vertices;
-    for (size_t i = 0; i < PieceCount; i++)
-    {
-        size_t Index = i * 3;
-        size_t vi_1 = Index * (sizeof(mesh_vertex) / sizeof(float));
-        size_t vi_2 = (Index + 1) * (sizeof(mesh_vertex) / sizeof(float));
-        size_t vi_3 = (Index + 2) * (sizeof(mesh_vertex) / sizeof(float));
-        vec3 p1 = vec3{ Vertices[vi_1], Vertices[vi_1 + 1], Vertices[vi_1 + 2] };
-        vec3 p2 = vec3{ Vertices[vi_2], Vertices[vi_2 + 1], Vertices[vi_2 + 2] };
-        vec3 p3 = vec3{ Vertices[vi_3], Vertices[vi_3 + 1], Vertices[vi_3 + 2] };
-        Explosion->Triangles[Index] = p1;
-        Explosion->Triangles[Index + 1] = p2;
-        Explosion->Triangles[Index + 2] = p3;
-
-        // TODO: do not regenerate normals
-        Normals[i] = GenerateNormal(p1, p2, p3);
-    }
-
-    AddPart(&Explosion->Mesh,
-            mesh_part{
-                material{Color, 0, 0, NULL, MaterialFlag_ForceTransparent},
-                0,
-                Explosion->Triangles.size(),
-                GL_TRIANGLES});
-    AddPart(&Explosion->Mesh,
-            mesh_part{
-                material{OutlineColor, 2.0f, 0, NULL, MaterialFlag_ForceTransparent | MaterialFlag_PolygonLines},
-                0,
-                Explosion->Triangles.size(),
-                GL_TRIANGLES});
-
-    for (size_t i = 0; i < PieceCount; i++)
-    {
-        auto &Piece = Explosion->Pieces[i];
-        Piece.Position = Position;
-        Piece.Scale = Scale;
-        Piece.Velocity = Velocity*1.1f + Normals[i]*1.5f;
-    }
-    */
 
     auto result = CreateEntity(alloc);
+	result->Type = EntityType_Explosion;
     result->Transform.Position = pos;
     result->Explosion = exp;
+	result->TrailGroup = tg;
     return result;
 }
 
-#define ASTEROID_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_SIZE+sizeof(asteroid))
+#define ASTEROID_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_GROUP_SIZE(1)+sizeof(asteroid))
 static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 {
     auto result = CreateEntity(alloc);
+	result->Type = EntityType_Asteroid;
     result->Model = CreateModel(alloc, astMesh);
     result->Collider = CreateCollider(alloc, ColliderType_Asteroid, vec3(0.5f));
-    result->Trail = CreateTrail(alloc, result, ASTEROID_COLOR, 0.5f, true);
+    result->TrailGroup = CreateTrailGroup(alloc, result, ASTEROID_COLOR, 0.5f, true);
     result->Asteroid = PushStruct<asteroid>(alloc);
     return result;
 }
 
-#define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(checkpoint)+TRAIL_SIZE+(sizeof(material)*2))
+#define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(checkpoint)+TRAIL_GROUP_SIZE(1)+(sizeof(material)*2))
 static entity *CreateCheckpointEntity(allocator *alloc, mesh *checkpointMesh)
 {
     auto result = CreateEntity(alloc);
+	result->Type = EntityType_Checkpoint;
     result->Model = CreateModel(alloc, checkpointMesh);
     result->Model->Materials.push_back(CreateMaterial(alloc, CHECKPOINT_COLOR, 0.0f, 0.0f, NULL));
     result->Model->Materials.push_back(CreateMaterial(alloc, CHECKPOINT_OUTLINE_COLOR, 1.0f, 0.0f, NULL));
     result->Checkpoint = PushStruct<checkpoint>(alloc);
-    result->Trail = CreateTrail(alloc, result, CHECKPOINT_OUTLINE_COLOR, ROAD_LANE_COUNT);
+    result->TrailGroup = CreateTrailGroup(alloc, result, CHECKPOINT_OUTLINE_COLOR, ROAD_LANE_COUNT);
     result->SetScl(vec3{ROAD_LANE_COUNT, 1.0f, ROAD_LANE_COUNT*2});
     return result;
 }
@@ -393,6 +336,7 @@ void InitEntityWorld(entity_world &world)
     world.ExplosionPool.Arena = &world.Arena;
     world.AsteroidPool.Arena = &world.Arena;
     world.CheckpointPool.Arena = &world.Arena;
+	world.UpdateArgsPool.Arena = &world.Arena;
 
     world.ShipPool.Name = "ShipPool";
     world.CrystalPool.Name = "CrystalPool";
@@ -400,6 +344,8 @@ void InitEntityWorld(entity_world &world)
     world.ExplosionPool.Name = "ExplosionPool";
     world.AsteroidPool.Name = "AsteroidPool";
     world.CheckpointPool.Name = "CheckpointPool";
+
+	CreateThreadPool(world.UpdateThreadPool, std::thread::hardware_concurrency(), 8);
 }
 
 // Finds the first free slot on the list and insert the entity
@@ -427,25 +373,28 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.CollisionEntities, ent);
     }
-    if (ent->Trail)
+    if (ent->TrailGroup)
     {
-        AddEntityToList(world.TrailEntities, ent);
-        if (!ent->Trail->RenderOnly)
+        AddEntityToList(world.TrailGroupEntities, ent);
+        if (!ent->TrailGroup->RenderOnly)
         {
-            for (int i = 0; i < TRAIL_COUNT; i++)
+            for (int i = 0; i < ent->TrailGroup->Count; i++)
             {
-                AddEntity(world, ent->Trail->Entities + i);
+                AddEntity(world, ent->TrailGroup->Entities[i]);
             }
         }
     }
+	if (ent->Trail)
+	{
+		for (int i = 0; i < TRAIL_COUNT; i++)
+		{
+			AddEntity(world, ent->Trail->Entities + i);
+		}
+	}
     if (ent->Explosion)
     {
         world.LastExplosion = ent->Explosion;
         AddEntityToList(world.ExplosionEntities, ent);
-        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
-        {
-            AddEntity(world, ent->Explosion->Entities + i);
-        }
     }
     if (ent->Ship && !(ent->Flags & EntityFlag_IsPlayer))
     {
@@ -512,24 +461,27 @@ void RemoveEntity(entity_world &world, entity *ent)
     {
         RemoveEntityFromList(world.CollisionEntities, ent);
     }
-    if (ent->Trail)
+    if (ent->TrailGroup)
     {
-        RemoveEntityFromList(world.TrailEntities, ent);
-        if (!ent->Trail->RenderOnly)
+        RemoveEntityFromList(world.TrailGroupEntities, ent);
+        if (!ent->TrailGroup->RenderOnly)
         {
-            for (int i = 0; i < TRAIL_COUNT; i++)
+            for (int i = 0; i < ent->TrailGroup->Count; i++)
             {
-                RemoveEntity(world, ent->Trail->Entities + i);
+                RemoveEntity(world, ent->TrailGroup->Entities[i]);
             }
         }
     }
+	if (ent->Trail)
+	{
+		for (int i = 0; i < TRAIL_COUNT; i++)
+		{
+			RemoveEntity(world, ent->Trail->Entities + i);
+		}
+	}
     if (ent->Explosion)
     {
         RemoveEntityFromList(world.ExplosionEntities, ent);
-        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
-        {
-            RemoveEntity(world, ent->Explosion->Entities + i);
-        }
         FreeEntry(world.ExplosionPool, ent->PoolEntry);
     }
     if (ent->Ship)
@@ -595,7 +547,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.RepeatingEntities.clear();
     w.CollisionEntities.clear();
     w.ShipEntities.clear();
-    w.TrailEntities.clear();
+    w.TrailGroupEntities.clear();
     
     ResetPool(w.AsteroidPool);
     ResetPool(w.CheckpointPool);
@@ -603,6 +555,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     ResetPool(w.ExplosionPool);
     ResetPool(w.ShipPool);
     ResetPool(w.PowerupPool);
+	ResetPool(w.UpdateArgsPool);
 
     w.GenState = PushStruct<gen_state>(w.Arena);
     InitGenState(w.GenState);
@@ -638,6 +591,17 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.BackgroundState.Texture = tex;
 }
 
+entity_update_args *GetUpdateArg(entity_world &world, entity *ent, float dt)
+{
+	auto entry = GetEntry(world.UpdateArgsPool);
+	auto result = PushStruct<entity_update_args>(entry);
+	result->World = &world;
+	result->Entity = ent;
+	result->DeltaTime = dt;
+	result->Entry = entry;
+	return result;
+}
+
 #define WORLD_ARC_RADIUS   500.0f
 #define WORLD_ARC_Y_FACTOR 0.005f
 vec3 WorldToRenderTransform(const vec3 &worldPos)
@@ -650,131 +614,147 @@ vec3 WorldToRenderTransform(const vec3 &worldPos)
     return result;
 }
 
-static void UpdateTrailGroupEntities(entity_world &world, float dt)
+static void SetSingleTrailPosition(entity *ent)
 {
-    static vec3 PointCache[TRAIL_COUNT*4];
-    for (auto ent : world.TrailGroupEntities)
-    {
-        if (!ent) continue;
-
-        auto tg = ent->TrailGroup;
-        if (tg->FirstFrame)
-        {
-            tg->FirstFrame = false;
-            for (int j = 0; j < tg->Count; j++)
-            {
-                auto tr = tg->Entities[j]->Trail;
-                for (int i = 0; i < TRAIL_COUNT; i++)
-                {
-                    tr->Entities[i].Transform.Position = ent->Transform.Position;
-                }
-            }
-        }
-
-        tg->Timer -= dt;
-        if (tg->Timer <= 0)
-        {
-            tg->Timer = Global_Game_TrailRecordTimer;
-            for (int i = 0; i < tg->Count; i++)
-            {
-                PushPosition(tg->Entities[i]->Trail, tg->Entities[i].Pos());
-            }
-        }
-
-        auto &m = tg->Mesh;
-        ResetBuffer(m.Buffer);
-
-        for (int j = 0; j < tg->Count; j++)
-        {
-            // First store the quads, then the lines
-            for (int i = 0; i < TRAIL_COUNT; i++)
-            {
-                auto pieceEntity = tr->Entities + i;
-                vec3 c1 = pieceEntity->Transform.Position;
-                vec3 c2;
-                if (i == TRAIL_COUNT - 1)
-                {
-                    c2 = ent->Transform.Position;
-                }
-                else
-                {
-                    c2 = tr->Entities[i + 1].Transform.Position;
-                }
-
-                float currentTrailTime = tr->Timer/Global_Game_TrailRecordTimer;
-                if (i == 0)
-                {
-                    c1 -= (c2 - c1) * currentTrailTime;
-                }
-
-                float r = tr->Radius;
-                float rm = tr->Radius * 0.8f;
-                float min2 =  rm * ((TRAIL_COUNT - i) / (float)TRAIL_COUNT);
-                float min1 =  rm * ((TRAIL_COUNT - i+1) / (float)TRAIL_COUNT);
-                vec3 p1 = c2 - vec3(r - min2, 0, 0);
-                vec3 p2 = c2 + vec3(r - min2, 0, 0);
-                vec3 p3 = c1 - vec3(r - min1, 0, 0);
-                vec3 p4 = c1 + vec3(r - min1, 0, 0);
-                color cl2 = color{ 1, 1, 1, 1.0f - (min2/tr->Radius) };
-                color cl1 = color{ 1, 1, 1, 1.0f - (min1/tr->Radius) };
-                AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
-
-                const float lo = 0.05f;
-                tg->PointCache[j][i*4] = p1 - vec3(lo, 0, 0);
-                tg->PointCache[j][i*4 + 1] = p3 - vec3(lo, 0, 0);
-                tg->PointCache[j][i*4 + 2] = p2 + vec3(lo, 0, 0);
-                tg->PointCache[j][i*4 + 3] = p4 + vec3(lo, 0, 0);
-                if (pieceEntity->Collider)
-                {
-                    auto &box = pieceEntity->Collider->Box;
-                    box.Half = vec3(r, (c2.y-c1.y) * 0.5f, 0.5f);
-                    box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
-                }
-            }
-        }
-
-        for (int j = 0; j < tg->Count; j++)
-        {
-            for (int i = 0; i < TRAIL_COUNT; i++)
-            {
-                vec3 *p = tg->PointCache[j] + i*4;
-                AddLine(m.Buffer, *p++, *p++);
-            }
-            for (int i = 0; i < TRAIL_COUNT; i++)
-            {
-                vec3 *p = tg->PointCache[j] + i*4 + 2;
-                AddLine(m.Buffer, *p++, *p++);
-            }
-        }
-    }
+	ent->TrailGroup->Entities[0]->SetPos(ent->Pos());
 }
 
-static void UpdateTrailEntities(entity_world &world, float dt)
+#define ENTITY_JOB_UNPACK_ARGS(arg) \
+	auto args = (entity_update_args *)arg; \
+	auto &world = *args->World; \
+	auto ent = args->Entity; \
+	float dt = args->DeltaTime
+
+#define ENTITY_JOB_FREE_ARGS(arg) FreeEntry(world.UpdateArgsPool, args->Entry)
+
+static void UpdateTrailGroupEntityJob(void *arg)
 {
-    static vec3 PointCache[TRAIL_COUNT*4];
-    for (auto ent : world.TrailEntities)
-    {
-        if (!ent) continue;
+	ENTITY_JOB_UNPACK_ARGS(arg);
 
-        auto tr = ent->Trail;
-        if (tr->FirstFrame)
-        {
-            tr->FirstFrame = false;
-            
-        }
+	if (!ent->Explosion)
+	{
+		SetSingleTrailPosition(ent);
+	}
 
-        tr->Timer -= dt;
-        if (tr->Timer <= 0)
-        {
-            tr->Timer = Global_Game_TrailRecordTimer;
-            PushPosition(tr, ent->Transform.Position);
-        }
+	auto tg = ent->TrailGroup;
+	if (tg->FirstFrame)
+	{
+		tg->FirstFrame = false;
+		for (int j = 0; j < tg->Count; j++)
+		{
+			auto tr = tg->Entities[j]->Trail;
+			for (int i = 0; i < TRAIL_COUNT; i++)
+			{
+				tr->Entities[i].Transform.Position = ent->Transform.Position;
+			}
+		}
+	}
 
-        auto &m = tr->Mesh;
-        ResetBuffer(m.Buffer);
+	tg->Timer -= dt;
+	if (tg->Timer <= 0)
+	{
+		tg->Timer = Global_Game_TrailRecordTimer;
+		for (int i = 0; i < tg->Count; i++)
+		{
+			PushPosition(tg->Entities[i]->Trail, tg->Entities[i]->Pos());
+		}
+	}
 
-        
-    }
+	auto &m = tg->Mesh;
+	ResetBuffer(m.Buffer);
+
+	for (int j = 0; j < tg->Count; j++)
+	{
+		// First store the quads, then the lines
+		for (int i = 0; i < TRAIL_COUNT; i++)
+		{
+			auto tr = tg->Entities[j]->Trail;
+			auto pieceEntity = tr->Entities + i;
+			vec3 c1 = pieceEntity->Transform.Position;
+			vec3 c2;
+			if (i == TRAIL_COUNT - 1)
+			{
+				c2 = ent->Transform.Position;
+			}
+			else
+			{
+				c2 = tr->Entities[i + 1].Transform.Position;
+			}
+
+			float currentTrailTime = tr->Timer / Global_Game_TrailRecordTimer;
+			if (i == 0)
+			{
+				c1 -= (c2 - c1) * currentTrailTime;
+			}
+
+			float r = tr->Radius;
+			float rm = tr->Radius * 0.8f;
+			float min2 = rm * ((TRAIL_COUNT - i) / (float)TRAIL_COUNT);
+			float min1 = rm * ((TRAIL_COUNT - i + 1) / (float)TRAIL_COUNT);
+			vec3 p1 = c2 - vec3(r - min2, 0, 0);
+			vec3 p2 = c2 + vec3(r - min2, 0, 0);
+			vec3 p3 = c1 - vec3(r - min1, 0, 0);
+			vec3 p4 = c1 + vec3(r - min1, 0, 0);
+			color cl2 = color{ 1, 1, 1, 1.0f - (min2 / tr->Radius) };
+			color cl1 = color{ 1, 1, 1, 1.0f - (min1 / tr->Radius) };
+			AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
+
+			const float lo = 0.05f;
+			tg->PointCache[j][i * 4] = p1 - vec3(lo, 0, 0);
+			tg->PointCache[j][i * 4 + 1] = p3 - vec3(lo, 0, 0);
+			tg->PointCache[j][i * 4 + 2] = p2 + vec3(lo, 0, 0);
+			tg->PointCache[j][i * 4 + 3] = p4 + vec3(lo, 0, 0);
+			if (pieceEntity->Collider)
+			{
+				auto &box = pieceEntity->Collider->Box;
+				box.Half = vec3(r, (c2.y - c1.y) * 0.5f, 0.5f);
+				box.Center = vec3(c1.x, c1.y + box.Half.y, c1.z + box.Half.z);
+			}
+		}
+	}
+
+	for (int j = 0; j < tg->Count; j++)
+	{
+		for (int i = 0; i < TRAIL_COUNT; i++)
+		{
+			vec3 *p = tg->PointCache[j] + i * 4;
+			AddLine(m.Buffer, *p++, *p++);
+		}
+		for (int i = 0; i < TRAIL_COUNT; i++)
+		{
+			vec3 *p = tg->PointCache[j] + i * 4 + 2;
+			AddLine(m.Buffer, *p++, *p++);
+		}
+	}
+
+	ENTITY_JOB_FREE_ARGS(args);
+}
+
+void UpdateExplosionEntityJob(void *arg)
+{
+	ENTITY_JOB_UNPACK_ARGS(arg);
+
+	auto exp = ent->Explosion;
+	exp->LifeTime -= dt;
+	if (exp->LifeTime <= 0)
+	{
+		RemoveEntity(world, ent);
+		return;
+	}
+
+	float alpha = exp->LifeTime / Global_Game_ExplosionLifeTime;
+	for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
+	{
+		auto partEnt = ent->TrailGroup->Entities[i];
+		partEnt->Transform.Position += partEnt->Transform.Velocity * dt;
+	}
+
+	for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
+	{
+		meshPart.Material.DiffuseColor.a = alpha;
+	}
+
+	ENTITY_JOB_FREE_ARGS(args);
 }
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
@@ -830,32 +810,22 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         ent->Transform.Rotation += ent->FrameRotation->Rotation * dt;
     }
 
-    UpdateTrailEntities(world, dt);
+	for (auto ent : world.TrailGroupEntities)
+	{
+		if (!ent) continue;
+		AddJob(world.UpdateThreadPool, UpdateTrailGroupEntityJob, (void *)GetUpdateArg(world, ent, dt));
+	}
 
-    for (auto ent : world.ExplosionEntities)
-    {
-        if (!ent) continue;
+	for (auto ent : world.ExplosionEntities)
+	{
+		if (!ent) continue;
+		AddJob(world.UpdateThreadPool, UpdateExplosionEntityJob, (void *)GetUpdateArg(world, ent, dt));
+	}
+}
 
-        auto exp = ent->Explosion;
-        exp->LifeTime -= dt;
-        if (exp->LifeTime <= 0)
-        {
-            RemoveEntity(world, ent);
-            continue;
-        }
-
-        float alpha = exp->LifeTime / Global_Game_ExplosionLifeTime;
-        for (int i = 0; i < EXPLOSION_PARTS_COUNT; i++)
-        {
-            auto partEnt = exp->TrailGroup->Entities[i];
-            partEnt->Transform.Position += partEnt->Transform.Velocity * dt;
-        }
-
-        for (auto &meshPart : exp->TrailGroup->Mesh.Parts)
-        {
-            meshPart.Material.DiffuseColor.a = alpha;
-        }
-    }
+void WaitUpdate(entity_world &world)
+{
+	while (world.UpdateThreadPool.NumJobs > 0) {}
 }
 
 void RenderBackground(game_main *g, entity_world &w)
@@ -879,12 +849,12 @@ void RenderBackground(game_main *g, entity_world &w)
 
 void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
 {
-    for (auto ent : world.TrailEntities)
+    for (auto ent : world.TrailGroupEntities)
     {
         if (!ent) continue;
-        auto tr = ent->Trail;
-        UploadVertices(tr->Mesh.Buffer, 0, tr->Mesh.Buffer.VertexCount);
-        DrawModel(rs, tr->Model, transform{});
+        auto tg = ent->TrailGroup;
+        UploadVertices(tg->Mesh.Buffer, 0, tg->Mesh.Buffer.VertexCount);
+        DrawModel(rs, tg->Model, transform{});
     }
     for (auto ent : world.ModelEntities)
     {

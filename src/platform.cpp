@@ -271,8 +271,6 @@ int main(int argc, char **argv)
             }
         }
 
-		Println(accul);
-
         int i = 0;
         while (accul >= deltaTime)
         {

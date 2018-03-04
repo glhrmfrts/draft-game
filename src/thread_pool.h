@@ -35,6 +35,8 @@ struct thread_pool
     std::vector<thread_data> Threads;
     std::mutex Mutex;
     int JobsPerThread = 1;
+	int MaxThreads = 1;
+	int NumThreads = 0;
     std::atomic_int NumJobs;
 };
 

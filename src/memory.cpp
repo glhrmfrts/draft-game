@@ -95,13 +95,13 @@ memory_pool_entry *GetEntry(memory_pool &pool)
         pool.FirstFree = result->Next;
 
 #ifdef DRAFT_DEBUG
-        printf("[DEBUG:%s] reuse entry %p\n", pool.Name, result->Base);
+        //printf("[DEBUG:%s] reuse entry %p\n", pool.Name, result->Base);
 #endif
         return result;
     }
     
 #ifdef DRAFT_DEBUG
-    printf("[DEBUG:%s] alloc entry\n", pool.Name);
+    //printf("[DEBUG:%s] alloc entry\n", pool.Name);
 #endif
     
     auto entry = PushStruct<memory_pool_entry>(*pool.Arena);
@@ -120,7 +120,7 @@ void PutEntry(memory_pool &pool, memory_pool_entry *entry, memory_pool_entry *pr
         prev->Next = next;
     }
 #ifdef DRAFT_DEBUG
-    printf("[DEBUG:%s] put entry %p\n", pool.Name, entry->Base);
+    //printf("[DEBUG:%s] put entry %p\n", pool.Name, entry->Base);
 #endif
     entry->Used = 0;
     pool.FirstFree = entry;
