@@ -78,6 +78,9 @@ void InitLevel(game_main *g)
 	g->MusicMaster.StepBeat = true;
 	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["hats"]);
 	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["pad_chords"]);
+
+	auto gen = g->World.GenState->GenParams + GenType_SideTrail;
+	gen->Flags |= GenFlag_Enabled;
 }
 
 void RemoveGameplayEntities(entity_world &w)

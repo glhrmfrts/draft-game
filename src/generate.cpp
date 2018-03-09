@@ -101,7 +101,7 @@ GEN_FUNC(GenerateSideTrail)
     // TODO: create the side trail pool
     auto ent = CreateEntity(&g->World.Arena);
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
-    ent->Trail = CreateTrail(&g->World.Arena, ent, Color_white, 0.5f, true);
+    ent->TrailGroup = CreateTrailGroup(&g->World.Arena, ent, Color_white, 0.5f, true);
     AddFlags(ent, EntityFlag_RemoveOffscreen | EntityFlag_UpdateMovement);
     AddEntity(g->World, ent);
 
@@ -111,6 +111,8 @@ GEN_FUNC(GenerateSideTrail)
     {
         ent->Pos().x = -ent->Pos().x;
     }
+
+	Println("Gen side trail");
 }
 
 GEN_FUNC(GenerateRandomGeometry)

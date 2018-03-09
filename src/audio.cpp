@@ -226,8 +226,6 @@ inline void AudioCheckError()
 static void SetBpm(music_master &m, int bpm)
 {
 	m.Bpm = bpm;
-	m.Timer = 0;
-	m.ElapsedTime = 0;
 	m.BeatTime = 60.0f / float(bpm);
 }
 
@@ -339,6 +337,8 @@ void MusicMasterLoadSong(music_master &m, song *s)
 {
 	m.Song = s;
 	m.Beat = 0;
+	m.Timer = 0;
+	m.ElapsedTime = 0;
 
 	SetBpm(m, s->Bpm);
 	if (s->Tracks.size() > m.Sources.size())

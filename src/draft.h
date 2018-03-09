@@ -60,7 +60,7 @@ struct profile_time
 	uint64 Delta() const { return End - Begin; }
 };
 
-static profile_time Global_ProfileTimers[32];
+static profile_time Global_ProfileTimers[64];
 static int Global_ProfileTimersCount;
 
 inline static void ResetProfileTimers()
