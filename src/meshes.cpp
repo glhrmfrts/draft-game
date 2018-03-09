@@ -2,10 +2,23 @@
 
 #define ASTEROID_COLOR  IntColor(0x00fa4f, 0.5f)
 
+#define PUSH_MESH_VERTEX(buffer, p1, u, v, c1, n) \
+	*(buffer++) = p1.x; *(buffer++) = p1.y; *(buffer++) = p1.z; \
+	*(buffer++) = u; *(buffer++) = v; \
+	*(buffer++) = c1.r; *(buffer++) = c1.g; *(buffer++) = c1.b; *(buffer++) = c1.a; \
+	*(buffer++) = n.x; *(buffer++) = n.y; *(buffer++) = n.z
+
 static void AddLine(vertex_buffer &Buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
 {
     PushVertex(Buffer, mesh_vertex{ p1, vec2{ 0, 0 }, c, n });
     PushVertex(Buffer, mesh_vertex{ p2, vec2{ 0, 0 }, c, n });
+}
+
+static float *AddLine(float *buffer, vec3 p1, vec3 p2, color c = Color_white, vec3 n = vec3(0))
+{
+	PUSH_MESH_VERTEX(buffer, p1, 0, 0, c, n);
+	PUSH_MESH_VERTEX(buffer, p2, 0, 0, c, n);
+	return buffer;
 }
 
 static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
@@ -21,6 +34,7 @@ static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
         Uv.v = 1;
         Uv.v2 = 0;
     }
+
     PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
     PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
     PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
@@ -40,6 +54,7 @@ static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
         Uv.v = 1;
         Uv.v2 = 0;
     }
+
     PushVertex(Buffer, mesh_vertex{ p1, vec2{ Uv.u, Uv.v }, c1, n });
     PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
     PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
@@ -47,6 +62,27 @@ static void AddQuad(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
     PushVertex(Buffer, mesh_vertex{ p2, vec2{ Uv.u2, Uv.v }, c2, n });
     PushVertex(Buffer, mesh_vertex{ p3, vec2{ Uv.u2, Uv.v2 }, c3, n });
     PushVertex(Buffer, mesh_vertex{ p4, vec2{ Uv.u, Uv.v2 }, c4, n });
+}
+
+static float *AddQuad(float *buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
+	color c1, color c2, color c3, color c4,
+	vec3 n = vec3(1), bool FlipV = false)
+{
+	texture_rect uv = { 0, 0, 1, 1 };
+	if (FlipV)
+	{
+		uv.v = 1;
+		uv.v2 = 0;
+	}
+
+	PUSH_MESH_VERTEX(buffer, p1, uv.u, uv.v, c1, n);
+	PUSH_MESH_VERTEX(buffer, p2, uv.u2, uv.v, c2, n);
+	PUSH_MESH_VERTEX(buffer, p4, uv.u, uv.v2, c4, n);
+
+	PUSH_MESH_VERTEX(buffer, p2, uv.u2, uv.v, c2, n);
+	PUSH_MESH_VERTEX(buffer, p3, uv.u2, uv.v2, c3, n);
+	PUSH_MESH_VERTEX(buffer, p4, uv.u, uv.v2, c4, n);
+	return buffer;
 }
 
 inline static vec3 GenerateNormal(vec3 p1, vec3 p2, vec3 p3)

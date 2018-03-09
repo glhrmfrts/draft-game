@@ -93,6 +93,7 @@ int main(int argc, char **argv)
     game.RealHeight = Height;
     game.Width = vWidth;
     game.Height = vHeight;
+	game.Platform.AudioDevice = AudioDevice;
     game.Platform.CompareFileTime = PlatformCompareFileTime;
     game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
     game.Platform.GetMilliseconds = PlatformGetMilliseconds;
@@ -278,13 +279,14 @@ int main(int argc, char **argv)
             if (i == 0)
             {
                 memcpy(&game.PrevInput, &game.Input, sizeof(game_input));
-                Input.MouseState.dX = 0;
-                Input.MouseState.dY = 0;
+				Input.MouseState.dX = 0;
+				Input.MouseState.dY = 0;
             }
             accul -= deltaTime;
             i++;
         }
 
+		//Lib.GameUpdate(&game, elapsed);
         Lib.GameRender(&game, elapsed);
         SDL_GL_SwapWindow(Window);
         //SDL_Delay(10);

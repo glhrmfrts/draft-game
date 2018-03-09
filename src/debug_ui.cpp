@@ -31,6 +31,23 @@ void DrawDebugUI(game_main *g, float dt)
     ImGui::Text("Checkpoint time: %.2f", float(g->LevelState.CurrentCheckpointFrame) / 60.0f);
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 
+	if (ImGui::CollapsingHeader("Timers"))
+	{
+		for (int i = 0; i < Global_ProfileTimersCount; i++)
+		{
+			auto &t = Global_ProfileTimers[i];
+			ImGui::Text("%s timer: %dms", t.Name, t.Delta());
+		}
+		ImGui::Spacing();
+	}
+	if (ImGui::CollapsingHeader("Music"))
+	{
+		ImGui::Text("Timer: %.2fs", g->MusicMaster.Timer);
+		ImGui::Text("Beat: %d", g->MusicMaster.Beat);
+		ImGui::Text("Beat/2: %d", g->MusicMaster.Beat/2);
+		ImGui::Text("Beat/4: %d", g->MusicMaster.Beat/4);
+		ImGui::Text("Beat time: %.2fs", g->MusicMaster.BeatTime);
+	}
     if (ImGui::CollapsingHeader("Camera"))
     {
         ImGui::Checkbox("FreeCam", &Global_Camera_FreeCam);

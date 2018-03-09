@@ -16,6 +16,25 @@ struct rect
     }
 };
 
+struct gui_vertex
+{
+	union
+	{
+		struct {
+			float PositionX;
+			float PositionY;
+			float UvX;
+			float UvY;
+			float ColorR;
+			float ColorG;
+			float ColorB;
+			float ColorA;
+		} Floats;
+
+		float Data[8];
+	};
+};
+
 struct gui_draw_command
 {
     color DiffuseColor;

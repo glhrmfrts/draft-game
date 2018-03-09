@@ -5,6 +5,9 @@
 #include <SDL2/SDL.h>
 #include <AL/al.h>
 #include <AL/alc.h>
+#include <sndfile.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include "thread_pool.h"
 #include "config.h"
 #include "common.h"
@@ -12,6 +15,7 @@
 #include "collision.h"
 #include "memory.h"
 #include "render.h"
+#include "audio.h"
 #include "asset.h"
 #include "gui.h"
 #include "random.h"
@@ -33,16 +37,46 @@ typedef PLATFORM_GET_MILLISECONDS(platform_get_milliseconds_func);
 
 struct platform_api
 {
+	ALCdevice *AudioDevice;
     platform_get_file_last_write_time_func *GetFileLastWriteTime;
     platform_compare_file_time_func *CompareFileTime;
     platform_get_milliseconds_func *GetMilliseconds;
 };
+
+static platform_api *Global_Platform;
 
 #define GAME_INIT(name) void name(game_main *game)
 #define GAME_UPDATE(name) void name(game_main *game, float dt)
 #define GAME_RENDER(name) void name(game_main *game, float dt)
 #define GAME_DESTROY(name) void name(game_main *game)
 #define GAME_PROCESS_EVENT(name) void name(game_main *game, SDL_Event *event)
+
+struct profile_time
+{
+	uint64 Begin;
+	uint64 End;
+	const char *Name;
+
+	uint64 Delta() const { return End - Begin; }
+};
+
+static profile_time Global_ProfileTimers[32];
+static int Global_ProfileTimersCount;
+
+inline static void ResetProfileTimers()
+{
+	Global_ProfileTimersCount = 0;
+}
+
+inline static void BeginProfileTimer(const char *name)
+{
+	Global_ProfileTimers[Global_ProfileTimersCount++] = profile_time{ Global_Platform->GetMilliseconds(), 0, name };
+}
+
+inline static void EndProfileTimer(const char *name)
+{
+	Global_ProfileTimers[Global_ProfileTimersCount - 1].End = Global_Platform->GetMilliseconds();
+}
 
 struct game_main;
 
@@ -148,12 +182,6 @@ struct game_input
 	game_input() {}
 };
 
-struct profile_time
-{
-    uint64 Begin;
-    uint64 End;
-};
-
 struct game_menu_context
 {
     tween_sequence ChangeSequence;
@@ -176,6 +204,7 @@ struct game_main
     profile_time UpdateTime;
     profile_time RenderTime;
 
+	music_master MusicMaster;
 	asset_loader AssetLoader;
     gui GUI;
     camera GUICamera;

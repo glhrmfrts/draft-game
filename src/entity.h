@@ -36,6 +36,8 @@ struct powerup
 struct lane_slot
 {
     int Index;
+	int Lane;
+	bool Occupy = true;
 };
 
 struct frame_rotation
@@ -80,9 +82,18 @@ enum collider_type
 };
 struct collider
 {
-    collider_type Type;
     bounding_box Box;
     vec3 Scale = vec3(1.0f);
+	collider_type Type;
+	bool Active = false; // Passive if false
+};
+
+struct audio_source
+{
+	ALuint ID;
+	float Gain = 1;
+	audio_clip *Clip = NULL;
+	bool Loop = false;
 };
 
 enum entity_type
@@ -119,6 +130,7 @@ struct entity
     model *Model = NULL;
     lane_slot *LaneSlot = NULL;
     frame_rotation *FrameRotation = NULL;
+	audio_source *AudioSource = NULL;
 
     inline vec3 &Pos() { return Transform.Position; }
     inline vec3 &Vel() { return Transform.Velocity; }
@@ -216,12 +228,14 @@ struct entity_world
     background_state BackgroundState;
     gen_state *GenState;
 
+	std::vector<entity *> AudioEntities;
     std::vector<entity *> CrystalEntities;
     std::vector<entity *> CheckpointEntities;
     std::vector<entity *> AsteroidEntities;
     std::vector<entity *> PowerupEntities;
     std::vector<entity *> ModelEntities;
-    std::vector<entity *> CollisionEntities;
+    std::vector<entity *> ActiveCollisionEntities;
+	std::vector<entity *> PassiveCollisionEntities;
     std::vector<entity *> TrailGroupEntities;
     std::vector<entity *> ShipEntities;
     std::vector<entity *> ExplosionEntities;

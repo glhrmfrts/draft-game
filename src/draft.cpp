@@ -14,6 +14,7 @@
 #include "tween.cpp"
 #include "collision.cpp"
 #include "render.cpp"
+#include "audio.cpp"
 #include "asset.cpp"
 #include "gui.cpp"
 #include "debug_ui.cpp"
@@ -37,6 +38,7 @@ extern "C"
         auto g = game;
         int Width = g->Width;
         int Height = g->Height;
+		Global_Platform = &g->Platform;
 
         ImGui_ImplSdlGL3_Init(g->Window);
 
@@ -48,6 +50,7 @@ extern "C"
         InitRenderState(g->RenderState, Width, Height);
         InitTweenState(g->TweenState);
         InitEntityWorld(g->World);
+		MusicMasterInit(g->MusicMaster);
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetType_Texture,
@@ -112,7 +115,39 @@ extern "C"
                 NULL
             )
         );
-
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetType_Sound,
+				"data/audio/explosion3.wav",
+				"explosion",
+				NULL
+			)
+		);
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetType_Sound,
+				"data/audio/checkpoint.wav",
+				"checkpoint",
+				NULL
+			)
+		);
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetType_Sound,
+				"data/audio/crystal.wav",
+				"crystal",
+				NULL
+			)
+		);
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetType_Song,
+				"data/audio/music/song.json",
+				"first_song",
+				NULL
+			)
+		);
+		
         InitLoadingScreen(g);
     }
 
@@ -125,6 +160,9 @@ extern "C"
     export_func GAME_UPDATE(GameUpdate)
     {
         auto g = game;
+
+		ResetProfileTimers();
+		MusicMasterTick(g->MusicMaster, dt);
         if (IsJustPressed(g, Action_debugUI))
         {
             Global_DebugUI = !Global_DebugUI;

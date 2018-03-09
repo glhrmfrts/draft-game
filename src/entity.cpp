@@ -10,6 +10,11 @@ inline static void AddFlags(entity *Entity, uint32 Flags)
     Entity->Flags |= Flags;
 }
 
+inline float LaneIndexToPitch(int index)
+{
+	return (index + 2)*0.25f;
+}
+
 static material *CreateMaterial(allocator *alloc, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
 {
     auto result = PushStruct<material>(alloc);
@@ -102,13 +107,22 @@ static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
 	return result;
 }
 
-static lane_slot *CreateLaneSlot(allocator *alloc, int lane)
+static lane_slot *CreateLaneSlot(allocator *alloc, int lane, bool occupy = true)
 {
     assert(lane >= -2 && lane <= 2);
 
     auto result = PushStruct<lane_slot>(alloc);
+	result->Lane = lane;
     result->Index = lane+2;
+	result->Occupy = occupy;
     return result;
+}
+
+static audio_source *CreateAudioSource(allocator *alloc, audio_clip *buffer = NULL)
+{
+	auto result = PushStruct<audio_source>(alloc);
+	AudioSourceCreate(result, buffer);
+	return result;
 }
 
 entity *CreateEntity(allocator *alloc)
@@ -119,7 +133,7 @@ entity *CreateEntity(allocator *alloc)
 }
 
 #define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + TRAIL_GROUP_SIZE(1) + sizeof(lane_slot) + (sizeof(material)*2))
-entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false, int colorIndex = 0)
+entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false, int colorIndex = 0, int lane = 0)
 {
     auto ent = CreateEntity(alloc);
 	ent->Type = EntityType_Ship;
@@ -133,17 +147,19 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
     ent->Ship = PushStruct<ship>(alloc);
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
+	ent->LaneSlot = CreateLaneSlot(alloc, lane);
     bool trailRenderOnly = isPlayer || (colorIndex == SHIP_RED);
     ent->TrailGroup = CreateTrailGroup(alloc, ent, outlineColor, 0.5f, trailRenderOnly);
     if (isPlayer)
     {
+		ent->Collider->Active = true;
         AddFlags(ent, EntityFlag_IsPlayer);
     }
     return ent;
 }
 
-#define CRYSTAL_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(frame_rotation))
-entity *CreateCrystalEntity(allocator *alloc, mesh *crystalMesh)
+#define CRYSTAL_ENTITY_SIZE (sizeof(entity) + sizeof(audio_source) + sizeof(lane_slot) + sizeof(model) + sizeof(collider) + sizeof(frame_rotation))
+entity *CreateCrystalEntity(allocator *alloc, asset_loader &loader, mesh *crystalMesh, int lane = 0)
 {
     auto ent = CreateEntity(alloc);
 	ent->Type = EntityType_Crystal;
@@ -152,6 +168,8 @@ entity *CreateCrystalEntity(allocator *alloc, mesh *crystalMesh)
     ent->Collider = CreateCollider(alloc, ColliderType_Crystal);
     ent->FrameRotation = PushStruct<frame_rotation>(alloc);
     ent->FrameRotation->Rotation.z = 90.0f;
+	ent->AudioSource = CreateAudioSource(alloc, FindSound(loader, "crystal"));
+	ent->LaneSlot = CreateLaneSlot(alloc, lane, false);
     return ent;
 }
 
@@ -195,8 +213,8 @@ entity *CreatePowerupEntity(allocator *alloc, random_series &series, float timeS
     return result;
 }
 
-#define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(explosion) + TRAIL_GROUP_SIZE(EXPLOSION_PARTS_COUNT))
-entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, color outlineColor, vec3 sign)
+#define EXPLOSION_ENTITY_SIZE (sizeof(entity) + sizeof(audio_source) + sizeof(lane_slot) + sizeof(explosion) + TRAIL_GROUP_SIZE(EXPLOSION_PARTS_COUNT))
+entity *CreateExplosionEntity(allocator *alloc, asset_loader &loader, vec3 pos, vec3 vel, color c, color outlineColor, vec3 sign, int lane = 0)
 {
     auto exp = PushStruct<explosion>(alloc);
 	auto tg = CreateTrailGroup(alloc, NULL, c, 0.2, true, EXPLOSION_PARTS_COUNT);
@@ -222,6 +240,8 @@ entity *CreateExplosionEntity(allocator *alloc, vec3 pos, vec3 vel, color c, col
     result->Transform.Position = pos;
     result->Explosion = exp;
 	result->TrailGroup = tg;
+	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "explosion"));
+	result->LaneSlot = CreateLaneSlot(alloc, lane, false);
     return result;
 }
 
@@ -238,7 +258,7 @@ static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 }
 
 #define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(checkpoint)+TRAIL_GROUP_SIZE(1)+(sizeof(material)*2))
-static entity *CreateCheckpointEntity(allocator *alloc, mesh *checkpointMesh)
+static entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, mesh *checkpointMesh)
 {
     auto result = CreateEntity(alloc);
 	result->Type = EntityType_Checkpoint;
@@ -248,6 +268,7 @@ static entity *CreateCheckpointEntity(allocator *alloc, mesh *checkpointMesh)
     result->Checkpoint = PushStruct<checkpoint>(alloc);
     result->TrailGroup = CreateTrailGroup(alloc, result, CHECKPOINT_OUTLINE_COLOR, ROAD_LANE_COUNT);
     result->SetScl(vec3{ROAD_LANE_COUNT, 1.0f, ROAD_LANE_COUNT*2});
+	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "checkpoint"));
     return result;
 }
 
@@ -365,13 +386,24 @@ void AddEntityToList(std::vector<entity *> &list, entity *ent)
 
 void AddEntity(entity_world &world, entity *ent)
 {
+	if (ent->AudioSource)
+	{
+		AddEntityToList(world.AudioEntities, ent);
+	}
     if (ent->Model)
     {
         AddEntityToList(world.ModelEntities, ent);
     }
     if (ent->Collider)
     {
-        AddEntityToList(world.CollisionEntities, ent);
+		if (ent->Collider->Active)
+		{
+			AddEntityToList(world.ActiveCollisionEntities, ent);
+		}
+		else
+		{
+			AddEntityToList(world.PassiveCollisionEntities, ent);
+		}
     }
     if (ent->TrailGroup)
     {
@@ -412,7 +444,7 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.PowerupEntities, ent);
     }
-    if (ent->LaneSlot)
+    if (ent->LaneSlot && ent->LaneSlot->Occupy)
     {
         AddEntityToList(world.LaneSlotEntities, ent);
     }
@@ -453,13 +485,24 @@ void RemoveEntityFromList(std::vector<entity *> &list, entity *ent)
 
 void RemoveEntity(entity_world &world, entity *ent)
 {
+	if (ent->AudioSource)
+	{
+		RemoveEntityFromList(world.AudioEntities, ent);
+	}
     if (ent->Model)
     {
         RemoveEntityFromList(world.ModelEntities, ent);
     }
     if (ent->Collider)
     {
-        RemoveEntityFromList(world.CollisionEntities, ent);
+		if (ent->Collider->Active)
+		{
+			RemoveEntityFromList(world.ActiveCollisionEntities, ent);
+		}
+		else
+		{
+			RemoveEntityFromList(world.PassiveCollisionEntities, ent);
+		}
     }
     if (ent->TrailGroup)
     {
@@ -502,7 +545,7 @@ void RemoveEntity(entity_world &world, entity *ent)
         RemoveEntityFromList(world.PowerupEntities, ent);
         FreeEntry(world.PowerupPool, ent->PoolEntry);
     }
-    if (ent->LaneSlot)
+    if (ent->LaneSlot && ent->LaneSlot->Occupy)
     {
         RemoveEntityFromList(world.LaneSlotEntities, ent);
     }
@@ -545,7 +588,8 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.RotatingEntities.clear();
     w.RemoveOffscreenEntities.clear();
     w.RepeatingEntities.clear();
-    w.CollisionEntities.clear();
+    w.ActiveCollisionEntities.clear();
+	w.PassiveCollisionEntities.clear();
     w.ShipEntities.clear();
     w.TrailGroupEntities.clear();
     
@@ -565,6 +609,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
     w.PlayerEntity->Transform.Position.z = SHIP_Z;
     w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
+	w.PlayerEntity->AudioSource = CreateAudioSource(&w.Arena);
     AddEntity(w, w.PlayerEntity);
 
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
@@ -650,6 +695,7 @@ static void UpdateTrailGroupEntityJob(void *arg)
 		}
 	}
 
+	BeginProfileTimer("Trail push position");
 	tg->Timer -= dt;
 	if (tg->Timer <= 0)
 	{
@@ -659,10 +705,12 @@ static void UpdateTrailGroupEntityJob(void *arg)
 			PushPosition(tg->Entities[i]->Trail, tg->Entities[i]->Pos());
 		}
 	}
+	EndProfileTimer("Trail push position");
 
 	auto &m = tg->Mesh;
-	ResetBuffer(m.Buffer);
+	float *bufferData = MapBuffer(m.Buffer, GL_WRITE_ONLY);
 
+	BeginProfileTimer("Trail build quads");
 	for (int j = 0; j < tg->Count; j++)
 	{
 		// First store the quads, then the lines
@@ -697,7 +745,7 @@ static void UpdateTrailGroupEntityJob(void *arg)
 			vec3 p4 = c1 + vec3(r - min1, 0, 0);
 			color cl2 = color{ 1, 1, 1, 1.0f - (min2 / tr->Radius) };
 			color cl1 = color{ 1, 1, 1, 1.0f - (min1 / tr->Radius) };
-			AddQuad(m.Buffer, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
+			bufferData = AddQuad(bufferData, p2, p1, p3, p4, cl2, cl2, cl1, cl1);
 
 			const float lo = 0.05f;
 			tg->PointCache[j][i * 4] = p1 - vec3(lo, 0, 0);
@@ -712,20 +760,23 @@ static void UpdateTrailGroupEntityJob(void *arg)
 			}
 		}
 	}
+	EndProfileTimer("Trail build quads");
 
+	BeginProfileTimer("Trail build lines");
 	for (int j = 0; j < tg->Count; j++)
 	{
 		for (int i = 0; i < TRAIL_COUNT; i++)
 		{
 			vec3 *p = tg->PointCache[j] + i * 4;
-			AddLine(m.Buffer, *p++, *p++);
+			bufferData = AddLine(bufferData, *p++, *p++);
 		}
 		for (int i = 0; i < TRAIL_COUNT; i++)
 		{
 			vec3 *p = tg->PointCache[j] + i * 4 + 2;
-			AddLine(m.Buffer, *p++, *p++);
+			bufferData = AddLine(bufferData, *p++, *p++);
 		}
 	}
+	EndProfileTimer("Trail build lines");
 
 	ENTITY_JOB_FREE_ARGS(args);
 }
@@ -735,6 +786,12 @@ void UpdateExplosionEntityJob(void *arg)
 	ENTITY_JOB_UNPACK_ARGS(arg);
 
 	auto exp = ent->Explosion;
+	if (exp->LifeTime == Global_Game_ExplosionLifeTime)
+	{
+		AudioSourceSetPitch(ent->AudioSource, LaneIndexToPitch(ent->LaneSlot->Index));
+		AudioSourcePlay(ent->AudioSource);
+	}
+
 	exp->LifeTime -= dt;
 	if (exp->LifeTime <= 0)
 	{
@@ -781,6 +838,11 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         bg.y -= velY * dt;
     }
 
+	for (auto ent : world.AudioEntities)
+	{
+		if (!ent) continue;
+		AudioSourceSetPosition(ent->AudioSource, ent->Pos());
+	}
     for (auto ent : world.MovementEntities)
     {
         if (!ent) continue;
@@ -813,13 +875,15 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 	for (auto ent : world.TrailGroupEntities)
 	{
 		if (!ent) continue;
-		AddJob(world.UpdateThreadPool, UpdateTrailGroupEntityJob, (void *)GetUpdateArg(world, ent, dt));
+		//AddJob(world.UpdateThreadPool, UpdateTrailGroupEntityJob, (void *)GetUpdateArg(world, ent, dt));
+		UpdateTrailGroupEntityJob((void *)GetUpdateArg(world, ent, dt));
 	}
 
 	for (auto ent : world.ExplosionEntities)
 	{
 		if (!ent) continue;
-		AddJob(world.UpdateThreadPool, UpdateExplosionEntityJob, (void *)GetUpdateArg(world, ent, dt));
+		//AddJob(world.UpdateThreadPool, UpdateExplosionEntityJob, (void *)GetUpdateArg(world, ent, dt));
+		UpdateExplosionEntityJob((void *)GetUpdateArg(world, ent, dt));
 	}
 }
 
@@ -853,7 +917,7 @@ void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
     {
         if (!ent) continue;
         auto tg = ent->TrailGroup;
-        UploadVertices(tg->Mesh.Buffer, 0, tg->Mesh.Buffer.VertexCount);
+        UnmapBuffer(tg->Mesh.Buffer);
         DrawModel(rs, tg->Model, transform{});
     }
     for (auto ent : world.ModelEntities)

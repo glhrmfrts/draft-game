@@ -53,4 +53,70 @@ struct string_format
 	size_t Size = 0;
 };
 
+template<typename T, int cap>
+struct null_array
+{
+    std::vector<T> vec;
+    int numNulls;
+
+    void Add(T elem)
+    {
+        for (int i = 0; i < vec.size(); i++)
+        {
+            if (vec[i] == NULL)
+            {
+                vec[i] = elem;
+                numNulls--;
+                return;
+            }
+        }
+        vec.push_back(elem);
+    }
+
+	int Count() const
+	{
+		return vec.size();
+	}
+
+    void Remove(int i)
+    {
+        vec[i] = NULL;
+        numNulls++;
+    }
+
+    void CheckClear()
+    {
+        if (numNulls == cap)
+        {
+            vec.clear();
+        }
+    }
+};
+
+template<typename T, int cap>
+struct fixed_array
+{
+    std::vector<T> vec;
+    int count = 0;
+
+    fixed_array()
+    {
+        vec.resize(cap);
+    }
+
+    void Add(T elem)
+    {
+        if (count >= vec.size())
+        {
+            throw std::exception("fixed array out of memory");
+        }
+        vec[count++] = elem;
+    }
+
+    int Count() const
+    {
+        return count;
+    }
+};
+
 #endif

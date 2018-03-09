@@ -47,6 +47,11 @@ void InitMenu(game_main *g)
     
     m->Alpha = 1.0f;
     m->FadeOutSequence.Complete = false;
+
+	auto sng = FindSong(g->AssetLoader, "first_song");
+	MusicMasterLoadSong(g->MusicMaster, sng);
+	MusicMasterPlayTrack(g->MusicMaster, sng->Names["bg_amb"]);
+	MusicMasterPlayTrack(g->MusicMaster, sng->Names["pad_dmaj"]);
 }
 
 MENU_FUNC(PlayMenuCallback)

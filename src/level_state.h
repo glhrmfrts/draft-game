@@ -48,7 +48,8 @@ struct level_state
 {
     memory_arena Arena;
     random_series Entropy;
-    audio_source *DraftBoostAudio;
+	asset_loader *AssetLoader;
+	audio_clip *DraftBoostSound;
 
     generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;

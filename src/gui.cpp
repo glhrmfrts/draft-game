@@ -134,6 +134,11 @@ void PushDrawCommand(gui &g)
     g.DrawCommandList.push_back(Curr);
 }
 
+inline size_t PushVertex(vertex_buffer &buf, const gui_vertex &v)
+{
+	return PushVertex(buf, v.Data);
+}
+
 void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
 {
     auto &curr = g.CurrentDrawCommand;
@@ -143,8 +148,8 @@ void DrawLine(gui &g, vec2 p1, vec2 p2, color c)
         g.CurrentDrawCommand = NextDrawCommand(g, GL_LINES, 0.0f, Color_white, NULL);
     }
 
-    PushVertex(g.Buffer, {p1.x, p1.y, 0,0, c.r, c.g, c.b, c.a});
-    PushVertex(g.Buffer, {p2.x, p2.y, 0,0, c.r, c.g, c.b, c.a});
+    PushVertex(g.Buffer, gui_vertex{p1.x, p1.y, 0,0, c.r, c.g, c.b, c.a});
+    PushVertex(g.Buffer, gui_vertex{p2.x, p2.y, 0,0, c.r, c.g, c.b, c.a});
 }
 
 uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
@@ -181,19 +186,19 @@ uint32 DrawRect(gui &g, rect Rect, color vColor, color DiffuseColor,
     switch (PrimType)
     {
     case GL_LINE_LOOP:
-        PushVertex(g.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
         break;
 
     case GL_TRIANGLES:
-        PushVertex(g.Buffer, {x,   y,   u, v,   C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
-        PushVertex(g.Buffer, {x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x,   y,   u, v,   C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x,   y+h, u,  v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x+w, y+h, u2, v2, C.r, C.g, C.b, C.a});
+        PushVertex(g.Buffer, gui_vertex{x+w, y,   u2, v,  C.r, C.g, C.b, C.a});
         break;
 
     default:

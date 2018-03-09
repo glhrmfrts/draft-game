@@ -34,28 +34,7 @@ static menu_data gameOverMenu = {
     }
 };
 
-struct audio_source
-{
-    ALuint Source;
-    float Gain = 1;
-};
-audio_source *CreateAudioSource(memory_arena &arena, ALuint buffer)
-{
-    auto result = PushStruct<audio_source>(arena);
-    alGenSources(1, &result->Source);
-    alSourcef(result->Source, AL_PITCH, 1);
-    alSourcef(result->Source, AL_GAIN, 1);
-    alSource3f(result->Source, AL_POSITION, 0,0,0);
-    alSource3f(result->Source, AL_VELOCITY, 0,0,0);
-    alSourcei(result->Source, AL_LOOPING, AL_FALSE);
-    alSourcei(result->Source, AL_BUFFER, buffer);
-    return result;
-}
-
-void UpdateAudioParams(audio_source *audio)
-{
-    alSourcef(audio->Source, AL_GAIN, audio->Gain);
-}
+static song *firstSong;
 
 void InitLevel(game_main *g)
 {
@@ -67,6 +46,7 @@ void InitLevel(game_main *g)
     ResetPool(l->ScoreTextPool);
     ResetPool(l->SequencePool);
     
+	l->AssetLoader = &g->AssetLoader;
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
     l->IntroTextPool.Arena = &l->Arena;
     l->ScoreTextPool.Arena = &l->Arena;
@@ -83,7 +63,7 @@ void InitLevel(game_main *g)
 
     g->Gravity = vec3(0, 0, 0);
     g->World.Camera = &g->Camera;
-    l->DraftBoostAudio = CreateAudioSource(l->Arena, FindSound(g->AssetLoader, "boost")->Buffer);
+	l->DraftBoostSound = FindSound(g->AssetLoader, "boost");
 
     InitFormat(&l->HealthFormat, "Health: %d\n", 24, &l->Arena);
     InitFormat(&l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
@@ -93,6 +73,11 @@ void InitLevel(game_main *g)
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
     l->GameplayState = GameplayState_Playing;
+
+	firstSong = FindSong(g->AssetLoader, "first_song");
+	g->MusicMaster.StepBeat = true;
+	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["hats"]);
+	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["pad_chords"]);
 }
 
 void RemoveGameplayEntities(entity_world &w)
@@ -251,6 +236,7 @@ void PlayerExplodeAndLoseHealth(level_state *l, entity_world &w, entity *player,
 
     auto playerExp = CreateExplosionEntity(
         GetEntry(w.ExplosionPool),
+		*l->AssetLoader,
         player->Pos(),
         player->Vel(),
         PLAYER_BODY_COLOR,
@@ -268,6 +254,7 @@ void PlayerEnemyCollision(level_state *l, entity_world &w,
 
     auto enemyExp = CreateExplosionEntity(
         GetEntry(w.ExplosionPool),
+		*l->AssetLoader,
         enemy->Pos(),
         enemy->Vel(),
         enemy->Ship->Color,
@@ -343,11 +330,13 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
 
             auto exp = CreateExplosionEntity(
                 GetEntry(g->World.ExplosionPool),
+				*l->AssetLoader,
                 entityToExplode->Transform.Position,
                 otherEntity->Transform.Velocity,
                 entityToExplode->Ship->Color,
                 entityToExplode->Ship->OutlineColor,
-                vec3{ 0, 1, 1 }
+                vec3{ 0, 1, 1 },
+				entityToExplode->LaneSlot->Lane
             );
             AddEntity(g->World, exp);
             RemoveEntity(g->World, entityToExplode);
@@ -372,6 +361,10 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
             l->Health += SCORE_HEALTH;
             AddScoreText(g, l, SCORE_TEXT_HEALTH, SCORE_HEALTH, crystalEntity->Pos(), CRYSTAL_COLOR);
 
+			Println(crystalEntity->LaneSlot->Index);
+			AudioSourceSetPitch(crystalEntity->AudioSource, LaneIndexToPitch(crystalEntity->LaneSlot->Index));
+			AudioSourcePlay(crystalEntity->AudioSource);
+
             auto pup = CreatePowerupEntity(GetEntry(g->World.PowerupPool),
                                            g->LevelState.Entropy,
                                            g->LevelState.TimeElapsed,
@@ -391,6 +384,7 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
         {
             auto exp = CreateExplosionEntity(
                 GetEntry(g->World.ExplosionPool),
+				*l->AssetLoader,
                 shipEntity->Pos(),
                 vec3(0.0f),
                 shipEntity->Ship->Color,
@@ -403,20 +397,6 @@ bool HandleCollision(game_main *g, entity *first, entity *second, float dt)
         return false;
     }
     return false;
-}
-
-void UpdateListener(camera &cam, vec3 PlayerPosition)
-{
-    static float *orient = new float[6];
-    orient[0] = cam.View[2][0];
-    orient[1] = cam.View[2][1];
-    orient[2] = cam.View[2][2];
-    orient[3] = cam.View[0][0];
-    orient[4] = cam.View[0][1];
-    orient[5] = cam.View[0][2];
-    alListenerfv(AL_ORIENTATION, orient);
-    alListenerfv(AL_POSITION, &cam.Position[0]);
-    alListener3f(AL_VELOCITY, 0, 0, 0);
 }
 
 void UpdateFreeCam(camera &cam, game_input &input, float dt)
@@ -454,7 +434,7 @@ void KeepEntityInsideOfRoad(entity *ent)
 
 void SpawnCheckpoint(game_main *g, level_state *l)
 {
-    auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), GetCheckpointMesh(g->World));
+    auto ent = CreateCheckpointEntity(GetEntry(g->World.CheckpointPool), g->AssetLoader, GetCheckpointMesh(g->World));
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z * 0.5f;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
@@ -462,6 +442,18 @@ void SpawnCheckpoint(game_main *g, level_state *l)
 }
 
 #define FrameSeconds(s) (s * 60)
+
+void PlayKick(void *arg)
+{
+	auto m = (music_master *)arg;
+	MusicMasterPlayTrack(*m, firstSong->Names["kick"]);
+}
+
+void PlaySnare(void *arg)
+{
+	auto m = (music_master *)arg;
+	MusicMasterPlayTrack(*m, firstSong->Names["snare"]);
+}
 
 void UpdateClassicMode(game_main *g, level_state *l)
 {
@@ -474,8 +466,10 @@ void UpdateClassicMode(game_main *g, level_state *l)
     {
     case 0:
     {
-        l->PlayerMinVel = PLAYER_MIN_VEL;
-        l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
+        //l->PlayerMinVel = PLAYER_MIN_VEL;
+        //l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
+		l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
+		l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
         
         if (frame == 0)
         {
@@ -496,9 +490,13 @@ void UpdateClassicMode(game_main *g, level_state *l)
 
     case 1:
     {
+		l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
+		l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
+
         if (frame == 0)
         {
             AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
+			MusicMasterOnNextBeat(g->MusicMaster, PlayKick, &g->MusicMaster, 4);
         }
         if (frame == FrameSeconds(5))
         {
@@ -518,6 +516,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
         if (frame == 0)
         {
             AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
+			MusicMasterOnNextBeat(g->MusicMaster, PlaySnare, &g->MusicMaster, 2);
         }
         if (frame == FrameSeconds(5))
         {
@@ -608,6 +607,13 @@ void UpdateLevel(game_main *g, float dt)
     auto *playerEntity = g->World.PlayerEntity;
     auto *playerShip = playerEntity->Ship;
     updateTime.Begin = g->Platform.GetMilliseconds();
+
+	static float myPitch = 1.0f;
+	float targetPitch = std::max(std::round(playerEntity->Vel().y) / 50.0f * 0.7f, 1.0f);
+	targetPitch = std::min(targetPitch, 2.5f*0.7f);
+	
+	myPitch = Interp(myPitch, targetPitch, 0.5f, dt);
+	MusicMasterSetPitch(g->MusicMaster, myPitch);
     
     if (IsJustPressed(g, Action_pause))
     {
@@ -648,6 +654,7 @@ void UpdateLevel(game_main *g, float dt)
         if (g->Input.Keys[SDL_SCANCODE_E])
         {
             auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+											*l->AssetLoader,
                                              playerEntity->Transform.Position,
                                              playerEntity->Transform.Velocity,
                                              playerEntity->Ship->Color,
@@ -666,7 +673,9 @@ void UpdateLevel(game_main *g, float dt)
             UpdateClassicMode(g, l);
         }
         
+		BeginProfileTimer("Gen state");
         UpdateGenState(g, world.GenState, (void *)l, dt);
+		EndProfileTimer("Gen state");
         
         {
             // player movement
@@ -695,6 +704,12 @@ void UpdateLevel(game_main *g, float dt)
                 }
             }
 
+			// check if player is out of bounds
+			if ((std::abs(playerX) - ROAD_LANE_WIDTH / 2) > 2.0f * ROAD_LANE_WIDTH)
+			{
+				playerEntity->Vel().y = std::min(PLAYER_MIN_VEL, playerEntity->Vel().y);
+			}
+
             if (l->DraftCharge == 1.0f && IsPressed(g, Action_boost))
             {
                 l->Score += SCORE_DRAFT;
@@ -714,30 +729,36 @@ void UpdateLevel(game_main *g, float dt)
                     AddScoreText(g, l, SCORE_TEXT_DRAFT, SCORE_DRAFT, playerEntity->Pos(), l->DraftTarget->Ship->Color);
                 }
                 ApplyBoostToShip(playerEntity, DRAFT_BOOST, 0);
+				AudioSourcePlay(playerEntity->AudioSource, l->DraftBoostSound);
             }
 
             world.GenState->PlayerLaneIndex = int(nearestLane)+2;
         }
 
-        size_t frameCollisionCount = 0;
-        DetectCollisions(world.CollisionEntities, l->CollisionCache, frameCollisionCount);
-        for (size_t i = 0; i < frameCollisionCount; i++)
-        {
-            auto col = &l->CollisionCache[i];
-            col->First->NumCollisions++;
-            col->Second->NumCollisions++;
+		BeginProfileTimer("Collision");
+		{
+			size_t frameCollisionCount = 0;
+			DetectCollisions(world.ActiveCollisionEntities, world.PassiveCollisionEntities, l->CollisionCache, &frameCollisionCount);
+			for (size_t i = 0; i < frameCollisionCount; i++)
+			{
+				auto col = &l->CollisionCache[i];
+				col->First->NumCollisions++;
+				col->Second->NumCollisions++;
 
-            if (HandleCollision(g, col->First, col->Second, dt))
-            {
-                ResolveCollision(*col);
-            }
-        }
+				if (HandleCollision(g, col->First, col->Second, dt))
+				{
+					ResolveCollision(*col);
+				}
+			}
 
-        Integrate(world.CollisionEntities, g->Gravity, dt);
-        if (l->NumTrailCollisions == 0)
-        {
-            l->CurrentDraftTime -= dt;
-        }
+			Integrate(world.ActiveCollisionEntities, g->Gravity, dt);
+			Integrate(world.PassiveCollisionEntities, g->Gravity, dt);
+			if (l->NumTrailCollisions == 0)
+			{
+				l->CurrentDraftTime -= dt;
+			}
+		}
+		EndProfileTimer("Collision");
 
         l->CurrentDraftTime = std::max(0.0f, std::min(l->CurrentDraftTime, Global_Game_DraftChargeTime));
         l->DraftCharge = l->CurrentDraftTime / Global_Game_DraftChargeTime;
@@ -758,7 +779,11 @@ void UpdateLevel(game_main *g, float dt)
             playerEntity->Model->Visible = true;
         }
 
+		//BeginProfileTimer(g->Platform.GetMilliseconds(), "World Entities");
         UpdateLogiclessEntities(world, dt);
+		//EndProfileTimer(g->Platform.GetMilliseconds(), "World Entities");
+
+		BeginProfileTimer("Game Entities");
         for (auto ent : world.ShipEntities)
         {
             if (!ent) continue;
@@ -837,6 +862,7 @@ void UpdateLevel(game_main *g, float dt)
                 {
                     ent->Asteroid->Exploded = true;
                     auto exp = CreateExplosionEntity(GetEntry(g->World.ExplosionPool),
+						                             *l->AssetLoader,
                                                      ent->Pos(),
                                                      vec3(0.0f),
                                                      ASTEROID_COLOR,
@@ -892,6 +918,8 @@ void UpdateLevel(game_main *g, float dt)
                     l->CurrentCheckpointFrame = 0;
                     l->Score += SCORE_CHECKPOINT;
                     AddScoreText(g, l, SCORE_TEXT_CHECKPOINT, SCORE_CHECKPOINT, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
+
+					AudioSourcePlay(ent->AudioSource);
                 }
                 break;
 
@@ -922,6 +950,7 @@ void UpdateLevel(game_main *g, float dt)
 
             ent->Pos().y += ent->Vel().y * dt;
         }
+		EndProfileTimer("Game Entities");
         
         l->Health = std::max(l->Health, 0);
         if (l->Health == 0 && l->GameplayState == GameplayState_Playing)
@@ -942,9 +971,7 @@ void UpdateLevel(game_main *g, float dt)
         UpdateMenuSelection(g, gameOverMenu, menuMoveY);
     }
 
-    auto playerPosition = playerEntity->Pos();
-    alSourcefv(l->DraftBoostAudio->Source, AL_POSITION, &playerPosition[0]);
-    UpdateListener(g->Camera, playerPosition);
+    AudioListenerUpdate(g->Camera);
 
 	if (l->ScoreTextList.size() > 0)
 	{
@@ -974,6 +1001,12 @@ void UpdateLevel(game_main *g, float dt)
 			FreeEntryFromData(l->IntroTextPool, introText);
 		}
 	}
+	
+#if 0
+	BeginProfileTimer(g->Platform.GetMilliseconds(), "Update thread wait");
+	WaitUpdate(g->World);
+	EndProfileTimer(g->Platform.GetMilliseconds(), "Update thread wait");
+#endif
 
     updateTime.End = g->Platform.GetMilliseconds();
 }
@@ -991,9 +1024,9 @@ void RenderLevel(game_main *g, float dt)
     RenderBackground(g, g->World);
     RenderBegin(g->RenderState, dt);
 
-	WaitUpdate(g->World);
     RenderEntityWorld(g->RenderState, g->World, dt);
 
+#if 0
 #ifdef DRAFT_DEBUG
     if (Global_Collision_DrawCollider)
     {
@@ -1004,6 +1037,7 @@ void RenderLevel(game_main *g, float dt)
             DrawDebugCollider(g->RenderState, ent->Collider->Box, ent->NumCollisions > 0);
         }
     }
+#endif
 #endif
     UpdateFinalCamera(g);
     RenderEnd(g->RenderState, g->FinalCamera);

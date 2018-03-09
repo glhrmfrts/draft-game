@@ -39,7 +39,7 @@ GEN_FUNC(GenerateCrystal)
 {
     auto l = static_cast<level_state *>(data);
     int lane = GetNextSpawnLane(state);
-    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), GetCrystalMesh(g->World));
+    auto ent = CreateCrystalEntity(GetEntry(g->World.CrystalPool), g->AssetLoader, GetCrystalMesh(g->World), lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z + 0.4f;
@@ -56,8 +56,7 @@ GEN_FUNC(GenerateShip)
     int colorIndex = GetNextShipColor(state, l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
     int lane = GetNextSpawnLane(state, true);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, colorIndex);
-    ent->LaneSlot = CreateLaneSlot(ent->PoolEntry, lane);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, colorIndex, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
@@ -181,7 +180,7 @@ void InitGenState(gen_state *state)
     gen->Func = GenerateSideTrail;
 
     gen = state->GenParams + GenType_RandomGeometry;
-    gen->Flags = GenFlag_Enabled | GenFlag_Randomize;
+    gen->Flags = /*GenFlag_Enabled |*/ GenFlag_Randomize;
     gen->Interval = 0.5f;
     gen->RandomOffset = 0.4f;
     gen->Func = GenerateRandomGeometry;

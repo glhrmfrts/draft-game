@@ -37,10 +37,20 @@ IntColor(int c, float alpha = 1.0f)
 
 struct mesh_vertex
 {
-    vec3 Position;
-    vec2 Uv;
-    color Color;
-    vec3 Normal;
+	union
+	{
+		struct
+		{
+			vec3 Position;
+			vec2 Uv;
+			color Color;
+			vec3 Normal;
+		} Attributes;
+
+		float Data[12];
+	};
+
+	~mesh_vertex() {}
 };
 
 struct vertex_buffer
@@ -50,6 +60,7 @@ struct vertex_buffer
     size_t RawIndex;
     size_t VertexCount;
     size_t VertexSize;
+	float *MappedData = NULL;
 };
 
 struct vertex_attribute

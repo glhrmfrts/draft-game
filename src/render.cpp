@@ -1,14 +1,12 @@
 // Copyright
 
-static void
-EnableVertexAttribute(vertex_attribute Attr)
+static void EnableVertexAttribute(vertex_attribute Attr)
 {
     glEnableVertexAttribArray(Attr.Location);
     glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
-static void
-vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
+static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 {
     glGenVertexArrays(1, &Buffer.VAO);
     glGenBuffers(1, &Buffer.VBO);
@@ -26,8 +24,7 @@ vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
 }
 
 #define InitialVertexBufferSize 16
-static void
-EnsureCapacity(vertex_buffer &Buffer, size_t Size)
+static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 {
     if (Buffer.RawIndex + Size > Buffer.Vertices.size())
     {
@@ -42,8 +39,7 @@ EnsureCapacity(vertex_buffer &Buffer, size_t Size)
     }
 }
 
-static void
-ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
+static void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 {
     Buffer.VertexCount = Index;
     Buffer.RawIndex = Index * Buffer.VertexSize;
@@ -51,8 +47,7 @@ ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 
 // InitBuffer accepts a variadic number of vertex_attributes, it
 // initializes the buffer and enable the passed attributes
-static void
-InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
+static void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
 {
     Buffer.VertexSize = VertexSize;
     ResetBuffer(Buffer);
@@ -77,28 +72,40 @@ void InitMeshBuffer(vertex_buffer &Buffer)
 
 // PushVertex pushes a single vertex to the buffer, the vertex size
 // is known by the VertexSize field
-inline size_t
-PushVertex(vertex_buffer &Buffer, const vector<float> &Verts)
+inline size_t PushVertex(vertex_buffer &buf, const float *data)
 {
-    EnsureCapacity(Buffer, Buffer.VertexSize);
+    EnsureCapacity(buf, buf.VertexSize);
 
-    size_t Idx = Buffer.RawIndex;
-    for (size_t i = 0; i < Buffer.VertexSize; i++) {
-        Buffer.Vertices[Idx+i] = Verts[i];
+    size_t Idx = buf.RawIndex;
+    for (size_t i = 0; i < buf.VertexSize; i++) {
+		buf.Vertices[Idx+i] = data[i];
     }
-    Buffer.RawIndex += Buffer.VertexSize;
-    Buffer.VertexCount++;
-    return Buffer.VertexCount - 1;
+	buf.RawIndex += buf.VertexSize;
+	buf.VertexCount++;
+    return buf.VertexCount - 1;
 }
 
-inline size_t
-PushVertex(vertex_buffer &Buffer, const mesh_vertex &Vertex)
+inline size_t PushVertex(vertex_buffer &buf, const mesh_vertex &vertex)
 {
-    vec3 p = Vertex.Position;
-    vec2 uv = Vertex.Uv;
-    color c = Vertex.Color;
-    vec3 n = Vertex.Normal;
-    return PushVertex(Buffer, {p.x, p.y, p.z, uv.x, uv.y, c.r, c.g, c.b, c.a, n.x, n.y, n.z});
+    return PushVertex(buf, vertex.Data);
+}
+
+inline float *MapBuffer(vertex_buffer &buf, GLenum usage)
+{
+	if (buf.MappedData != NULL) return buf.MappedData;
+
+	glBindBuffer(GL_ARRAY_BUFFER, buf.VBO);
+	buf.MappedData = (float *)glMapBuffer(GL_ARRAY_BUFFER, usage);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	return buf.MappedData;
+}
+
+inline void UnmapBuffer(vertex_buffer &buf)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, buf.VBO);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	buf.MappedData = NULL;
 }
 
 void UploadVertices(vertex_buffer &Buffer, GLenum Usage)
@@ -686,12 +693,21 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
     InitBuffer(r.ScreenBuffer, 4, 2,
                vertex_attribute{0, 2, GL_FLOAT, 4*sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
-    PushVertex(r.ScreenBuffer, {-1, -1, 0, 0});
-    PushVertex(r.ScreenBuffer, {1, -1, 1, 0});
-    PushVertex(r.ScreenBuffer, {-1, 1, 0, 1});
-    PushVertex(r.ScreenBuffer, {1, -1, 1, 0});
-    PushVertex(r.ScreenBuffer, {1, 1, 1, 1});
-    PushVertex(r.ScreenBuffer, {-1, 1, 0, 1});
+
+	float data[24] = { 
+		-1, -1, 0, 0,
+		1, -1, 1, 0,
+		-1, 1, 0, 1,
+		1, -1, 1, 0,
+		1, 1, 1, 1,
+		-1, 1, 0, 1
+	};
+    PushVertex(r.ScreenBuffer, data);
+    PushVertex(r.ScreenBuffer, data + 4);
+    PushVertex(r.ScreenBuffer, data + 8);
+    PushVertex(r.ScreenBuffer, data + 12);
+    PushVertex(r.ScreenBuffer, data + 16);
+    PushVertex(r.ScreenBuffer, data + 20);
     UploadVertices(r.ScreenBuffer, GL_STATIC_DRAW);
 
     InitFramebuffer(r, r.MultisampledSceneFramebuffer, width, height, FramebufferFlag_HasDepth | FramebufferFlag_Multisampled, ColorTextureFlag_Count);
