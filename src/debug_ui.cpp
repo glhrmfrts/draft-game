@@ -30,7 +30,25 @@ void DrawDebugUI(game_main *g, float dt)
     ImGui::Text("Checkpoint: %d", g->LevelState.CheckpointNum);
     ImGui::Text("Checkpoint time: %.2f", float(g->LevelState.CurrentCheckpointFrame) / 60.0f);
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
-
+	ImGui::Text("Road bounds: %.2f|%.2f", g->World.RoadState.Left, g->World.RoadState.Right);
+	
+	if (ImGui::CollapsingHeader("Music"))
+	{
+		ImGui::Text("Timer: %.2fs", g->MusicMaster.Timer);
+		ImGui::Text("Beat: %d", g->MusicMaster.Beat);
+		ImGui::Text("Beat/2: %d", g->MusicMaster.Beat/2);
+		ImGui::Text("Beat/4: %d", g->MusicMaster.Beat/4);
+		ImGui::Text("Beat time: %.2fs", g->MusicMaster.BeatTime);
+		ImGui::Spacing();
+	}
+	if (ImGui::CollapsingHeader("Background"))
+	{
+		auto &instances = g->World.BackgroundState.Instances;
+		ImGui::Text("Offset: %s", ToString(g->World.BackgroundState.Offset).c_str());
+		ImGui::DragFloat2("Instance 0 offset", &instances[0].Offset[0]);
+		ImGui::DragFloat2("Instance 1 offset", &instances[1].Offset[0]);
+		ImGui::Spacing();
+	}
 	if (ImGui::CollapsingHeader("Timers"))
 	{
 		for (int i = 0; i < Global_ProfileTimersCount; i++)
@@ -39,14 +57,6 @@ void DrawDebugUI(game_main *g, float dt)
 			ImGui::Text("%s timer: %dms", t.Name, t.Delta());
 		}
 		ImGui::Spacing();
-	}
-	if (ImGui::CollapsingHeader("Music"))
-	{
-		ImGui::Text("Timer: %.2fs", g->MusicMaster.Timer);
-		ImGui::Text("Beat: %d", g->MusicMaster.Beat);
-		ImGui::Text("Beat/2: %d", g->MusicMaster.Beat/2);
-		ImGui::Text("Beat/4: %d", g->MusicMaster.Beat/4);
-		ImGui::Text("Beat time: %.2fs", g->MusicMaster.BeatTime);
 	}
     if (ImGui::CollapsingHeader("Camera"))
     {
@@ -72,6 +82,7 @@ void DrawDebugUI(game_main *g, float dt)
 		ImGui::Text("Renderables: %lu", g->RenderState.FrameSolidRenderables.size() + g->RenderState.FrameTransparentRenderables.size());
 		ImGui::Spacing();
         ImGui::Checkbox("PostFX", &Global_Renderer_DoPostFX);
+		ImGui::SliderFloat("Bend radius", &g->RenderState.BendRadius, 0, 1000.0f, "%.2f");
 
         if (ImGui::TreeNode("Bloom"))
         {

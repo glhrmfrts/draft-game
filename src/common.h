@@ -3,11 +3,11 @@
 
 #include <algorithm>
 #include <iostream>
-#include <cassert>
-#include <cstdarg>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
+#include <assert.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <vector>
 #include <list>
@@ -18,6 +18,12 @@
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <GL/glew.h>
+
+#ifdef _WIN32
+#define export_func __declspec(dllexport)
+#else
+#define export_func
+#endif
 
 #define ARRAY_COUNT(arr) (sizeof(arr)/sizeof(arr[0]))
 
@@ -109,6 +115,56 @@ inline float Square(float f)
 inline float Length2(const vec3 &v)
 {
     return Square(v.x) + Square(v.y) + Square(v.z);
+}
+
+static inline int NextP2(int n)
+{
+	int Result = 1;
+	while (Result < n)
+	{
+		Result <<= 1;
+	}
+	return Result;
+}
+
+static long int GetFileSize(FILE *handle)
+{
+	long int result = 0;
+
+	fseek(handle, 0, SEEK_END);
+	result = ftell(handle);
+	rewind(handle);
+
+	return result;
+}
+
+static FILE *OpenFile(const char *Filename, const char *Mode)
+{
+	FILE *Handle;
+#ifdef _WIN32
+	fopen_s(&Handle, Filename, Mode);
+#else
+	Handle = fopen(Filename, Mode);
+#endif
+	return Handle;
+}
+
+static const char *ReadFile(const char *filename)
+{
+	FILE *handle = OpenFile(filename, "r");
+	long int length = GetFileSize(handle);
+	char *buffer = new char[length + 1];
+	int i = 0;
+	char c = 0;
+	while ((c = fgetc(handle)) != EOF) {
+		buffer[i++] = c;
+		if (i >= length) break;
+	}
+
+	buffer[i] = '\0';
+	fclose(handle);
+
+	return (const char *)buffer;
 }
 
 #endif

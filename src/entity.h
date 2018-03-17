@@ -2,6 +2,7 @@
 #define DRAFT_ENTITY_H
 
 struct entity;
+struct entity_world;
 
 struct model
 {
@@ -22,9 +23,12 @@ struct ship
 
 struct entity_repeat
 {
+	typedef void(callback)(entity_world *, entity *);
+
     int Count = 0;
     float Size = 0;
     float DistanceFromCamera = 0;
+	callback *Callback = NULL;
 };
 
 struct powerup
@@ -96,6 +100,14 @@ struct audio_source
 	bool Loop = false;
 };
 
+struct road_piece
+{
+	float BackLeft;
+	float BackRight;
+	float FrontLeft;
+	float FrontRight;
+};
+
 enum entity_type
 {
 	EntityType_Invalid,
@@ -131,6 +143,7 @@ struct entity
     lane_slot *LaneSlot = NULL;
     frame_rotation *FrameRotation = NULL;
 	audio_source *AudioSource = NULL;
+	road_piece *RoadPiece = NULL;
 
     inline vec3 &Pos() { return Transform.Position; }
     inline vec3 &Vel() { return Transform.Velocity; }
@@ -182,13 +195,16 @@ struct trail_piece
 
 struct background_instance
 {
-    float y;
+	color Color;
+	vec2 Offset;
 };
 
 struct background_state
 {
     std::vector<background_instance> Instances;
-    texture *Texture;
+	vec2 Offset = vec2(0.0f);
+    texture *RandomTexture;
+	float Time = 0;
 };
 
 struct gen_state;
@@ -200,6 +216,35 @@ struct entity_update_args
 	entity *Entity;
 	memory_pool_entry *Entry;
 	float DeltaTime;
+};
+
+struct road_mesh_manager
+{
+	memory_arena Arena;
+	string_format KeyFormat;
+	std::string Key;
+	std::unordered_map<std::string, mesh *> Meshes;
+};
+
+enum road_change
+{
+	RoadChange_NarrowRight,
+	RoadChange_NarrowLeft,
+	RoadChange_NarrowCenter,
+	RoadChange_WidensLeft,
+	RoadChange_WidensRight,
+	RoadChange_WidensCenter,
+};
+
+struct road_state
+{
+	road_piece NextPiece;
+	road_change Change;
+	bool ShouldChange = false;
+	mesh *RoadMesh = NULL;
+	float Left = 0;
+	float Right = 0;
+	int PlayerActiveEntityIndex = 0;
 };
 
 struct entity_world
@@ -220,10 +265,12 @@ struct entity_world
     mesh *FloorMesh = NULL;
     mesh *ShipMesh = NULL;
     mesh *CrystalMesh = NULL;
-    mesh *RoadMesh = NULL;
     mesh *AsteroidMesh = NULL;
     mesh *CheckpointMesh = NULL;
     mesh *BackgroundMesh = NULL;
+
+	road_state RoadState;
+	road_mesh_manager RoadMeshManager;
 
     background_state BackgroundState;
     gen_state *GenState;
@@ -244,6 +291,7 @@ struct entity_world
     std::vector<entity *> LaneSlotEntities;
     std::vector<entity *> RotatingEntities;
     std::vector<entity *> MovementEntities;
+	std::vector<entity *> RoadPieceEntities;
     asset_loader *AssetLoader = NULL;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;

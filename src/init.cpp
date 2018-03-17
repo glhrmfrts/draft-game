@@ -13,30 +13,29 @@ void RegisterInputActions(game_input &input)
     input.Actions[Action_pause] = action_state{ SDL_SCANCODE_ESCAPE, 0, 0, 0, Axis_Invalid, XboxButton_Start };
 }
 
-void InitLoadingScreen(game_main *Game)
+void InitLoadingScreen(game_main *g)
 {
-    Game->State = GameState_LoadingScreen;
-    InitAssetLoader(Game->AssetLoader, Game->Platform);
+    g->State = GameState_LoadingScreen;
+    InitAssetLoader(g, g->AssetLoader, g->Platform);
 
-    for (auto &Asset : Game->Assets)
+    for (auto &Asset : g->Assets)
     {
-        AddAssetEntry(Game->AssetLoader, Asset);
+        AddAssetEntry(g->AssetLoader, Asset);
     }
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.ModelProgram);
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.BlurHorizontalProgram);
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.BlurVerticalProgram);
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.BlendProgram);
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.BlitProgram);
-    AddShaderProgramEntries(Game->AssetLoader, Game->RenderState.ResolveMultisampleProgram);
-
-    StartLoading(Game->AssetLoader);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.ModelProgram);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlurHorizontalProgram);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlurVerticalProgram);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlendProgram);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlitProgram);
+    AddShaderProgramEntries(g->AssetLoader, g->RenderState.ResolveMultisampleProgram);
+	AddShaderProgramEntries(g->AssetLoader, g->RenderState.PerlinNoiseProgram);
 }
 
 typedef void init_func(game_main *Game);
 
 void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
 {
-    if (Update(g->AssetLoader))
+    if (int(g->AssetLoader.Pool.NumJobs) == 0)
     {
         nextModeInit(g);
     }

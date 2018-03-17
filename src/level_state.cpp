@@ -20,17 +20,17 @@ MENU_FUNC(GameOverMenuCallback);
 static menu_data pauseMenu = {
     "PAUSED", 2, PauseMenuCallback,
     {
-        menu_item{"CONTINUE", MenuItemType_Text},
-        menu_item{"EXIT", MenuItemType_Text},
+        {"CONTINUE", MenuItemType_Text, true},
+        {"EXIT", MenuItemType_Text, true},
     }
 };
 
 static menu_data gameOverMenu = {
     "GAME OVER", 3, GameOverMenuCallback,
     {
-        menu_item{"CONTINUE", MenuItemType_Text},
-        menu_item{"RESTART", MenuItemType_Text},
-        menu_item{"EXIT", MenuItemType_Text},
+        {"CONTINUE", MenuItemType_Text, true },
+        {"RESTART", MenuItemType_Text, true},
+        {"EXIT", MenuItemType_Text, true},
     }
 };
 
@@ -163,7 +163,7 @@ void AddIntroText(game_main *g, level_state *l, const char *text, color c)
 
 void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
-    vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(pos), 1.0f};
+    vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(pos, g->RenderState.BendRadius), 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
     screenPos.x = (g->Width/2) * screenPos.x + (g->Width/2);
     screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);
@@ -477,12 +477,30 @@ void UpdateClassicMode(game_main *g, level_state *l)
         if (frame == 0)
         {
             AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
+			RoadChange(g->World, RoadChange_NarrowRight);
         }
         if (frame == FrameSeconds(5))
         {
             Enable(crystals);
             Randomize(crystals);
+			RoadChange(g->World, RoadChange_WidensLeft);
         }
+		if (frame == FrameSeconds(7))
+		{
+			RoadChange(g->World, RoadChange_NarrowLeft);
+		}
+		if (frame == FrameSeconds(9))
+		{
+			RoadChange(g->World, RoadChange_WidensRight);
+		}
+		if (frame == FrameSeconds(11))
+		{
+			RoadChange(g->World, RoadChange_NarrowCenter);
+		}
+		if (frame == FrameSeconds(13))
+		{
+			RoadChange(g->World, RoadChange_WidensCenter);
+		}
         if (frame == FrameSeconds(25))
         {
             Disable(crystals);
@@ -708,7 +726,9 @@ void UpdateLevel(game_main *g, float dt)
             }
 
 			// check if player is out of bounds
-			if ((std::abs(playerX) - ROAD_LANE_WIDTH / 2) > 2.0f * ROAD_LANE_WIDTH)
+			float playerRight = playerX + ROAD_LANE_WIDTH / 2;
+			float playerLeft = playerX - ROAD_LANE_WIDTH / 2;
+			if (playerRight < world.RoadState.Left*ROAD_LANE_WIDTH || playerLeft > world.RoadState.Right*ROAD_LANE_WIDTH)
 			{
 				playerEntity->Vel().y = std::min(PLAYER_MIN_VEL, playerEntity->Vel().y);
 			}
@@ -967,11 +987,11 @@ void UpdateLevel(game_main *g, float dt)
     float menuMoveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
     if (l->GameplayState == GameplayState_Paused)
     {
-        UpdateMenuSelection(g, pauseMenu, menuMoveY);
+        UpdateMenuSelection(g, pauseMenu, 0, 0, menuMoveY);
     }
     if (l->GameplayState == GameplayState_GameOver)
     {
-        UpdateMenuSelection(g, gameOverMenu, menuMoveY);
+        UpdateMenuSelection(g, gameOverMenu, 0, 0, menuMoveY);
     }
 
     AudioListenerUpdate(g->Camera);

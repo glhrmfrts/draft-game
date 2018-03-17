@@ -28,4 +28,24 @@ static float Global_Renderer_BloomBlurOffset = 1.8f;
 static float Global_Renderer_FogStart = 500.0f;
 static float Global_Renderer_FogEnd = 1000.0f;
 
+struct resolution
+{
+	int Width;
+	int Height;
+};
+
+static resolution Global_Resolutions[] = {
+	{1920, 1080},
+	{1600, 900},
+	{1366, 768},
+	{1280, 720},
+};
+
+static const char *Global_ResolutionTexts[] = {
+	"1920x1080",
+	"1600x900",
+	"1366x768",
+	"1280x720",
+};
+
 #endif

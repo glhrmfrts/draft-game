@@ -218,6 +218,47 @@ uint32 DrawRect(gui &g, rect R, color C, GLuint PrimType = GL_TRIANGLES, bool Ch
     return DrawRect(g, R, C, Color_white, NULL, {}, 0, false, PrimType, CheckState);
 }
 
+uint32 DrawCircle(gui &g, vec2 center, float radius, color c, GLuint PrimType)
+{
+	PushDrawCommand(g);
+	g.CurrentDrawCommand = NextDrawCommand(g, PrimType, 0, Color_white, NULL);
+
+	if (PrimType == GL_TRIANGLE_FAN)
+	{
+		PushVertex(g.Buffer, gui_vertex{ center.x, center.y, 0, 0, c.r, c.g, c.b, c.a });
+	}
+
+	const int segments = 24;
+	const float theta = M_PI * 2 / float(segments);
+	float angle = 0;
+	for (int i = 0; i < segments+1; i++)
+	{
+		vec2 p;
+		p.x = cos(angle) * radius;
+		p.y = sin(angle) * radius;
+		p += center;
+
+		PushVertex(g.Buffer, gui_vertex{ p.x, p.y, 0, 0, c.r, c.g, c.b, c.a });
+
+		angle += theta;
+	}
+	return GUIElementState_none;
+}
+
+uint32 DrawPolygon(gui &g, vec2 *Vertices, size_t Count, color c)
+{
+	PushDrawCommand(g);
+	g.CurrentDrawCommand = NextDrawCommand(g, GL_LINE_LOOP, 0, Color_white, NULL);
+
+	for (size_t i = 0; i < Count; i++)
+	{
+		vec2 v = Vertices[i];
+		PushVertex(g.Buffer, gui_vertex{ v.x, v.y, 0, 0, c.r, c.g, c.b, c.a });
+	}
+
+	return GUIElementState_none;
+}
+
 uint32 DrawTexture(gui &g, rect R, texture *T, bool FlipV = false, GLuint PrimType = GL_TRIANGLES, bool CheckState = true)
 {
     return DrawRect(g, R, Color_white, Color_white, T, {0, 0, 1, 1}, 1, FlipV, PrimType, CheckState);
@@ -326,7 +367,7 @@ void End(gui &g)
             Unbind(*Cmd.Texture, 0);
         }
     }
-
+	 
     glBindVertexArray(0);
     UnbindShaderProgram();
     glDisable(GL_BLEND);
@@ -350,10 +391,59 @@ void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
         col.a = 0.25f;
     }
     col.a *= alpha;
-    DrawTextCentered(g->GUI, font, item.Text, rect{centerX,baseY + textPadding,0,0}, col);
-}
 
-static menu_item backItem = {"BACK", MenuItemType_Text};
+	const float itemWidth = 500;
+	const float optionWidth = 250;
+	const float optionX = centerX + itemWidth / 2;
+	switch (item.Type)
+	{ 
+	case MenuItemType_Text:
+		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX,baseY + textPadding,0,0 }, col);
+		break;
+
+	case MenuItemType_SliderFloat:
+	{
+		const float lineWidth = optionWidth;
+		const float lineX = optionX;
+		const float lineY = baseY + textPadding + 24 / 2;
+		const float lineLeft = lineX - lineWidth / 2;
+		const float lineRight = lineX + lineWidth / 2;
+
+		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX - itemWidth / 2, baseY + textPadding,0,0 }, col);
+		DrawLine(g->GUI, vec2{ lineLeft, lineY }, vec2{ lineRight, lineY }, col);
+		DrawCircle(g->GUI, vec2{ lineLeft + (lineWidth * *item.SliderFloat.Value), lineY }, 10, col, GL_TRIANGLE_FAN);
+		break;
+	}
+
+	case MenuItemType_Switch:
+	{
+		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX - itemWidth / 2, baseY + textPadding,0,0 }, col);
+
+		color onColor = col;
+		color offColor = col;
+		if (*item.Switch.Value)
+		{
+			offColor.a = 0.25f;
+		}
+		else
+		{
+			onColor.a = 0.25f;
+		}
+		DrawTextCentered(g->GUI, font, "on", rect{ centerX + itemWidth/2 - optionWidth/4, baseY + textPadding, 0, 0 }, onColor);
+		DrawTextCentered(g->GUI, font, "off", rect{ centerX + itemWidth/2 + optionWidth/4, baseY + textPadding, 0, 0 }, offColor);
+		break;
+	}
+
+	case MenuItemType_Options:
+	{
+		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX - itemWidth / 2, baseY + textPadding,0,0 }, col);
+		DrawTextCentered(g->GUI, font, item.Options.Values.vec[item.Options.SelectedIndex], rect{ centerX + itemWidth / 2, baseY + textPadding, 0, 0 }, col);
+		break;
+	}
+	}
+} 
+
+static menu_item backItem = {"BACK", MenuItemType_Text, true};
 
 void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.0f, bool drawBackItem = false)
 {
@@ -407,16 +497,60 @@ float GetMenuAxisValue(game_input &input, menu_axis &axis, float dt)
     return 0.0f;
 }
 
-bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputY, bool backItemEnabled = false)
+void UpdateMenuItem(menu_item &item, float inputX, float menuInputX)
+{
+	switch (item.Type)
+	{
+	case MenuItemType_SliderFloat:
+	{
+		float value = *item.SliderFloat.Value;
+		value += inputX * 0.02f;
+		value = glm::clamp(value, 0.0f, 1.0f);
+		*item.SliderFloat.Value = value;
+		break;
+	}
+
+	case MenuItemType_Switch:
+	{
+		bool value = *item.Switch.Value;
+		if (inputX > 0)
+		{
+			value = false;
+		}
+		else if (inputX < 0)
+		{
+			value = true;
+		}
+		*item.Switch.Value = value;
+		break;
+	}
+
+	case MenuItemType_Options:
+	{
+		if (menuInputX > 0)
+		{
+			item.Options.SelectedIndex++;
+		}
+		else if (menuInputX < 0)
+		{
+			item.Options.SelectedIndex--;
+		}
+		item.Options.SelectedIndex = glm::clamp(item.Options.SelectedIndex, 0, item.Options.Values.Count() - 1);
+		break;
+	}
+	}
+}
+
+bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputX, float menuInputX, float menuInputY, bool backItemEnabled = false)
 {
     int prevHotItem = menu.HotItem;
     auto item = menu.Items + menu.HotItem;
     do {
-        if (inputY < 0.0f)
+        if (menuInputY < 0.0f)
         {
             menu.HotItem++;
         }
-        else if (inputY > 0.0f)
+        else if (menuInputY > 0.0f)
         {
             menu.HotItem--;
         }
@@ -436,6 +570,11 @@ bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputY, bool backI
     }
 
     bool backSelected = menu.HotItem == menu.NumItems;
+	if (!backSelected)
+	{
+		UpdateMenuItem(menu.Items[menu.HotItem], inputX, menuInputX);
+	}
+
     if (IsJustPressed(g, Action_select))
     {
         if (backSelected)

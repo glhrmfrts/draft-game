@@ -187,60 +187,237 @@ struct mesh_part_scope
 #define ROAD_FLOOR_COLOR   Color_black
 #define ROAD_LANE_COLOR    color{1,1,1,1.0f}
 
-mesh *GetRoadMesh(entity_world &w)
+mesh *BuildStraightRoadMesh(memory_arena &arena, float l, float r)
 {
-    if (w.RoadMesh)
-    {
-        return w.RoadMesh;
-    }
+	auto roadMesh = PushStruct<mesh>(arena);
+	InitMeshBuffer(roadMesh->Buffer);
 
-    auto roadMesh = PushStruct<mesh>(w.PersistentArena);
-    InitMeshBuffer(roadMesh->Buffer);
+	material roadMaterial = { ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{ 1, 1 } };
+	material borderMaterial = { ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	material laneMaterial = { ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	float width = r - l;
 
-    auto roadTexture = FindTexture(*w.AssetLoader, "grid");
-    material roadMaterial = {ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{1, 1}};
-    material borderMaterial = {ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{0, 0}};
-    material laneMaterial = {ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{0, 0}};
-    float width = 5.0f;
-    float l = -width/2;
-    float r = width/2;
+	mesh_part_scope roadScope(roadMesh);
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		AddQuad(roadMesh->Buffer, vec3{ l, y, 0 }, vec3{ r, y, 0 }, vec3{ r, y + 1, 0 }, vec3{ l, y + 1, 0 }, Color_white, vec3(1, 1, 1));
+	}
+	roadScope.Commit(roadMaterial, GL_TRIANGLES);
 
-    mesh_part_scope roadScope(roadMesh);
-    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
-    {
-        AddQuad(roadMesh->Buffer, vec3{l, y, 0}, vec3{r, y, 0}, vec3{r, y+1, 0}, vec3{l, y+1, 0}, Color_white, vec3(1, 1, 1));
-    }
-    roadScope.Commit(roadMaterial, GL_TRIANGLES);
+	mesh_part_scope borderScope(roadMesh);
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		for (int i = 0; i < (int)width + 1; i++)
+		{
+			if (i == 0 || i == (int)width)
+			{
+				AddLine(roadMesh->Buffer, vec3{ l + i, y, 0.05f }, vec3{ l + i, y + 1, 0.05f });
+			}
+		}
+	}
+	borderScope.Commit(borderMaterial, GL_LINES, 4);
 
-    mesh_part_scope borderScope(roadMesh);
-    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
-    {
-        for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
-        {
-            if (i == 0 || i == ROAD_LANE_COUNT)
-            {
-                AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f});
-            }
-        }
-    }
-    borderScope.Commit(borderMaterial, GL_LINES, 4);
+	mesh_part_scope laneScope(roadMesh);
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		for (int i = 0; i < (int)width + 1; i++)
+		{
+			if (y % 2 == 0)
+			{
+				color c = Color_white;
+				AddLine(roadMesh->Buffer, vec3{ l + i, y, 0.05f }, vec3{ l + i, y + 1, 0.05f }, c);
+			}
+		}
+	}
+	laneScope.Commit(laneMaterial, GL_LINES, 2);
+	EndMesh(roadMesh, GL_STATIC_DRAW);
 
-    mesh_part_scope laneScope(roadMesh);
-    for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
-    {
-        for (int i = 0; i < ROAD_LANE_COUNT+1; i++)
-        {
-            if (y % 2 == 0)
-            {
-                color c = Color_white;
-                AddLine(roadMesh->Buffer, vec3{l + i, y, 0.05f}, vec3{l + i, y+1, 0.05f}, c);
-            }
-        }
-    }
-    laneScope.Commit(laneMaterial, GL_LINES, 2);
-    EndMesh(roadMesh, GL_STATIC_DRAW);
+	return roadMesh;
+}
 
-    return w.RoadMesh = roadMesh;
+mesh *BuildVariantRoadMesh(memory_arena &arena, float backLeft, float backRight, float frontLeft, float frontRight)
+{
+	auto roadMesh = PushStruct<mesh>(arena);
+	InitMeshBuffer(roadMesh->Buffer);
+
+	//auto roadTexture = FindTexture(*w.AssetLoader, "grid");
+	material roadMaterial = { ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{ 1, 1 } };
+	material borderMaterial = { ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	material laneMaterial = { ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	float backWidth = backRight - backLeft;
+	float frontWidth = frontRight - frontLeft;
+	float bl = backLeft;
+	float br = backRight;
+	float fl = frontLeft;
+	float fr = frontRight;
+	float dleft = (frontLeft - backLeft) / (float)ROAD_SEGMENT_SIZE;
+	float dright = (frontRight - backRight) / (float)ROAD_SEGMENT_SIZE;
+	float left = 0;
+	float right = 0;
+	float maxLeft = 0;
+	float maxRight = 0;
+	if (std::abs(bl) > std::abs(fl))
+	{
+		maxLeft = bl;
+	}
+	else
+	{
+		maxLeft = fl;
+	}
+
+	if (std::abs(br) > std::abs(fr))
+	{
+		maxRight = br;
+	}
+	else
+	{
+		maxRight = fr;
+	}
+
+	mesh_part_scope roadScope(roadMesh);
+	left = bl;
+	right = br;
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		AddQuad(roadMesh->Buffer, vec3{ left, y, 0 }, vec3{ right, y, 0 }, vec3{ right + dright, y + 1, 0 }, vec3{ left + dleft, y + 1, 0 }, Color_white, vec3(1, 1, 1));
+		left += dleft;
+		right += dright;
+	}
+	roadScope.Commit(roadMaterial, GL_TRIANGLES);
+
+	mesh_part_scope borderScope(roadMesh);
+	left = bl;
+	right = br;
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		AddLine(roadMesh->Buffer, vec3{ left, y, 0.05f }, vec3{ left + dleft, y + 1, 0.05f });
+		AddLine(roadMesh->Buffer, vec3{ right, y, 0.05f }, vec3{ right + dright, y + 1, 0.05f });
+		left += dleft;
+		right += dright;
+	}
+	borderScope.Commit(borderMaterial, GL_LINES, 4);
+
+	mesh_part_scope laneScope(roadMesh);
+	left = bl;
+	right = br;
+	for (int y = 0; y < ROAD_SEGMENT_SIZE; y++)
+	{
+		if (y % 2 == 0)
+		{
+			for (float x = maxLeft; x < maxRight; x += 1)
+			{
+				if (x > left && x < right)
+				{
+					color c = Color_white;
+					AddLine(roadMesh->Buffer, vec3{ x, y, 0.05f }, vec3{ x, y + 1, 0.05f }, c);
+				}
+			}
+		}
+		left += dleft;
+		right += dright;
+	}
+	laneScope.Commit(laneMaterial, GL_LINES, 2);
+	EndMesh(roadMesh, GL_STATIC_DRAW);
+
+	return roadMesh;
+}
+
+mesh *GetStraightRoadMesh(road_mesh_manager &manager, float left, float right)
+{
+	char *keyChars = Format(&manager.KeyFormat, "straight", left, right);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildStraightRoadMesh(manager.Arena, left, right);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetNarrowRightRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "narrowR", -2.5f, 0.5f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, -2.5f, 2.5f, 0.5f, 2.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetNarrowLeftRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "narrowL", 2.5f, -0.5f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, -2.5f, 2.5f, -2.5f, -0.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetNarrowCenterRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "narrowC", 5.0f, 1.0f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, -2.5f, 2.5f, -0.5f, 0.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetWidensLeftRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "widensL", 0.5f, -2.5f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, 0.5f, 2.5f, -2.5f, 2.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetWidensRightRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "widensR", -0.5f, 2.5f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, -2.5f, -0.5f, -2.5f, 2.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
+}
+
+mesh *GetWidensCenterRoadMesh(road_mesh_manager &manager)
+{
+	char *keyChars = Format(&manager.KeyFormat, "widensC", 1.0f, 5.0f);
+	manager.Key.assign(keyChars);
+
+	if (manager.Meshes.find(manager.Key) == manager.Meshes.end())
+	{
+		auto result = BuildVariantRoadMesh(manager.Arena, -0.5f, 0.5f, -2.5f, 2.5f);
+		manager.Meshes[manager.Key] = result;
+		return result;
+	}
+	return manager.Meshes[manager.Key];
 }
 
 mesh *GetShipMesh(entity_world &w)

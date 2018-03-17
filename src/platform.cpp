@@ -1,6 +1,7 @@
 // Copyright
 
 #include <iostream>
+#include <fstream>
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
@@ -15,6 +16,8 @@
 #else
 #include "platform_linux.cpp"
 #endif
+
+#include "options.cpp"
 
 static void OpenGameController(game_input &input)
 {
@@ -45,11 +48,38 @@ int main(int argc, char **argv)
         std::cout << "Failed to init display SDL" << std::endl;
     }
 
-    int Width = GAME_BASE_WIDTH;
-    int Height = GAME_BASE_HEIGHT;
+	memory_arena platformArena;
+	options opts;
+	{
+		std::string content(ReadFile("options.json"));
+		ParseOptions(content, &platformArena, &opts);
+	}
+
+	int resID = opts.Values["graphics/resolution"]->Int;
+	if (resID > ARRAY_COUNT(Global_Resolutions) - 1)
+	{
+		assert(!"Invalid resolution id");
+	}
+
+	auto res = Global_Resolutions[resID];
+	int Width = res.Width;
+	int Height = res.Height;
     int vWidth = Width;
     int vHeight = Height;
-    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_WINDOW_OPENGL);
+	uint32 windowFlags = SDL_WINDOW_OPENGL;
+
+	if (opts.Values["graphics/fullscreen"]->Bool)
+	{
+		windowFlags |= SDL_WINDOW_FULLSCREEN;
+		
+		SDL_DisplayMode displayMode;
+		SDL_GetDisplayMode(0, 0, &displayMode);
+
+		vWidth = displayMode.w;
+		vHeight = displayMode.h;
+	}
+
+    SDL_Window *Window = SDL_CreateWindow("Draft", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, windowFlags);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -89,14 +119,15 @@ int main(int argc, char **argv)
 
     game_main game;
     game.Window = Window;
-    game.RealWidth = Width;
-    game.RealHeight = Height;
-    game.Width = vWidth;
-    game.Height = vHeight;
+    game.ViewportWidth = vWidth;
+    game.ViewportHeight = vHeight;
+    game.Width = Width;
+    game.Height = Height;
 	game.Platform.AudioDevice = AudioDevice;
     game.Platform.CompareFileTime = PlatformCompareFileTime;
     game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
     game.Platform.GetMilliseconds = PlatformGetMilliseconds;
+	game.Platform.CreateThread = PlatformCreateThread;
 
     auto &Input = game.Input;
     if (SDL_NumJoysticks() > 0)
@@ -105,6 +136,8 @@ int main(int argc, char **argv)
     }
 
     game_library Lib;
+	game.GameLibrary = &Lib;
+
     std::string LibPath = GameLibraryPath;
     std::string TempPath;
     std::string LibFilename;
@@ -114,7 +147,7 @@ int main(int argc, char **argv)
         LibPath = std::string(argv[1]);
     }
     SplitExtension(LibPath, LibFilename, LibExtension);
-    TempPath = LibFilename + "_temp." + LibExtension;
+    TempPath = LibFilename + "Temp." + LibExtension;
     LoadGameLibrary(Lib, LibPath.c_str(), TempPath.c_str());
 
     Lib.GameInit(&game);
@@ -142,8 +175,10 @@ int main(int argc, char **argv)
             reloadTimer = GameLibraryReloadTime;
             if (GameLibraryChanged(Lib))
             {
+				Lib.GameUnload(&game);
                 UnloadGameLibrary(Lib);
                 LoadGameLibrary(Lib, LibPath.c_str(), TempPath.c_str());
+				Lib.GameReload(&game);
             }
         }
 #endif
@@ -294,6 +329,8 @@ int main(int argc, char **argv)
     }
 
     Lib.GameDestroy(&game);
+	Lib.GameUnload(&game);
+	UnloadGameLibrary(Lib);
 
     alcMakeContextCurrent(NULL);
     alcDestroyContext(AudioContext);

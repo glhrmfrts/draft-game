@@ -18,6 +18,9 @@ struct allocator
 struct memory_arena : allocator
 {
     memory_block *CurrentBlock = NULL;
+	bool Free = true;
+
+	~memory_arena();
 };
 
 struct memory_pool_entry : allocator

@@ -111,8 +111,6 @@ GEN_FUNC(GenerateSideTrail)
     {
         ent->Pos().x = -ent->Pos().x;
     }
-
-	Println("Gen side trail");
 }
 
 GEN_FUNC(GenerateRandomGeometry)

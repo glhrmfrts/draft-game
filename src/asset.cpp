@@ -1,83 +1,33 @@
 // Copyright
-#include <nlohmann/json.hpp>
 #include "lodepng.h"
+#include <fstream>
 
 #define DefaultTextureFilter GL_NEAREST
 #define DefaultTextureWrap GL_CLAMP_TO_EDGE
 
 static void LoadAssetThreadSafePart(void *Arg);
 
-static inline int NextP2(int n)
-{
-    int Result = 1;
-    while (Result < n)
-    {
-        Result <<= 1;
-    }
-    return Result;
-}
-
-static long int GetFileSize(FILE *handle)
-{
-    long int result = 0;
-
-    fseek(handle, 0, SEEK_END);
-    result = ftell(handle);
-    rewind(handle);
-
-    return result;
-}
-
-static FILE *OpenFile(const char *Filename, const char *Mode)
-{
-    FILE *Handle;
-#ifdef _WIN32
-    fopen_s(&Handle, Filename, Mode);
-#else
-    Handle = fopen(Filename, Mode);
-#endif
-    return Handle;
-}
-
-static const char *ReadFile(const char *filename)
-{
-    FILE *handle = OpenFile(filename, "r");
-    long int length = GetFileSize(handle);
-    char *buffer = new char[length + 1];
-    int i = 0;
-    char c = 0;
-    while ((c = fgetc(handle)) != EOF) {
-        buffer[i++] = c;
-        if (i >= length) break;
-    }
-
-    buffer[i] = '\0';
-    fclose(handle);
-
-    return (const char *)buffer;
-}
-
-void InitAssetLoader(asset_loader &Loader, platform_api &Platform)
+void InitAssetLoader(game_main *g, asset_loader &Loader, platform_api &Platform)
 {
     int Error = FT_Init_FreeType(&Loader.FreeTypeLib);
-    if (Error)
+    if (Error) 
     {
         Println("error font lib");
         exit(EXIT_FAILURE);
-    }
+    } 
 
-    CreateThreadPool(Loader.Pool, 1, 32);
-    Loader.NumLoadedEntries = 0;
+    CreateThreadPool(Loader.Pool, g, 1, 32);
+    Loader.NumLoadedEntries = 0; 
     Loader.Platform = &Platform;
+	Loader.Arena.Free = false;
 }
 
 void DestroyAssetLoader(asset_loader &Loader)
 {
     FT_Done_FreeType(Loader.FreeTypeLib);
-    DestroyThreadPool(Loader.Pool);
 }
 
-asset_entry CreateAssetEntry(asset_type Type, const string &Filename, const string &ID, void *Param)
+asset_entry CreateAssetEntry(asset_entry_type Type, const string &Filename, const string &ID, void *Param)
 {
     asset_entry Result = {};
     Result.Type = Type;
@@ -87,13 +37,14 @@ asset_entry CreateAssetEntry(asset_type Type, const string &Filename, const stri
     return Result;
 }
 
-void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow = false)
+void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow = true, bool oneShot = false)
 {
     Entry.Completion = AssetCompletion_Incomplete;
     Entry.Loader = &Loader;
+	Entry.OneShot = oneShot;
     switch (Entry.Type)
     {
-    case AssetType_Texture:
+    case AssetEntryType_Texture:
     {
         auto *Result = PushStruct<texture>(Loader.Arena);
         glGenTextures(1, &Result->ID);
@@ -101,7 +52,7 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
         break;
     }
 
-    case AssetType_Font:
+    case AssetEntryType_Font:
     {
         auto *Result = PushStruct<bitmap_font>(Loader.Arena);
         Result->Texture = PushStruct<texture>(Loader.Arena);
@@ -110,7 +61,7 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
         break;
     }
 
-    case AssetType_Shader:
+    case AssetEntryType_Shader:
     {
         auto *ShaderParam = (shader_asset_param *)Entry.Param;
         GLuint Result = glCreateShader(ShaderParam->Type);
@@ -118,7 +69,7 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
         break;
     }
 
-    case AssetType_Sound:
+    case AssetEntryType_Sound:
     {
 		auto result = AudioClipCreate(&Loader.Arena, AudioClipType_Sound);
         Entry.Sound.Result = result;
@@ -126,7 +77,7 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
         break;
     }
 
-	case AssetType_Stream:
+	case AssetEntryType_Stream:
 	{
 		auto result = AudioClipCreate(&Loader.Arena, AudioClipType_Stream);
 		Entry.Stream.Result = result;
@@ -134,13 +85,20 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
 		break;
 	}
 
-	case AssetType_Song:
+	case AssetEntryType_Song:
 	{
 		Entry.Song.Result = PushStruct<song>(Loader.Arena);
 		break;
 	}
+
+	case AssetEntryType_OptionsLoad:
+	{
+		Entry.Options.Result = PushStruct<options>(Loader.Arena);
+		break;
+	}
     }
     Loader.Entries.Add(Entry);
+	Loader.Active = true;
 
 	if (KickLoadingNow)
 	{
@@ -152,13 +110,13 @@ inline void
 AddShaderProgramEntries(asset_loader &Loader, shader_program &Program)
 {
     asset_entry VertexEntry = CreateAssetEntry(
-        AssetType_Shader,
+        AssetEntryType_Shader,
         Program.VertexShaderParam.Path,
         Program.VertexShaderParam.Path,
         (void *)&Program.VertexShaderParam
     );
     asset_entry FragmentEntry = CreateAssetEntry(
-        AssetType_Shader,
+        AssetEntryType_Shader,
         Program.FragmentShaderParam.Path,
         Program.FragmentShaderParam.Path,
         (void *)&Program.FragmentShaderParam
@@ -173,7 +131,7 @@ FindBitmapFont(asset_loader &Loader, const string &ID)
     for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
-        if (Entry.Type == AssetType_Font && Entry.ID == ID)
+        if (Entry.Type == AssetEntryType_Font && Entry.ID == ID)
         {
             return Entry.Font.Result;
         }
@@ -187,7 +145,7 @@ FindTexture(asset_loader &Loader, const string &ID)
 	for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
-        if (Entry.Type == AssetType_Texture && Entry.ID == ID)
+        if (Entry.Type == AssetEntryType_Texture && Entry.ID == ID)
         {
             return Entry.Texture.Result;
         }
@@ -201,7 +159,7 @@ FindSound(asset_loader &Loader, const string &ID)
 	for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
-        if (Entry.Type == AssetType_Sound && Entry.ID == ID)
+        if (Entry.Type == AssetEntryType_Sound && Entry.ID == ID)
         {
             return Entry.Sound.Result;
         }
@@ -215,7 +173,7 @@ FindStream(asset_loader &Loader, const string &ID)
 	for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
-		if (Entry.Type == AssetType_Stream && Entry.ID == ID)
+		if (Entry.Type == AssetEntryType_Stream && Entry.ID == ID)
 		{
 			return Entry.Stream.Result;
 		}
@@ -229,9 +187,23 @@ FindSong(asset_loader &Loader, const string &ID)
 	for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
-		if (Entry.Type == AssetType_Song && Entry.ID == ID)
+		if (Entry.Type == AssetEntryType_Song && Entry.ID == ID)
 		{
 			return Entry.Song.Result;
+		}
+	}
+	return NULL;
+}
+
+inline options *
+FindOptions(asset_loader &loader, const string &id)
+{
+	for (int i = 0; i < loader.Entries.Count(); i++)
+	{
+		auto &entry = loader.Entries.vec[i];
+		if (entry.Type == AssetEntryType_OptionsLoad && entry.ID == id)
+		{
+			return entry.Options.Result;
 		}
 	}
 	return NULL;
@@ -242,7 +214,7 @@ static void LoadAssetThreadSafePart(void *Arg)
     auto *Entry = (asset_entry *)Arg;
 	switch (Entry->Type)
 	{
-	case AssetType_Texture:
+	case AssetEntryType_Texture:
 	{
 		uint32 Flags = (uintptr_t)Entry->Param;
 		auto *Result = Entry->Texture.Result;
@@ -259,6 +231,11 @@ static void LoadAssetThreadSafePart(void *Arg)
 		{
 			Result->Filters.Min = GL_LINEAR_MIPMAP_LINEAR;
 			Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
+		}
+		if (Flags & TextureFlag_Nearest)
+		{
+			Result->Filters.Min = GL_NEAREST;
+			Result->Filters.Mag = GL_NEAREST;
 		}
 
 		vector<uint8> Data;
@@ -289,7 +266,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 		break;
 	}
 
-	case AssetType_Font:
+	case AssetEntryType_Font:
 	{
 		FT_Face Face;
 		int Error = FT_New_Face(Entry->Loader->FreeTypeLib, Entry->Filename.c_str(), 0, &Face);
@@ -359,13 +336,13 @@ static void LoadAssetThreadSafePart(void *Arg)
 		break;
 	}
 
-	case AssetType_Shader:
+	case AssetEntryType_Shader:
 	{
 		Entry->Shader.Source = ReadFile(Entry->Filename.c_str());
 		break;
 	}
 
-	case AssetType_Sound:
+	case AssetEntryType_Sound:
 	{
 		SF_INFO Info;
 		SNDFILE *SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &Info);
@@ -386,9 +363,10 @@ static void LoadAssetThreadSafePart(void *Arg)
 		Result->SampleCount = SampleCount;
 
 		Entry->Sound.Data = Data;
+		break;
 	}
 
-	case AssetType_Stream:
+	case AssetEntryType_Stream:
 	{
 		auto result = Entry->Stream.Result;
 		result->SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &result->Info);
@@ -403,7 +381,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 		break;
 	}
 
-	case AssetType_Song:
+	case AssetEntryType_Song:
 	{
 		using json = nlohmann::json;
 
@@ -425,7 +403,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 		for (auto trackFile : j["tracks"])
 		{
 			result->Files.push_back(trackFile);
-			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetType_Stream, trackFile, trackFile, NULL), true);
+			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Stream, trackFile, trackFile, NULL), true);
 		}
 
 		for (json::iterator it = j["names"].begin(); it != j["names"].end(); ++it)
@@ -434,6 +412,34 @@ static void LoadAssetThreadSafePart(void *Arg)
 		}
 
 		//free((void *)content);
+		break;
+	}
+
+	case AssetEntryType_OptionsLoad:
+	{
+		std::string content(ReadFile(Entry->Filename.c_str()));
+		
+		options *result = Entry->Options.Result;
+		ParseOptions(content, &Entry->Loader->Arena, result);
+		break;
+	}
+
+	case AssetEntryType_OptionsSave:
+	{
+		using json = nlohmann::json;
+		json j = {};
+		options *opts = (options *)Entry->Param;
+		j["audio/music_gain"] = opts->Values["audio/music_gain"]->Float;
+		j["audio/sfx_gain"] = opts->Values["audio/sfx_gain"]->Float;
+		j["graphics/resolution"] = opts->Values["graphics/resolution"]->Int;
+		j["graphics/fullscreen"] = opts->Values["graphics/fullscreen"]->Bool;
+		j["graphics/aa"] = opts->Values["graphics/aa"]->Bool;
+		j["graphics/bloom"] = opts->Values["graphics/bloom"]->Bool;
+
+		std::ofstream file;
+		file.open(Entry->Filename);
+		file << j.dump(4);
+		file.close();
 		break;
 	}
 	}
@@ -448,7 +454,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 {
     switch (Entry->Type)
     {
-    case AssetType_Texture:
+    case AssetEntryType_Texture:
     {
         auto *Result = Entry->Texture.Result;
         Bind(*Result, 0);
@@ -459,7 +465,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         break;
     }
 
-    case AssetType_Font:
+    case AssetEntryType_Font:
     {
         auto *Result = Entry->Font.Result;
         auto *Texture = Result->Texture;
@@ -488,7 +494,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         break;
     }
 
-    case AssetType_Shader:
+    case AssetEntryType_Shader:
     {
         auto *Param = (shader_asset_param *)Entry->Param;
         GLuint Result = Entry->Shader.Result;
@@ -505,7 +511,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         break;
     }
 
-    case AssetType_Sound:
+    case AssetEntryType_Sound:
     {
         auto *Result = Entry->Sound.Result;
 		AudioClipSetSoundData(Result, Entry->Sound.Data);
@@ -513,12 +519,12 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
         break;
     }
 
-	case AssetType_Stream:
+	case AssetEntryType_Stream:
 	{
 		break;
 	}
 
-	case AssetType_Song:
+	case AssetEntryType_Song:
 	{
 		auto result = Entry->Song.Result;
 		for (auto &file : result->Files)
@@ -530,21 +536,17 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
     }
 
     Entry->Completion = AssetCompletion_ThreadUnsafe;
-}
-
-void StartLoading(asset_loader &Loader)
-{
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	if (Entry->OneShot)
 	{
-		auto &Entry = Loader.Entries.vec[i];
-        AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Entry);
-    }
+		Entry->Completion = AssetCompletion_Done;
+	}
 }
 
 bool Update(asset_loader &Loader)
 {
-    if (!int(Loader.Pool.NumJobs))
+    if (Loader.Active && !int(Loader.Pool.NumJobs))
     {
+		Loader.Active = false;
 		for (int i = 0; i < Loader.Entries.Count(); i++)
 		{
 			auto &Entry = Loader.Entries.vec[i];
@@ -564,6 +566,8 @@ void CheckAssetsChange(asset_loader &Loader)
 	for (int i = 0; i < Loader.Entries.Count(); i++)
 	{
 		auto &Entry = Loader.Entries.vec[i];
+		if (Entry.Completion == AssetCompletion_Done) continue;
+
         uint64 LastWriteTime = Loader.Platform->GetFileLastWriteTime(Entry.Filename.c_str());
         int32 Compare = Loader.Platform->CompareFileTime(LastWriteTime, Entry.LastLoadTime);
         if (Compare != 0)

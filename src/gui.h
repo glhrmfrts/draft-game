@@ -83,12 +83,46 @@ struct gui
 enum menu_item_type
 {
     MenuItemType_Text,
+	MenuItemType_SliderFloat,
+	MenuItemType_Switch,
+	MenuItemType_Options,
 };
+
 struct menu_item
 {
     const char *Text;
     menu_item_type Type;
     bool Enabled = true;
+
+	union
+	{
+		struct {
+			float Min;
+			float Max;
+			float *Value;
+		} SliderFloat;
+
+		struct {
+			bool *Value;
+		} Switch;
+
+		struct {
+			fixed_array<const char *, 8> Values;
+			int SelectedIndex;
+		} Options;
+	};
+
+	menu_item() {}
+	menu_item(const char *t, menu_item_type type, bool enabled)
+		: Text(t), Type(type), Enabled(enabled)
+	{
+		if (type == MenuItemType_Options)
+		{
+			this->Options.Values = fixed_array<const char *, 8>();
+		}
+	}
+
+	~menu_item() {}
 };
 
 struct game_main;

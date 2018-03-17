@@ -18,7 +18,7 @@ struct job
 struct thread_pool;
 struct thread_data
 {
-    std::thread Thread;
+	platform_thread *Thread;
     std::queue<job> Jobs;
     std::condition_variable ConditionVar;
     std::mutex Mutex;
@@ -34,6 +34,7 @@ struct thread_pool
 {
     std::vector<thread_data> Threads;
     std::mutex Mutex;
+	game_main *Game;
     int JobsPerThread = 1;
 	int MaxThreads = 1;
 	int NumThreads = 0;

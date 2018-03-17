@@ -85,6 +85,7 @@ struct texture_wrap
 #define TextureFlag_Mipmap 0x1
 #define TextureFlag_Anisotropic 0x2
 #define TextureFlag_WrapRepeat 0x4
+#define TextureFlag_Nearest 0x8
 struct texture
 {
     string Filename;
@@ -246,6 +247,7 @@ struct model_program : shader_program
     int FogColor;
     int FogStart;
     int FogEnd;
+	int BendRadius;
 };
 
 struct blur_program : shader_program
@@ -256,6 +258,14 @@ struct blur_program : shader_program
 struct resolve_multisample_program : shader_program
 {
     int SampleCount;
+};
+
+struct perlin_noise_program : shader_program
+{
+	int RandomSampler;
+	int Time;
+	int Offset;
+	int Color;
 };
 
 enum color_texture_type
@@ -308,6 +318,7 @@ struct render_state
     shader_program BlendProgram;
     shader_program BlitProgram;
     resolve_multisample_program ResolveMultisampleProgram;
+	perlin_noise_program PerlinNoiseProgram;
 
     framebuffer MultisampledSceneFramebuffer;
     framebuffer SceneFramebuffer;
@@ -325,6 +336,8 @@ struct render_state
 
     uint32 Width;
     uint32 Height;
+	uint32 ViewportWidth;
+	uint32 ViewportHeight;
 
     GLint MaxMultiSampleCount;
     GLint LastVAO;
@@ -332,6 +345,8 @@ struct render_state
     color FogColor;
     color ExplosionLightColor;
     float ExplosionLightTimer = 0;
+	float DeltaTime = 0;
+	float BendRadius = 500;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;

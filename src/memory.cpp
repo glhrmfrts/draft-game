@@ -86,6 +86,11 @@ void FreeArena(memory_arena &Arena)
     }
 }
 
+memory_arena::~memory_arena()
+{
+	if (Free) FreeArena(*this);
+}
+
 memory_pool_entry *GetEntry(memory_pool &pool)
 {
     assert(pool.ElemSize > 0);
@@ -230,7 +235,7 @@ void InitFormat(string_format *format, const char *str, size_t size, allocator *
     format->Result = static_cast<char *>(PushSize(alloc, size, str));
 }
 
-void Sprintf(char *result, size_t size, const char *format, std::va_list args)
+void Sprintf(char *result, size_t size, const char *format, va_list args)
 {
 #ifdef _WIN32
 	vsprintf_s(result, size, format, args);
@@ -243,7 +248,7 @@ char *Format(string_format *format, ...)
 {
     assert(format->Result);
 
-    std::va_list args;
+    va_list args;
     va_start(args, format);
     Sprintf(format->Result, format->Size, format->Format, args);
     va_end(args);

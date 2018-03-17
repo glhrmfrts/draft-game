@@ -8,12 +8,14 @@
 #include <sndfile.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include "types.h"
 #include "thread_pool.h"
 #include "config.h"
 #include "common.h"
 #include "tween.h"
 #include "collision.h"
 #include "memory.h"
+#include "options.h"
 #include "render.h"
 #include "audio.h"
 #include "asset.h"
@@ -30,10 +32,22 @@
 #define PLATFORM_GET_FILE_LAST_WRITE_TIME(name) uint64 name(const char *Filename)
 #define PLATFORM_COMPARE_FILE_TIME(name)        int32 name(uint64 t1, uint64 t2)
 #define PLATFORM_GET_MILLISECONDS(name)         uint64 name()
+#define PLATFORM_CREATE_THREAD(f)               platform_thread *f(game_main *g, const char *name, void *arg)
 
 typedef PLATFORM_GET_FILE_LAST_WRITE_TIME(platform_get_file_last_write_time_func);
 typedef PLATFORM_COMPARE_FILE_TIME(platform_compare_file_time_func);
 typedef PLATFORM_GET_MILLISECONDS(platform_get_milliseconds_func);
+typedef PLATFORM_CREATE_THREAD(platform_create_thread_func);
+
+struct platform_thread
+{
+	typedef void(func)(void *);
+
+	std::thread Thread;
+	func *Func;
+	const char *Name;
+	void *Arg;
+};
 
 struct platform_api
 {
@@ -41,11 +55,14 @@ struct platform_api
     platform_get_file_last_write_time_func *GetFileLastWriteTime;
     platform_compare_file_time_func *CompareFileTime;
     platform_get_milliseconds_func *GetMilliseconds;
+	platform_create_thread_func *CreateThread;
 };
 
 static platform_api *Global_Platform;
 
 #define GAME_INIT(name) void name(game_main *game)
+#define GAME_RELOAD(name) void name(game_main *game)
+#define GAME_UNLOAD(name) void name(game_main *game)
 #define GAME_UPDATE(name) void name(game_main *game, float dt)
 #define GAME_RENDER(name) void name(game_main *game, float dt)
 #define GAME_DESTROY(name) void name(game_main *game)
@@ -78,11 +95,11 @@ inline static void EndProfileTimer(const char *name)
 	Global_ProfileTimers[Global_ProfileTimersCount - 1].End = Global_Platform->GetMilliseconds();
 }
 
-struct game_main;
-
 extern "C"
 {
 	typedef GAME_INIT(game_init_func);
+	typedef GAME_RELOAD(game_reload_func);
+	typedef GAME_UNLOAD(game_unload_func);
     typedef GAME_UPDATE(game_update_func);
 	typedef GAME_RENDER(game_render_func);
 	typedef GAME_DESTROY(game_destroy_func);
@@ -200,6 +217,7 @@ struct game_main
     game_input Input;
     game_input PrevInput;
     game_menu_context MenuContext;
+	options *Options;
 
     profile_time UpdateTime;
     profile_time RenderTime;
@@ -222,12 +240,13 @@ struct game_main
 
     random_series ExplosionEntropy;
 
+	void *GameLibrary;
     platform_api Platform;
 	SDL_Window *Window;
     int Width;
     int Height;
-    int RealWidth;
-    int RealHeight;
+    int ViewportWidth;
+    int ViewportHeight;
     bool Running = true;
 
     game_main() {}

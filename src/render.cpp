@@ -458,7 +458,11 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
 
     GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     printf("%x\n", Status);
-    assert(Status == GL_FRAMEBUFFER_COMPLETE);
+	if (Status != GL_FRAMEBUFFER_COMPLETE)
+	{
+		assert(!(Status == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT));
+		assert(Status == GL_FRAMEBUFFER_COMPLETE);
+	}
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -482,11 +486,11 @@ BindFramebuffer(framebuffer &Framebuffer)
 }
 
 static void
-UnbindFramebuffer(render_state &RenderState)
+UnbindFramebuffer(render_state &rs)
 {
     // @TODO: un-hardcode this
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, GAME_BASE_WIDTH, GAME_BASE_HEIGHT);
+    glViewport(0, 0, rs.ViewportWidth, rs.ViewportHeight);
 }
 
 void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
@@ -558,6 +562,7 @@ static void ModelProgramCallback(shader_asset_param *p)
         program->FogColor = glGetUniformLocation(program->ID, "u_FogColor");
         program->FogStart = glGetUniformLocation(program->ID, "u_FogStart");
         program->FogEnd = glGetUniformLocation(program->ID, "u_FogEnd");
+		program->BendRadius = glGetUniformLocation(program->ID, "u_BendRadius");
 
         Bind(*program);
         SetUniform(program->Sampler, 0);
@@ -624,6 +629,23 @@ static void ResolveMultisampleProgramCallback(shader_asset_param *Param)
     }
 }
 
+static void PerlinNoiseProgramCallback(shader_asset_param *param)
+{
+	auto program = (perlin_noise_program *)param->ShaderProgram;
+	if (IsLinkable(program))
+	{
+		LinkShaderProgram(*program);
+		program->RandomSampler = glGetUniformLocation(program->ID, "u_RandomSampler");
+		program->Time = glGetUniformLocation(program->ID, "u_Time");
+		program->Offset = glGetUniformLocation(program->ID, "u_Offset");
+		program->Color = glGetUniformLocation(program->ID, "u_Color");
+
+		Bind(*program);
+		SetUniform(program->RandomSampler, 0);
+		UnbindShaderProgram();
+	}
+}
+
 static void InitShaderProgram(shader_program &Program, const string &vsPath, const string &fsPath,
                               shader_asset_callback_func *Callback)
 {
@@ -641,7 +663,7 @@ static void InitShaderProgram(shader_program &Program, const string &vsPath, con
     };
 }
 
-static void InitRenderState(render_state &r, uint32 width, uint32 height)
+static void InitRenderState(render_state &r, uint32 width, uint32 height, uint32 viewportWidth, uint32 viewportHeight)
 {
     glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &r.MaxMultiSampleCount);
     if (r.MaxMultiSampleCount > 8)
@@ -650,6 +672,8 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
     }
     r.Width = width;
     r.Height = height;
+	r.ViewportWidth = viewportWidth;
+	r.ViewportHeight = viewportHeight;
     r.FogColor = Color_black;
 
     InitShaderProgram(
@@ -688,6 +712,12 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height)
         "data/shaders/multisample.frag.glsl",
         ResolveMultisampleProgramCallback
     );
+	InitShaderProgram(
+		r.PerlinNoiseProgram,
+		"data/shaders/blit.vert.glsl",
+		"data/shaders/perlin.frag.glsl",
+		PerlinNoiseProgramCallback
+	);
 
     InitMeshBuffer(r.SpriteBuffer);
     InitBuffer(r.ScreenBuffer, 4, 2,
@@ -837,24 +867,45 @@ void PostProcessEnd(render_state &r)
     // @TODO: cleanup textures
 }
 
-void RenderBegin(render_state &RenderState, float DeltaTime)
+void RenderBackground(render_state &rs, const background_state &bg)
 {
-    if (RenderState.ExplosionLightTimer > 0)
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	Bind(rs.PerlinNoiseProgram);
+	Bind(*bg.RandomTexture, 0);
+	SetUniform(rs.PerlinNoiseProgram.Time, bg.Time);
+	glBindVertexArray(rs.ScreenBuffer.VAO);
+
+	for (int i = 0; i < bg.Instances.size(); i++)
+	{
+		SetUniform(rs.PerlinNoiseProgram.Color, bg.Instances[i].Color);
+		SetUniform(rs.PerlinNoiseProgram.Offset, bg.Offset + bg.Instances[i].Offset);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+
+	glDisable(GL_BLEND);
+}
+
+void RenderBegin(render_state &rs, float deltaTime)
+{
+    if (rs.ExplosionLightTimer > 0)
     {
-        RenderState.ExplosionLightTimer -= DeltaTime;
+        rs.ExplosionLightTimer -= deltaTime;
     }
     else
     {
-        RenderState.ExplosionLightTimer = 0;
+        rs.ExplosionLightTimer = 0;
     }
 
-    RenderState.LastVAO = -1;
-    RenderState.RenderableCount = 0;
-    RenderState.FrameSolidRenderables.clear();
-    RenderState.FrameTransparentRenderables.clear();
+	rs.DeltaTime = deltaTime;
+    rs.LastVAO = -1;
+    rs.RenderableCount = 0;
+    rs.FrameSolidRenderables.clear();
+    rs.FrameTransparentRenderables.clear();
 
 #ifdef DRAFT_DEBUG
-    ResetBuffer(RenderState.DebugBuffer);
+    ResetBuffer(rs.DebugBuffer);
 #endif
 }
 
@@ -929,38 +980,40 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
 
 static material DebugMaterial{Color_white, 0.0f, 0.0f, NULL, MaterialFlag_PolygonLines};
 
-void RenderEnd(render_state &RenderState, camera &Camera)
+void RenderEnd(render_state &rs, camera &Camera)
 {
     assert(Camera.Updated);
 
 #ifdef DRAFT_DEBUG
     // push debug renderable
     {
-        size_t i = NextRenderable(RenderState);
-        auto &r = RenderState.Renderables[i];
-        r.VAO = RenderState.DebugBuffer.VAO;
+        size_t i = NextRenderable(rs);
+        auto &r = rs.Renderables[i];
+        r.VAO = rs.DebugBuffer.VAO;
         r.VertexOffset = 0;
-        r.VertexCount = RenderState.DebugBuffer.VertexCount;
+        r.VertexCount = rs.DebugBuffer.VertexCount;
         r.Material = &DebugMaterial;
         r.PrimitiveType = GL_LINES;
         r.Transform = transform{};
-        RenderState.FrameSolidRenderables.push_back(i);
-        UploadVertices(RenderState.DebugBuffer, GL_DYNAMIC_DRAW);
+        rs.FrameSolidRenderables.push_back(i);
+        UploadVertices(rs.DebugBuffer, GL_DYNAMIC_DRAW);
     }
 #endif
 
-    Bind(RenderState.ModelProgram);
+    Bind(rs.ModelProgram);
+	SetUniform(rs.ModelProgram.BendRadius, rs.BendRadius);
+
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    for (auto RenderableIndex : RenderState.FrameSolidRenderables)
+    for (auto RenderableIndex : rs.FrameSolidRenderables)
     {
-        RenderRenderable(RenderState, Camera, RenderState.Renderables[RenderableIndex]);
+        RenderRenderable(rs, Camera, rs.Renderables[RenderableIndex]);
     }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    for (auto RenderableIndex : RenderState.FrameTransparentRenderables)
+    for (auto RenderableIndex : rs.FrameTransparentRenderables)
     {
-        RenderRenderable(RenderState, Camera, RenderState.Renderables[RenderableIndex]);
+        RenderRenderable(rs, Camera, rs.Renderables[RenderableIndex]);
     }
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);

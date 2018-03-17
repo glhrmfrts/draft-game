@@ -1,6 +1,6 @@
 // Copyright
 
-static void ThreadPoolLoop(void *Arg)
+extern "C" export_func void ThreadPoolLoop(void *Arg)
 {
     auto *Data = (thread_data *)Arg;
     auto *Pool = Data->Pool;
@@ -24,12 +24,13 @@ static void ThreadPoolLoop(void *Arg)
     }
 }
 
-void CreateThreadPool(thread_pool &pool, int MaxThreads, int JobsPerThread = 1)
+void CreateThreadPool(thread_pool &pool, game_main *game, int MaxThreads, int JobsPerThread = 1)
 {
     pool.NumJobs = 0;
     pool.JobsPerThread = JobsPerThread;
 	pool.MaxThreads = MaxThreads;
 	pool.NumThreads = 0;
+	pool.Game = game;
 	pool.Threads.resize(MaxThreads);
 }
 
@@ -66,11 +67,11 @@ void AddJob(thread_pool &pool, job_func *func, void *arg)
 		data->Jobs.push(job{ func, arg });
 		data->ID = pool.Threads.size() - 1;
 		data->Pool = &pool;
-		data->Thread = std::thread(ThreadPoolLoop, data);
+		data->Thread = pool.Game->Platform.CreateThread(pool.Game, "ThreadPoolLoop", (void *)data);
 	}
 }
 
-void DestroyThreadPool(thread_pool &Pool)
+void StopThreadPool(thread_pool &Pool)
 {
     assert(Pool.NumJobs == 0);
     for (auto &Data : Pool.Threads)
@@ -79,9 +80,12 @@ void DestroyThreadPool(thread_pool &Pool)
         Data.Stop = true;
         Data.ConditionVar.notify_one();
     }
+}
 
-    for (auto &Data : Pool.Threads)
-    {
-        Data.Thread.join();
-    }
+void RestartThreadPool(thread_pool &Pool)
+{
+	for (auto &Data : Pool.Threads)
+	{
+		Data.Stop = false;
+	}
 }

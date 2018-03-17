@@ -42,6 +42,7 @@ enum music_master_message_type
 	MusicMasterMessageType_StopTrack,
 	MusicMasterMessageType_OnNextBeat,
 	MusicMasterMessageType_SetPitch,
+	MusicMasterMessageType_SetGain,
 };
 
 struct music_master_message
@@ -66,6 +67,10 @@ struct music_master_message
 		struct {
 			float Pitch;
 		} SetPitch;
+
+		struct {
+			float Gain;
+		} SetGain;
 	};
 
 	music_master_message() {}
@@ -76,7 +81,7 @@ struct audio_source;
 struct music_master
 {
 	memory_arena Arena;
-	std::thread Thread;
+	platform_thread *Thread;
 	std::mutex Mutex;
 	std::condition_variable ConditionVar;
 	std::queue<music_master_message> Queue;

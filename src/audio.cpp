@@ -229,8 +229,9 @@ static void SetBpm(music_master &m, int bpm)
 	m.BeatTime = 60.0f / float(bpm);
 }
 
-void MusicMasterLoop(music_master *m)
+extern "C" export_func void MusicMasterLoop(void *arg)
 {
+	auto m = (music_master *)arg;
 	for (;;)
 	{
 		music_master_message msg;
@@ -323,13 +324,23 @@ void MusicMasterLoop(music_master *m)
 			}
 			break;
 		}
+
+		case MusicMasterMessageType_SetGain:
+		{
+			float gain = msg.SetGain.Gain;
+			for (auto source : m->Sources)
+			{
+				AudioSourceSetGain(source, gain);
+			}
+			break;
+		}
 		}
 	}
-}
+} 
 
-void MusicMasterInit(music_master &m)
+void MusicMasterInit(game_main *g, music_master &m)
 {
-	m.Thread = std::thread(MusicMasterLoop, &m);
+	m.Thread = g->Platform.CreateThread(g, "MusicMasterLoop", (void *)&m);
 	m.NextBeatCallbackPool.Arena = &m.Arena;
 }
 
@@ -422,4 +433,18 @@ void MusicMasterSetPitch(music_master &m, float pitch)
 	msg.Type = MusicMasterMessageType_SetPitch;
 	msg.SetPitch.Pitch = pitch;
 	MusicMasterQueueMessage(m, msg);
+}
+
+void MusicMasterSetGain(music_master &m, float gain)
+{
+	music_master_message msg;
+	msg.Type = MusicMasterMessageType_SetGain;
+	msg.SetGain.Gain = gain;
+	MusicMasterQueueMessage(m, msg);
+}
+
+void MusicMasterExit(music_master &m)
+{
+	m.StopLoop = true;
+	m.ConditionVar.notify_one();
 }

@@ -342,7 +342,84 @@ void PushPosition(trail *t, vec3 pos)
     t->Entities[t->PositionStackIndex++].Transform.Position = pos;
 }
 
-void InitEntityWorld(entity_world &world)
+void SetRoadPieceBounds(road_piece *piece, float backLeft, float backRight, float frontLeft, float frontRight)
+{
+	piece->BackLeft = backLeft;
+	piece->BackRight = backRight;
+	piece->FrontLeft = frontLeft;
+	piece->FrontRight = frontRight;
+}
+
+void RoadChange(entity_world &w, road_change change)
+{
+	w.RoadState.ShouldChange = true;
+	w.RoadState.Change = change;
+}
+
+void RoadRepeatCallback(entity_world *w, entity *ent)
+{
+	if (w->RoadState.ShouldChange)
+	{
+		w->RoadState.ShouldChange = false;
+		switch (w->RoadState.Change)
+		{
+		case RoadChange_NarrowRight:
+			ent->Model->Mesh = GetNarrowRightRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, -2.5f, 2.5f, 0.5f, 2.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, 0.5f, 2.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, 0.5f, 2.5f, 0.5f, 2.5f);
+			break;
+
+		case RoadChange_NarrowLeft:
+			ent->Model->Mesh = GetNarrowLeftRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, -2.5f, 2.5f, -2.5f, -0.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, -0.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, -0.5f, -2.5f, -0.5f);
+			break;
+
+		case RoadChange_NarrowCenter:
+			ent->Model->Mesh = GetNarrowCenterRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, -2.5f, 2.5f, -0.5f, 0.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -0.5f, 0.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, -0.5f, 0.5f, -0.5f, 0.5f);
+			break;
+
+		case RoadChange_WidensLeft:
+			ent->Model->Mesh = GetWidensLeftRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, 0.5f, 2.5f, -2.5f, 2.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+			break;
+
+		case RoadChange_WidensRight:
+			ent->Model->Mesh = GetWidensRightRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, -2.5f, -0.5f, -2.5f, 2.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+			break;
+
+		case RoadChange_WidensCenter:
+			ent->Model->Mesh = GetWidensCenterRoadMesh(w->RoadMeshManager);
+			SetRoadPieceBounds(ent->RoadPiece, -0.5f, 0.5f, -2.5f, 2.5f);
+
+			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
+			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+			break;
+		}
+	}
+	else
+	{
+		ent->Model->Mesh = w->RoadState.RoadMesh;
+		*ent->RoadPiece = w->RoadState.NextPiece;
+	}
+}
+
+void InitEntityWorld(game_main *g, entity_world &world)
 {
     world.ShipPool.ElemSize = SHIP_ENTITY_SIZE;
     world.CrystalPool.ElemSize = CRYSTAL_ENTITY_SIZE;
@@ -366,7 +443,7 @@ void InitEntityWorld(entity_world &world)
     world.AsteroidPool.Name = "AsteroidPool";
     world.CheckpointPool.Name = "CheckpointPool";
 
-	CreateThreadPool(world.UpdateThreadPool, std::thread::hardware_concurrency(), 8);
+	CreateThreadPool(world.UpdateThreadPool, g, std::thread::hardware_concurrency(), 8);
 }
 
 // Finds the first free slot on the list and insert the entity
@@ -386,6 +463,10 @@ void AddEntityToList(std::vector<entity *> &list, entity *ent)
 
 void AddEntity(entity_world &world, entity *ent)
 {
+	if (ent->RoadPiece)
+	{
+		AddEntityToList(world.RoadPieceEntities, ent);
+	}
 	if (ent->AudioSource)
 	{
 		AddEntityToList(world.AudioEntities, ent);
@@ -485,6 +566,10 @@ void RemoveEntityFromList(std::vector<entity *> &list, entity *ent)
 
 void RemoveEntity(entity_world &world, entity *ent)
 {
+	if (ent->RoadPiece)
+	{
+		RemoveEntityFromList(world.RoadPieceEntities, ent);
+	}
 	if (ent->AudioSource)
 	{
 		RemoveEntityFromList(world.AudioEntities, ent);
@@ -577,6 +662,8 @@ void RemoveEntity(entity_world &world, entity *ent)
 
 void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 {
+	w.RoadMeshManager.Arena.Free = false;
+	
     FreeArena(w.Arena);
     w.AsteroidEntities.clear();
     w.CrystalEntities.clear();
@@ -592,6 +679,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 	w.PassiveCollisionEntities.clear();
     w.ShipEntities.clear();
     w.TrailGroupEntities.clear();
+	w.RoadPieceEntities.clear();
     
     ResetPool(w.AsteroidPool);
     ResetPool(w.CheckpointPool);
@@ -614,26 +702,30 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
 
+	InitFormat(&w.RoadMeshManager.KeyFormat, "%s%f%f", 32, &w.RoadMeshManager.Arena);
+	w.RoadState.RoadMesh = GetStraightRoadMesh(w.RoadMeshManager, -2.5f, 2.5f);
+
     for (int i = 0; i < ROAD_SEGMENT_COUNT; i++)
     {
         auto ent = PushStruct<entity>(w.Arena);
         ent->Pos().y = i*ROAD_SEGMENT_SIZE;
         ent->Pos().z = 0.0f;
-        ent->Transform.Scale = vec3{ 2, 2, 1 };
-        ent->Model = CreateModel(&w.Arena, GetRoadMesh(w));
+        ent->Transform.Scale = vec3{ 2, 1, 1 };
+		ent->Model = CreateModel(&w.Arena, w.RoadState.RoadMesh);
         ent->Repeat = PushStruct<entity_repeat>(&w.Arena);
         ent->Repeat->Count = ROAD_SEGMENT_COUNT;
         ent->Repeat->Size = ROAD_SEGMENT_SIZE;
         ent->Repeat->DistanceFromCamera = ROAD_SEGMENT_SIZE;
+		ent->Repeat->Callback = RoadRepeatCallback;
+		ent->RoadPiece = PushStruct<road_piece>(w.Arena);
+		SetRoadPieceBounds(ent->RoadPiece, -2.5f, 2.5f, -2.5f, 2.5f);
         AddEntity(w, ent);
     }
+	SetRoadPieceBounds(&w.RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
 
-    auto tex = FindTexture(*loader, "background");
-    for (int i = 0; i < 2; i++)
-    {
-        w.BackgroundState.Instances.push_back(background_instance{i*float(tex->Height)});
-    }
-    w.BackgroundState.Texture = tex;
+    w.BackgroundState.RandomTexture = FindTexture(*loader, "random");
+	w.BackgroundState.Instances.push_back(background_instance{ color(0, 1, 1, 1), vec2(0.0f) });
+	w.BackgroundState.Instances.push_back(background_instance{ color(1, 0, 1, 1), vec2(1060, 476) });
 }
 
 entity_update_args *GetUpdateArg(entity_world &world, entity *ent, float dt)
@@ -649,9 +741,9 @@ entity_update_args *GetUpdateArg(entity_world &world, entity *ent, float dt)
 
 #define WORLD_ARC_RADIUS   500.0f
 #define WORLD_ARC_Y_FACTOR 0.005f
-vec3 WorldToRenderTransform(const vec3 &worldPos)
+vec3 WorldToRenderTransform(const vec3 &worldPos, const float radius)
 {
-    float r = (WORLD_ARC_RADIUS - worldPos.z);
+    float r = (radius - worldPos.z);
     float d = worldPos.y*WORLD_ARC_Y_FACTOR;
     vec3 result = worldPos;
     result.y = std::cos(d) * r;
@@ -696,6 +788,7 @@ static void UpdateTrailGroupEntityJob(void *arg)
 	}
 
 	BeginProfileTimer("Trail push position");
+
 	tg->Timer -= dt;
 	if (tg->Timer <= 0)
 	{
@@ -814,6 +907,14 @@ void UpdateExplosionEntityJob(void *arg)
 	ENTITY_JOB_FREE_ARGS(args);
 }
 
+static bool IsInsideRoadPiece(entity *roadEntity, entity *playerEntity)
+{
+	return (
+		roadEntity->Pos().y < playerEntity->Pos().y &&
+		true//roadEntity->Pos().y + ROAD_SEGMENT_SIZE > playerEntity->Pos().y
+	);
+}
+
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
@@ -828,15 +929,8 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
     }
         
     float velY = world.PlayerEntity->Vel().y;
-    auto tex = world.BackgroundState.Texture;
-    for (auto &bg : world.BackgroundState.Instances)
-    {
-        if (bg.y+float(tex->Height) < 0)
-        {
-            bg.y += tex->Height*2;
-        }
-        bg.y -= velY * dt;
-    }
+	world.BackgroundState.Offset += vec2(0.0f, velY) * dt;
+	world.BackgroundState.Time += dt;
 
 	for (auto ent : world.AudioEntities)
 	{
@@ -863,6 +957,10 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         if (world.Camera->Position.y - ent->Transform.Position.y > repeat->DistanceFromCamera)
         {
             ent->Transform.Position.y += repeat->Size * repeat->Count;
+			if (ent->Repeat->Callback)
+			{
+				ent->Repeat->Callback(&world, ent);
+			}
         }
     }
     for (auto ent : world.RotatingEntities)
@@ -885,6 +983,20 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 		//AddJob(world.UpdateThreadPool, UpdateExplosionEntityJob, (void *)GetUpdateArg(world, ent, dt));
 		UpdateExplosionEntityJob((void *)GetUpdateArg(world, ent, dt));
 	}
+
+	auto roadEntity = world.RoadPieceEntities[world.RoadState.PlayerActiveEntityIndex];
+	while (!IsInsideRoadPiece(roadEntity, world.PlayerEntity))
+	{
+		if (world.RoadState.PlayerActiveEntityIndex >= world.RoadPieceEntities.size() - 1)
+		{
+			world.RoadState.PlayerActiveEntityIndex = -1;
+		}
+		roadEntity = world.RoadPieceEntities[++world.RoadState.PlayerActiveEntityIndex];
+	}
+
+	float d = (world.PlayerEntity->Pos().y - roadEntity->Pos().y) / ROAD_SEGMENT_SIZE;
+	world.RoadState.Left = Lerp(roadEntity->RoadPiece->BackLeft, d, roadEntity->RoadPiece->FrontLeft);
+	world.RoadState.Right = Lerp(roadEntity->RoadPiece->BackRight, d, roadEntity->RoadPiece->FrontRight);
 }
 
 void WaitUpdate(entity_world &world)
@@ -913,6 +1025,7 @@ void RenderBackground(game_main *g, entity_world &w)
 
 void RenderEntityWorld(render_state &rs, entity_world &world, float dt)
 {
+	RenderBackground(rs, world.BackgroundState);
     for (auto ent : world.TrailGroupEntities)
     {
         if (!ent) continue;

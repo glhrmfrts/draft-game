@@ -20,32 +20,36 @@ struct bitmap_font
     texture_rect TexRect[MaxCharSupport];
 };
 
-enum asset_type
+enum asset_entry_type
 {
-    AssetType_Texture,
-    AssetType_Font,
-    AssetType_Shader,
-    AssetType_Sound,
-	AssetType_Stream,
-	AssetType_Song,
+    AssetEntryType_Texture,
+	AssetEntryType_Font,
+	AssetEntryType_Shader,
+	AssetEntryType_Sound,
+	AssetEntryType_Stream,
+	AssetEntryType_Song,
+	AssetEntryType_OptionsLoad,
+	AssetEntryType_OptionsSave,
 };
 enum asset_completion
 {
     AssetCompletion_Incomplete,
     AssetCompletion_ThreadSafe,
     AssetCompletion_ThreadUnsafe,
+	AssetCompletion_Done,
 };
 
 struct asset_loader;
 struct asset_entry
 {
     uint64 LastLoadTime;
-    asset_type Type;
+    asset_entry_type Type;
     asset_completion Completion;
     string Filename;
     string ID;
     asset_loader *Loader;
     void *Param;
+	bool OneShot;
 
     union
     {
@@ -83,6 +87,11 @@ struct asset_entry
 		{
 			song *Result;
 		} Song;
+
+		struct
+		{
+			options *Result;
+		} Options;
     };
 };
 
@@ -96,6 +105,7 @@ struct asset_loader
     platform_api *Platform;
     thread_pool Pool;
     std::atomic_int NumLoadedEntries;
+	bool Active;
 };
 
 #endif
