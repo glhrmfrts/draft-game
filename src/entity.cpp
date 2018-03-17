@@ -257,7 +257,7 @@ static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
     return result;
 }
 
-#define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(checkpoint)+TRAIL_GROUP_SIZE(1)+(sizeof(material)*2))
+#define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(audio_source)+sizeof(checkpoint)+TRAIL_GROUP_SIZE(1)+(sizeof(material)*2))
 static entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, mesh *checkpointMesh)
 {
     auto result = CreateEntity(alloc);
@@ -270,6 +270,17 @@ static entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, me
     result->SetScl(vec3{ROAD_LANE_COUNT, 1.0f, ROAD_LANE_COUNT*2});
 	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "checkpoint"));
     return result;
+}
+
+#define FINISH_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(finish))
+static entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *finishMesh)
+{
+	auto result = CreateEntity(alloc);
+	result->Type = EntityType_Finish;
+	result->Model = CreateModel(alloc, finishMesh);
+	result->Finish = PushStruct<finish>(alloc);
+	result->SetScl(vec3{ ROAD_LANE_COUNT*4, ROAD_LANE_COUNT*4, ROAD_LANE_COUNT*4 });
+	return result;
 }
 
 static float Interp(float c, float t, float a, float dt)
@@ -358,6 +369,14 @@ void RoadChange(entity_world &w, road_change change)
 
 void RoadRepeatCallback(entity_world *w, entity *ent)
 {
+	if (w->ShouldSpawnFinish)
+	{
+		w->ShouldSpawnFinish = false;
+		w->DisableRoadRepeat = true;
+		w->OnSpawnFinish();
+		return;
+	}
+
 	if (w->RoadState.ShouldChange)
 	{
 		w->RoadState.ShouldChange = false;
@@ -427,6 +446,7 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.ExplosionPool.ElemSize = EXPLOSION_ENTITY_SIZE;
     world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
     world.CheckpointPool.ElemSize = CHECKPOINT_ENTITY_SIZE;
+	world.FinishPool.ElemSize = FINISH_ENTITY_SIZE;
     
     world.ShipPool.Arena = &world.Arena;
     world.CrystalPool.Arena = &world.Arena;
@@ -434,6 +454,7 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.ExplosionPool.Arena = &world.Arena;
     world.AsteroidPool.Arena = &world.Arena;
     world.CheckpointPool.Arena = &world.Arena;
+	world.FinishPool.Arena = &world.Arena;
 	world.UpdateArgsPool.Arena = &world.Arena;
 
     world.ShipPool.Name = "ShipPool";
@@ -545,6 +566,10 @@ void AddEntity(entity_world &world, entity *ent)
     {
         AddEntityToList(world.CheckpointEntities, ent);
     }
+	if (ent->Finish)
+	{
+		AddEntityToList(world.FinishEntities, ent);
+	}
     if (ent->Flags & EntityFlag_UpdateMovement)
     {
         AddEntityToList(world.MovementEntities, ent);
@@ -653,6 +678,11 @@ void RemoveEntity(entity_world &world, entity *ent)
         RemoveEntityFromList(world.CheckpointEntities, ent);
         FreeEntry(world.CheckpointPool, ent->PoolEntry);
     }
+	if (ent->Finish)
+	{
+		RemoveEntityFromList(world.FinishEntities, ent);
+		FreeEntry(world.FinishPool, ent->PoolEntry);
+	}
     if (ent->Flags & EntityFlag_UpdateMovement)
     {
         RemoveEntityFromList(world.MovementEntities, ent);
@@ -741,13 +771,41 @@ entity_update_args *GetUpdateArg(entity_world &world, entity *ent, float dt)
 
 #define WORLD_ARC_RADIUS   500.0f
 #define WORLD_ARC_Y_FACTOR 0.005f
+vec3 WorldToRenderTransformInner(const vec3 &worldPos, const float radius)
+{
+	float r = (radius - worldPos.z);
+	float d = worldPos.y*WORLD_ARC_Y_FACTOR;
+	vec3 result = worldPos;
+	result.y = std::cos(d) * r;
+	result.z = std::sin(d) * r;
+	return result;
+}
+
 vec3 WorldToRenderTransform(const vec3 &worldPos, const float radius)
 {
-    float r = (radius - worldPos.z);
-    float d = worldPos.y*WORLD_ARC_Y_FACTOR;
-    vec3 result = worldPos;
-    result.y = std::cos(d) * r;
-    result.z = std::sin(d) * r;
+	static vec3 tangentWorldPoint = vec3{ 0, 100, 0 };
+	vec3 result = WorldToRenderTransformInner(worldPos, radius);
+	vec3 rtdir = glm::normalize(vec3{ 0, -result.z, result.y });
+	Println(ToString(rtdir));
+	
+	if (worldPos.y >= tangentWorldPoint.y)
+	{
+		vec3 tangentPoint = WorldToRenderTransformInner(tangentWorldPoint, radius);
+		vec3 tangentDir = glm::normalize(vec3{ 0, -tangentPoint.z, tangentPoint.y });
+		result = tangentPoint + (tangentDir * (worldPos.y - tangentWorldPoint.y));
+		result.x = worldPos.x;
+
+		float angle = 0 * M_PI / 180.0f;
+		result.y = ((result.y - worldPos.y) * std::cos(angle)) - ((result.z - worldPos.z) * std::sin(angle)) + worldPos.y;
+		result.z = ((result.z - worldPos.z) * std::cos(angle)) - ((result.y - worldPos.y) * std::sin(angle)) + worldPos.z;
+		//result.y += (worldPos.z * tangentUp.y);
+		//result.z += (worldPos.z * tangentUp.z);
+
+		//Println(ToString(tangentDir));
+	}
+
+	//Println(result.y);
+	
     return result;
 }
 
@@ -953,15 +1011,21 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
     }
     for (auto ent : world.RepeatingEntities)
     {
+		if (!ent) continue;
+
         auto repeat = ent->Repeat;
-        if (world.Camera->Position.y - ent->Transform.Position.y > repeat->DistanceFromCamera)
-        {
-            ent->Transform.Position.y += repeat->Size * repeat->Count;
-			if (ent->Repeat->Callback)
+		if (world.Camera->Position.y - ent->Transform.Position.y > repeat->DistanceFromCamera)
+		{
+			if (!(ent->RoadPiece && world.DisableRoadRepeat))
 			{
-				ent->Repeat->Callback(&world, ent);
+				ent->Transform.Position.y += repeat->Size * repeat->Count;
 			}
-        }
+			if (repeat->Callback)
+			{
+				repeat->Callback(&world, ent);
+			}
+		}
+		
     }
     for (auto ent : world.RotatingEntities)
     {

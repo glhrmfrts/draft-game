@@ -13,6 +13,20 @@ Current TODOs:
 - OK (Game) Make the ambient light affected by an explosion
 
 
+Compass and straightedge constructions
+It is relatively straightforward to construct a line t tangent to a circle at a point T on the circumference of the circle:
+
+A line a is drawn from O, the center of the circle, through the radial point T;
+The line t is the perpendicular line to a.
+
+
+
+Construction of a tangent to a given circle (black) from a given exterior point (P).
+Thales' theorem may be used to construct the tangent lines to a point P external to the circle C:
+
+A circle is drawn centered on the midpoint of the line segment OP, where O is again the center of the circle C.
+The intersection points T1 and T2 are the tangent points for lines passing through P, by the following argument.
+The line segments OT1 and OT2 are radii of the circle C; since both are inscribed in a semicircle, they are perpendicular to the line segments PT1 and PT2, respectively. But only a tangent line is perpendicular to the radial line. Hence, the two lines from P and passing through T1 and T2 are tangent to the circle C.
 
 Audio:
 

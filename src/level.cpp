@@ -1,12 +1,23 @@
 // Copyright
 
+using hash_string = std::hash<std::string>;
+
 static std::unordered_map<size_t, color> LevelColors = {
-	{std::hash<std::string>()("CRYSTAL_COLOR"), CRYSTAL_COLOR}
+	{ hash_string()("CRYSTAL_COLOR"), CRYSTAL_COLOR },
+	{ hash_string()("SHIP_BLUE_COLOR"), IntColor(ShipPalette.Colors[SHIP_BLUE]) },
+	{ hash_string()("SHIP_ORANGE_COLOR"), IntColor(ShipPalette.Colors[SHIP_ORANGE]) },
 };
 
 static std::unordered_map<size_t, gen_type> LevelGenTypes = {
-	{std::hash<std::string>()("CRYSTALS"), GenType_Crystal},
-	{std::hash<std::string>()("SHIPS"), GenType_Ship},
+	{ hash_string()("CRYSTALS"), GenType_Crystal },
+	{ hash_string()("SHIPS"), GenType_Ship },
+	{ hash_string()("RED_SHIPS"), GenType_RedShip },
+};
+
+static std::unordered_map<size_t, int> LevelShipColors = {
+	{ hash_string()("SHIP_BLUE"), SHIP_BLUE },
+	{ hash_string()("SHIP_ORANGE"), SHIP_ORANGE },
+	{ hash_string()("ALL"), -1 },
 };
 
 void ParseLevel(std::istream &stream, allocator *alloc, level *result)
@@ -23,7 +34,8 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 	std::string line;
 	while (std::getline(stream, line))
 	{
-		if (trim_copy(line) == "}")
+		trim(line);
+		if (line == "}")
 		{
 			if (parseState == Parse_Frame)
 			{
@@ -35,12 +47,21 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 				currentCheckpoint = NULL;
 				parseState = Parse_Level;
 			}
-			return;
+			continue;
 		}
 
 		int i = line.find(":");
-		std::string cmd = trim_copy(line.substr(0, i));
-		std::string argstr = line.substr(i+1);
+		std::string cmd;
+		std::string argstr;
+		if (i == std::string::npos)
+		{
+			cmd = line;
+		}
+		else
+		{
+			cmd = trim_copy(line.substr(0, i));
+			argstr = line.substr(i + 1);
+		}
 
 		std::vector<std::string> args;
 		if (argstr.size() > 0)
@@ -103,7 +124,7 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 			if (cmd == "add_intro_text")
 			{
 				c->Type = LevelCommand_AddIntroText;
-				c->AddIntroText.ColorHash = std::hash<std::string>()(args[1]);
+				c->AddIntroText.ColorHash = hash_string()(args[1]);
 
 				size_t size = args[0].size();
 				char *buffer = (char *)PushSize(alloc, size + 1, "add_intro_text");
@@ -114,7 +135,25 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 			else if (cmd == "enable")
 			{
 				c->Type = LevelCommand_Enable;
-				c->Enable.Hash = std::hash<std::string>()(args[0]);
+				c->Hash = hash_string()(args[0]);
+			}
+			else if (cmd == "disable")
+			{
+				c->Type = LevelCommand_Disable;
+				c->Hash = hash_string()(args[0]);
+			}
+			else if (cmd == "ship_color")
+			{
+				c->Type = LevelCommand_ShipColor;
+				c->Hash = hash_string()(args[0]);
+			}
+			else if (cmd == "spawn_checkpoint")
+			{
+				c->Type = LevelCommand_SpawnCheckpoint;
+			}
+			else if (cmd == "spawn_finish")
+			{
+				c->Type = LevelCommand_SpawnFinish;
 			}
 			break;
 		}
@@ -125,6 +164,9 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 void LevelUpdate(level *l, game_main *g, level_state *state, float dt)
 {
 	auto cp = &l->Checkpoints[state->CheckpointNum];
+	state->PlayerMinVel = cp->PlayerMinVel;
+	state->PlayerMaxVel = cp->PlayerMaxVel;
+
 	if (cp->CurrentFrameIndex >= cp->Frames.size())
 	{
 		return;
@@ -136,12 +178,28 @@ void LevelUpdate(level *l, game_main *g, level_state *state, float dt)
 		{
 			switch (cmd.Type)
 			{
+			case LevelCommand_Enable:
+				Enable(&g->World.GenState->GenParams[LevelGenTypes[cmd.Hash]]);
+				break;
+
+			case LevelCommand_Disable:
+				Disable(&g->World.GenState->GenParams[LevelGenTypes[cmd.Hash]]);
+				break;
+
 			case LevelCommand_AddIntroText:
 				AddIntroText(g, state, cmd.AddIntroText.Text, LevelColors[cmd.AddIntroText.ColorHash]);
 				break;
 
-			case LevelCommand_Enable:
-				Enable(&g->World.GenState->GenParams[LevelGenTypes[cmd.Enable.Hash]]);
+			case LevelCommand_ShipColor:
+				state->ForceShipColor = LevelShipColors[cmd.Hash];
+				break;
+
+			case LevelCommand_SpawnCheckpoint:
+				SpawnCheckpoint(g, state);
+				break;
+
+			case LevelCommand_SpawnFinish:
+				SpawnFinish(g, state);
 				break;
 			}
 		}

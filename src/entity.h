@@ -68,6 +68,11 @@ struct checkpoint
     checkpoint_state State = CheckpointState_Initial;
 };
 
+struct finish
+{
+	bool Finished = false;
+};
+
 struct explosion;
 struct trail;
 struct trail_group;
@@ -117,6 +122,7 @@ enum entity_type
 	EntityType_Powerup,
 	EntityType_Asteroid,
 	EntityType_Checkpoint,
+	EntityType_Finish,
 	EntityType_MAX,
 };
 
@@ -130,6 +136,7 @@ struct entity
 
     // entity components
     checkpoint *Checkpoint = NULL;
+	finish *Finish = NULL;
     asteroid *Asteroid = NULL;
     powerup *Powerup = NULL;
     explosion *Explosion = NULL;
@@ -260,6 +267,7 @@ struct entity_world
     memory_pool PowerupPool;
     memory_pool AsteroidPool;
     memory_pool CheckpointPool;
+	memory_pool FinishPool;
 	generic_pool<entity_update_args> UpdateArgsPool;
 
     mesh *FloorMesh = NULL;
@@ -268,6 +276,7 @@ struct entity_world
     mesh *AsteroidMesh = NULL;
     mesh *CheckpointMesh = NULL;
     mesh *BackgroundMesh = NULL;
+	mesh *FinishMesh = NULL;
 
 	road_state RoadState;
 	road_mesh_manager RoadMeshManager;
@@ -292,12 +301,17 @@ struct entity_world
     std::vector<entity *> RotatingEntities;
     std::vector<entity *> MovementEntities;
 	std::vector<entity *> RoadPieceEntities;
+	std::vector<entity *> FinishEntities;
     asset_loader *AssetLoader = NULL;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
     entity *PlayerEntity;
     entity *RoadEntity;
     int NumEntities = 0;
+
+	std::function<void()> OnSpawnFinish;
+	bool ShouldSpawnFinish = false;
+	bool DisableRoadRepeat = false;
 };
 
 #endif

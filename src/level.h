@@ -7,8 +7,12 @@
 
 enum level_command_type
 {
-	LevelCommand_AddIntroText,
 	LevelCommand_Enable,
+	LevelCommand_Disable,
+	LevelCommand_AddIntroText,
+	LevelCommand_ShipColor,
+	LevelCommand_SpawnCheckpoint,
+	LevelCommand_SpawnFinish,
 };
 
 struct level_command
@@ -23,10 +27,7 @@ struct level_command
 			const char *Text;
 		} AddIntroText;
 
-		struct
-		{
-			size_t Hash;
-		} Enable;
+		size_t Hash;
 	};
 };
 

@@ -177,7 +177,7 @@ struct mesh_part_scope
     }
 };
 
-#define ROAD_SEGMENT_COUNT 10
+#define ROAD_SEGMENT_COUNT 12
 #define ROAD_SEGMENT_SIZE  24
 #define ROAD_LANE_WIDTH    2
 #define ROAD_LANE_COUNT    5
@@ -528,6 +528,37 @@ mesh *GetCheckpointMesh(entity_world &w)
     AddPart(cpMesh, mesh_part{material{CHECKPOINT_OUTLINE_COLOR, 1.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_LINE_LOOP});
     EndMesh(cpMesh, GL_STATIC_DRAW);
     return w.CheckpointMesh = cpMesh;
+}
+
+mesh *GetFinishMesh(entity_world &w)
+{
+	if (w.FinishMesh)
+	{
+		return w.FinishMesh;
+	}
+
+	auto finishMesh = PushStruct<mesh>(w.PersistentArena);
+	InitMeshBuffer(finishMesh->Buffer);
+	PushVertex(finishMesh->Buffer, mesh_vertex{ vec3{0.0f, 0.0f, 0.0f}, vec2{0.5f, 0.5f}, Color_white, vec3{1,1,1} });
+
+	const float radius = 1.0f;
+	const int segments = 48;
+	const float theta = M_PI * 2 / float(segments);
+	float angle = 0;
+	for (int i = 0; i < segments + 1; i++)
+	{
+		float x = cos(angle) * radius;
+		float z = sin(angle) * radius;
+
+		PushVertex(finishMesh->Buffer, mesh_vertex{ vec3{x, 0, z}, vec2{x + 0.5f, z + 0.5f}, Color_white, vec3{1,1,1} });
+
+		angle += theta;
+	}
+
+	AddPart(finishMesh, mesh_part{ material{Color_white, 1.0f, 0, NULL}, 0, finishMesh->Buffer.VertexCount, GL_TRIANGLE_FAN });
+	EndMesh(finishMesh, GL_STATIC_DRAW);
+
+	return w.FinishMesh = finishMesh;
 }
 
 mesh *GetBackgroundMesh(entity_world &w)

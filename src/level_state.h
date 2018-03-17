@@ -88,5 +88,7 @@ struct level_state
 
 void InitLevel(game_main *g);
 void AddIntroText(game_main *g, level_state *l, const char *text, color c);
+void SpawnCheckpoint(game_main *g, level_state *l);
+void SpawnFinish(game_main *g, level_state *l);
 
 #endif

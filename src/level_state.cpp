@@ -444,6 +444,19 @@ void SpawnCheckpoint(game_main *g, level_state *l)
     AddEntity(g->World, ent);
 }
 
+void SpawnFinish(game_main *g, level_state *l)
+{
+	g->World.ShouldSpawnFinish = true;
+	g->World.OnSpawnFinish = [g]()
+	{
+		auto ent = CreateFinishEntity(GetEntry(g->World.FinishPool), g->AssetLoader, GetFinishMesh(g->World));
+		ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET + ROAD_SEGMENT_SIZE*1.5f;
+		ent->Pos().z = SHIP_Z * 0.5f;
+		AddFlags(ent, EntityFlag_RemoveOffscreen);
+		AddEntity(g->World, ent);
+	};
+}
+
 void PlayKick(void *arg)
 {
 	auto m = (music_master *)arg;
@@ -921,7 +934,7 @@ void UpdateLevel(game_main *g, float dt)
                     }
 
                     l->CheckpointNum++;
-                    l->CurrentCheckpointFrame = 0;
+					l->CurrentCheckpointFrame = -1;
                     PlayerExplodeAndLoseHealth(l, g->World, playerEntity, 25);
                 }
                 break;
@@ -937,7 +950,7 @@ void UpdateLevel(game_main *g, float dt)
                     }
 
                     l->CheckpointNum++;
-                    l->CurrentCheckpointFrame = 0;
+					l->CurrentCheckpointFrame = -1;
                     l->Score += SCORE_CHECKPOINT;
                     AddScoreText(g, l, SCORE_TEXT_CHECKPOINT, SCORE_CHECKPOINT, ent->Pos(), IntColor(ShipPalette.Colors[SHIP_BLUE]));
 
@@ -972,6 +985,20 @@ void UpdateLevel(game_main *g, float dt)
 
             ent->Pos().y += ent->Vel().y * dt;
         }
+		for (auto ent : world.FinishEntities)
+		{
+			if (!ent) continue;
+
+			if (ent->Finish->Finished)
+			{
+				ent->Pos().y = g->Camera.Position.y + 1;
+			}
+			else if (g->Camera.Position.y + 5.0f >= ent->Pos().y)
+			{
+				ent->Finish->Finished = true;
+				//l->GameplayState = GameplayState_Finished;
+			}
+		}
 		EndProfileTimer("Game Entities");
         
         l->Health = std::max(l->Health, 0);
