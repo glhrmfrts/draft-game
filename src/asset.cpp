@@ -96,6 +96,12 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
 		Entry.Options.Result = PushStruct<options>(Loader.Arena);
 		break;
 	}
+
+	case AssetEntryType_Level:
+	{
+		Entry.Level.Result = PushStruct<level>(Loader.Arena);
+		break;
+	}
     }
     Loader.Entries.Add(Entry);
 	Loader.Active = true;
@@ -204,6 +210,20 @@ FindOptions(asset_loader &loader, const string &id)
 		if (entry.Type == AssetEntryType_OptionsLoad && entry.ID == id)
 		{
 			return entry.Options.Result;
+		}
+	}
+	return NULL;
+}
+
+inline level *
+FindLevel(asset_loader &loader, const string &id)
+{
+	for (int i = 0; i < loader.Entries.Count(); i++)
+	{
+		auto &entry = loader.Entries.vec[i];
+		if (entry.Type == AssetEntryType_Level && entry.ID == id)
+		{
+			return entry.Level.Result;
 		}
 	}
 	return NULL;
@@ -442,6 +462,18 @@ static void LoadAssetThreadSafePart(void *Arg)
 		file.close();
 		break;
 	}
+
+	case AssetEntryType_Level:
+	{
+		std::ifstream file(Entry->Filename);
+
+		level *result = Entry->Level.Result;
+		ParseLevel(file, &Entry->Loader->Arena, result);
+
+		std::string songPath = "data/audio/" + result->SongName + "/song.json";
+		AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Song, songPath, result->SongName, NULL));
+		break;
+	}
 	}
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -531,6 +563,13 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 		{
 			result->Tracks.push_back(FindStream(*Entry->Loader, file));
 		}
+		break;
+	}
+
+	case AssetEntryType_Level:
+	{
+		auto result = Entry->Level.Result;
+		result->Song = FindSong(*Entry->Loader, result->SongName);
 		break;
 	}
     }

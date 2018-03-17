@@ -30,6 +30,7 @@ enum asset_entry_type
 	AssetEntryType_Song,
 	AssetEntryType_OptionsLoad,
 	AssetEntryType_OptionsSave,
+    AssetEntryType_Level,
 };
 enum asset_completion
 {
@@ -92,6 +93,11 @@ struct asset_entry
 		{
 			options *Result;
 		} Options;
+
+        struct
+        {
+            level *Result;
+        } Level;
     };
 };
 

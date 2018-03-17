@@ -50,6 +50,7 @@ struct level_state
     random_series Entropy;
 	asset_loader *AssetLoader;
 	audio_clip *DraftBoostSound;
+	level *Level;
 
     generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;
@@ -62,7 +63,10 @@ struct level_state
     float DamageTimer = 0;
     int Health = 100;
     int CurrentCheckpointFrame = 0;
+	
+	// The player's current checkpoint
     int CheckpointNum = 0;
+
     int ForceShipColor = -1;
     gameplay_state GameplayState = GameplayState_Playing;
     
@@ -82,6 +86,7 @@ struct level_state
     std::list<level_intro_text *> IntroTextList;
 };
 
-static void InitLevel(game_main *g);
+void InitLevel(game_main *g);
+void AddIntroText(game_main *g, level_state *l, const char *text, color c);
 
 #endif

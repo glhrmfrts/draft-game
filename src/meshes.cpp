@@ -177,8 +177,6 @@ struct mesh_part_scope
     }
 };
 
-#define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
-
 #define ROAD_SEGMENT_COUNT 10
 #define ROAD_SEGMENT_SIZE  24
 #define ROAD_LANE_WIDTH    2

@@ -18,6 +18,7 @@
 #include "options.h"
 #include "render.h"
 #include "audio.h"
+#include "level.h"
 #include "asset.h"
 #include "gui.h"
 #include "random.h"

@@ -16,6 +16,7 @@
 #include "render.cpp"
 #include "audio.cpp"
 #include "options.cpp"
+#include "level.cpp"
 #include "asset.cpp"
 #include "gui.cpp"
 #include "debug_ui.cpp"
@@ -152,17 +153,17 @@ extern "C"
 		);
 		g->Assets.push_back(
 			CreateAssetEntry(
-				AssetEntryType_Song,
-				"data/audio/music/song.json",
-				"first_song",
+				AssetEntryType_OptionsLoad,
+				"options.json",
+				"options",
 				NULL
 			)
 		);
 		g->Assets.push_back(
 			CreateAssetEntry(
-				AssetEntryType_OptionsLoad,
-				"options.json",
-				"options",
+				AssetEntryType_Level,
+				"data/levels/1.level",
+				"1",
 				NULL
 			)
 		);

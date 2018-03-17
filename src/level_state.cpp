@@ -73,11 +73,11 @@ void InitLevel(game_main *g)
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
     l->GameplayState = GameplayState_Playing;
+	l->Level = FindLevel(g->AssetLoader, "1");
 
-	firstSong = FindSong(g->AssetLoader, "first_song");
 	g->MusicMaster.StepBeat = true;
-	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["hats"]);
-	MusicMasterPlayTrack(g->MusicMaster, firstSong->Names["pad_chords"]);
+	MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["hats"]);
+	MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["pad_chords"]);
 
 	auto gen = g->World.GenState->GenParams + GenType_SideTrail;
 	gen->Flags |= GenFlag_Enabled;
@@ -444,8 +444,6 @@ void SpawnCheckpoint(game_main *g, level_state *l)
     AddEntity(g->World, ent);
 }
 
-#define FrameSeconds(s) (s * 60)
-
 void PlayKick(void *arg)
 {
 	auto m = (music_master *)arg;
@@ -479,29 +477,29 @@ void UpdateClassicMode(game_main *g, level_state *l)
             AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
 			RoadChange(g->World, RoadChange_NarrowRight);
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             Enable(crystals);
             Randomize(crystals);
 			RoadChange(g->World, RoadChange_WidensLeft);
         }
-		if (frame == FrameSeconds(7))
+		if (frame == FRAME_SECONDS(7))
 		{
 			RoadChange(g->World, RoadChange_NarrowLeft);
 		}
-		if (frame == FrameSeconds(9))
+		if (frame == FRAME_SECONDS(9))
 		{
 			RoadChange(g->World, RoadChange_WidensRight);
 		}
-		if (frame == FrameSeconds(11))
+		if (frame == FRAME_SECONDS(11))
 		{
 			RoadChange(g->World, RoadChange_NarrowCenter);
 		}
-		if (frame == FrameSeconds(13))
+		if (frame == FRAME_SECONDS(13))
 		{
 			RoadChange(g->World, RoadChange_WidensCenter);
 		}
-        if (frame == FrameSeconds(25))
+        if (frame == FRAME_SECONDS(25))
         {
             Disable(crystals);
             SpawnCheckpoint(g, l);
@@ -519,12 +517,12 @@ void UpdateClassicMode(game_main *g, level_state *l)
             AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
 			MusicMasterOnNextBeat(g->MusicMaster, PlayKick, &g->MusicMaster, 4);
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             l->ForceShipColor = SHIP_BLUE;
             Enable(ships);
         }
-        if (frame == FrameSeconds(40))
+        if (frame == FRAME_SECONDS(40))
         {
             Disable(ships);
             SpawnCheckpoint(g, l);
@@ -539,12 +537,12 @@ void UpdateClassicMode(game_main *g, level_state *l)
             AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
 			MusicMasterOnNextBeat(g->MusicMaster, PlaySnare, &g->MusicMaster, 2);
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             l->ForceShipColor = SHIP_ORANGE;
             Enable(ships);
         }
-        if (frame == FrameSeconds(40))
+        if (frame == FRAME_SECONDS(40))
         {
             Disable(ships);
             SpawnCheckpoint(g, l);
@@ -561,12 +559,12 @@ void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "DODGE", IntColor(ShipPalette.Colors[SHIP_RED]));
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             RemoveFlags(redShips, GenFlag_ReserveLane);
             Enable(redShips);
         }
-        if (frame == FrameSeconds(25))
+        if (frame == FRAME_SECONDS(25))
         {
             Disable(redShips);
             SpawnCheckpoint(g, l);
@@ -583,11 +581,11 @@ void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             Enable(asteroids);
         }
-        if (frame == FrameSeconds(25))
+        if (frame == FRAME_SECONDS(25))
         {
             Disable(asteroids);
             SpawnCheckpoint(g, l);
@@ -604,18 +602,18 @@ void UpdateClassicMode(game_main *g, level_state *l)
         {
             AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
         }
-        if (frame == FrameSeconds(1))
+        if (frame == FRAME_SECONDS(1))
         {
             AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
         }
-        if (frame == FrameSeconds(5))
+        if (frame == FRAME_SECONDS(5))
         {
             l->ForceShipColor = -1;
             Enable(ships);
         }
     }
     }
-    l->CurrentCheckpointFrame++;
+    
 }
 
 void UpdateLevel(game_main *g, float dt)
@@ -691,7 +689,8 @@ void UpdateLevel(game_main *g, float dt)
 
         if (l->GameplayState == GameplayState_Playing)
         {
-            UpdateClassicMode(g, l);
+            //UpdateClassicMode(g, l);
+			LevelUpdate(l->Level, g, l, dt);
         }
         
 		BeginProfileTimer("Gen state");
@@ -1024,6 +1023,8 @@ void UpdateLevel(game_main *g, float dt)
 			FreeEntryFromData(l->IntroTextPool, introText);
 		}
 	}
+
+	l->CurrentCheckpointFrame++;
 	
 #if 0
 	BeginProfileTimer(g->Platform.GetMilliseconds(), "Update thread wait");
