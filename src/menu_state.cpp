@@ -89,8 +89,8 @@ void UpdateFinalCamera(game_main *g)
 {
     auto &fc = g->FinalCamera;
     auto &c = g->Camera;
-    fc.Position = WorldToRenderTransform(c.Position, g->RenderState.BendRadius);
-    fc.LookAt = WorldToRenderTransform(c.LookAt, g->RenderState.BendRadius);
+    fc.Position = WorldToRenderTransform(g->World, c.Position, g->RenderState.BendRadius);
+    fc.LookAt = WorldToRenderTransform(g->World, c.LookAt, g->RenderState.BendRadius);
 
     if (fc.LookAt.y < fc.Position.y)
     {
@@ -107,7 +107,7 @@ void InitMenu(game_main *g)
 {
     g->State = GameState_Menu;
     InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
-    
+
     auto m = &g->MenuState;
     if (m->FadeOutSequence.Tweens.size() == 0)
     {
@@ -120,7 +120,7 @@ void InitMenu(game_main *g)
         );
         AddSequences(g->TweenState, &m->FadeOutSequence, 1);
     }
-    
+
     m->Alpha = 1.0f;
     m->FadeOutSequence.Complete = false;
 
@@ -130,7 +130,8 @@ void InitMenu(game_main *g)
 	MusicMasterPlayTrack(g->MusicMaster, sng->Names["pad_dmaj"]);
 
 	g->Options = FindOptions(g->AssetLoader, "options");
-	
+    MusicMasterSetGain(g->MusicMaster, g->Options->Values["audio/music_gain"]->Float);
+
 	GraphicsMenu.Items[0].Options.SelectedIndex = g->Options->Values["graphics/resolution"]->Int;
 	for (int i = 0; i < ARRAY_COUNT(Global_Resolutions); i++)
 	{
@@ -235,7 +236,7 @@ void UpdateMenu(game_main *g, float dt)
 			m->Screen = MenuScreen_Main;
         }
     }
-    
+
     if (m->FadeOutSequence.Complete)
     {
         InitLevel(g);

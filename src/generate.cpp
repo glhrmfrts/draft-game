@@ -1,7 +1,5 @@
 // Copyright
 
-#define GEN_PLAYER_OFFSET 250
-
 int GetNextSpawnLane(gen_state *state, bool isShip = false)
 {
     static int lastLane = 0;
@@ -184,7 +182,7 @@ void InitGenState(gen_state *state)
     gen->Interval = 0.5f;
     gen->RandomOffset = 0.4f;
     gen->Func = GenerateRandomGeometry;
-    
+
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
     {
         state->ReservedLanes[i] = 0;
@@ -222,12 +220,12 @@ void UpdateGen(game_main *g, gen_state *state, gen_params *p, void *data, float 
         {
             p->Timer -= (p->Timer * 0.9f) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
         }
-        
+
         if (p->ReservedLane != NO_RESERVED_LANE)
         {
             state->ReservedLanes[p->ReservedLane + 2] = 0;
         }
-        
+
         p->ReservedLane = NO_RESERVED_LANE;
     }
 

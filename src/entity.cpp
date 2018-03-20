@@ -75,7 +75,7 @@ static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
 	result->Count = count;
 	result->Entities.resize(count);
 	result->PointCache.resize(count);
-	
+
     InitMeshBuffer(result->Mesh.Buffer);
     result->Model.Mesh = &result->Mesh;
 
@@ -85,7 +85,7 @@ static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
 
     // planes
     AddPart(&result->Mesh, {{c, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, PlaneCount, GL_TRIANGLES});
-    
+
     // left line
     AddPart(&result->Mesh, {{c, emission, 0, NULL}, PlaneCount, LineCount, GL_LINES});
 
@@ -278,6 +278,7 @@ static entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *
 	auto result = CreateEntity(alloc);
 	result->Type = EntityType_Finish;
 	result->Model = CreateModel(alloc, finishMesh);
+    result->Model->SortNumber = 1;
 	result->Finish = PushStruct<finish>(alloc);
 	result->SetScl(vec3{ ROAD_LANE_COUNT*4, ROAD_LANE_COUNT*4, ROAD_LANE_COUNT*4 });
 	return result;
@@ -377,6 +378,13 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 		return;
 	}
 
+    if (w->ShouldRoadTangent)
+    {
+        w->ShouldRoadTangent = false;
+        w->RoadTangentPoint = w->PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+        return;
+    }
+
 	if (w->RoadState.ShouldChange)
 	{
 		w->RoadState.ShouldChange = false;
@@ -447,7 +455,7 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
     world.CheckpointPool.ElemSize = CHECKPOINT_ENTITY_SIZE;
 	world.FinishPool.ElemSize = FINISH_ENTITY_SIZE;
-    
+
     world.ShipPool.Arena = &world.Arena;
     world.CrystalPool.Arena = &world.Arena;
     world.PowerupPool.Arena = &world.Arena;
@@ -693,7 +701,7 @@ void RemoveEntity(entity_world &world, entity *ent)
 void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 {
 	w.RoadMeshManager.Arena.Free = false;
-	
+
     FreeArena(w.Arena);
     w.AsteroidEntities.clear();
     w.CrystalEntities.clear();
@@ -710,7 +718,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.ShipEntities.clear();
     w.TrailGroupEntities.clear();
 	w.RoadPieceEntities.clear();
-    
+
     ResetPool(w.AsteroidPool);
     ResetPool(w.CheckpointPool);
     ResetPool(w.CrystalPool);
@@ -721,7 +729,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     w.GenState = PushStruct<gen_state>(w.Arena);
     InitGenState(w.GenState);
-    
+
     w.AssetLoader = loader;
     w.Camera = cam;
     w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
@@ -781,31 +789,19 @@ vec3 WorldToRenderTransformInner(const vec3 &worldPos, const float radius)
 	return result;
 }
 
-vec3 WorldToRenderTransform(const vec3 &worldPos, const float radius)
+vec3 WorldToRenderTransform(entity_world &w, const vec3 &worldPos, const float radius)
 {
-	static vec3 tangentWorldPoint = vec3{ 0, 100, 0 };
+    vec3 tangentWorldPoint = vec3{ worldPos.x, w.RoadTangentPoint, worldPos.z };
 	vec3 result = WorldToRenderTransformInner(worldPos, radius);
 	vec3 rtdir = glm::normalize(vec3{ 0, -result.z, result.y });
-	Println(ToString(rtdir));
-	
+
 	if (worldPos.y >= tangentWorldPoint.y)
 	{
 		vec3 tangentPoint = WorldToRenderTransformInner(tangentWorldPoint, radius);
 		vec3 tangentDir = glm::normalize(vec3{ 0, -tangentPoint.z, tangentPoint.y });
-		result = tangentPoint + (tangentDir * (worldPos.y - tangentWorldPoint.y));
-		result.x = worldPos.x;
-
-		float angle = 0 * M_PI / 180.0f;
-		result.y = ((result.y - worldPos.y) * std::cos(angle)) - ((result.z - worldPos.z) * std::sin(angle)) + worldPos.y;
-		result.z = ((result.z - worldPos.z) * std::cos(angle)) - ((result.y - worldPos.y) * std::sin(angle)) + worldPos.z;
-		//result.y += (worldPos.z * tangentUp.y);
-		//result.z += (worldPos.z * tangentUp.z);
-
-		//Println(ToString(tangentDir));
+		result = tangentPoint + (tangentDir * ((worldPos.y - tangentWorldPoint.y) * (radius * WORLD_ARC_Y_FACTOR)));
 	}
 
-	//Println(result.y);
-	
     return result;
 }
 
@@ -985,9 +981,12 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 
         world.GenState->LaneSlots[ent->LaneSlot->Index]++;
     }
-        
-    float velY = world.PlayerEntity->Vel().y;
-	world.BackgroundState.Offset += vec2(0.0f, velY) * dt;
+
+    if (world.PlayerEntity->Pos().y)
+    {
+        float velY = world.PlayerEntity->Vel().y;
+        world.BackgroundState.Offset += vec2(0.0f, velY) * dt;
+    }
 	world.BackgroundState.Time += dt;
 
 	for (auto ent : world.AudioEntities)
@@ -1025,7 +1024,7 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 				repeat->Callback(&world, ent);
 			}
 		}
-		
+
     }
     for (auto ent : world.RotatingEntities)
     {

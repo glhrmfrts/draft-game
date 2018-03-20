@@ -248,6 +248,7 @@ struct model_program : shader_program
     int FogStart;
     int FogEnd;
 	int BendRadius;
+    int RoadTangentPoint;
 };
 
 struct blur_program : shader_program
@@ -304,6 +305,7 @@ struct renderable
     material *Material;
     size_t VertexOffset;
     size_t VertexCount;
+    int SortNumber;
     GLint VAO;
     GLuint PrimitiveType;
     GLfloat LineWidth;
@@ -328,11 +330,11 @@ struct render_state
     vertex_buffer SpriteBuffer;
     vertex_buffer ScreenBuffer;
 
-    vector<renderable> Renderables;
+    std::vector<renderable> Renderables;
     size_t RenderableCount;
 
-    vector<size_t> FrameSolidRenderables;
-    vector<size_t> FrameTransparentRenderables;
+    std::vector<size_t> FrameSolidRenderables;
+    std::vector<size_t> FrameTransparentRenderables;
 
     uint32 Width;
     uint32 Height;
@@ -347,6 +349,8 @@ struct render_state
     float ExplosionLightTimer = 0;
 	float DeltaTime = 0;
 	float BendRadius = 500;
+
+    float *RoadTangentPoint = NULL;
 
 #ifdef DRAFT_DEBUG
     vertex_buffer DebugBuffer;

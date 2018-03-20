@@ -155,6 +155,10 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 			{
 				c->Type = LevelCommand_SpawnFinish;
 			}
+            else if (cmd == "road_tangent")
+            {
+                c->Type = LevelCommand_RoadTangent;
+            }
 			break;
 		}
 		}
@@ -201,6 +205,10 @@ void LevelUpdate(level *l, game_main *g, level_state *state, float dt)
 			case LevelCommand_SpawnFinish:
 				SpawnFinish(g, state);
 				break;
+
+            case LevelCommand_RoadTangent:
+                RoadTangent(g, state);
+                break;
 			}
 		}
 		cp->CurrentFrameIndex++;

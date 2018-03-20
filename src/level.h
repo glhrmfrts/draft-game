@@ -13,6 +13,7 @@ enum level_command_type
 	LevelCommand_ShipColor,
 	LevelCommand_SpawnCheckpoint,
 	LevelCommand_SpawnFinish,
+    LevelCommand_RoadTangent,
 };
 
 struct level_command

@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <cctype>
 #include <locale>
+#include <limits>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>

@@ -563,6 +563,7 @@ static void ModelProgramCallback(shader_asset_param *p)
         program->FogStart = glGetUniformLocation(program->ID, "u_FogStart");
         program->FogEnd = glGetUniformLocation(program->ID, "u_FogEnd");
 		program->BendRadius = glGetUniformLocation(program->ID, "u_BendRadius");
+        program->RoadTangentPoint = glGetUniformLocation(program->ID, "u_RoadTangentPoint");
 
         Bind(*program);
         SetUniform(program->Sampler, 0);
@@ -724,7 +725,7 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height, uint32
                vertex_attribute{0, 2, GL_FLOAT, 4*sizeof(float), 0},
                vertex_attribute{1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
 
-	float data[24] = { 
+	float data[24] = {
 		-1, -1, 0, 0,
 		1, -1, 1, 0,
 		-1, 1, 0, 1,
@@ -980,6 +981,11 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
 
 static material DebugMaterial{Color_white, 0.0f, 0.0f, NULL, MaterialFlag_PolygonLines};
 
+static bool SortRenderables(renderable &a, renderable &b)
+{
+    return a.SortNumber < b.SortNumber;
+}
+
 void RenderEnd(render_state &rs, camera &Camera)
 {
     assert(Camera.Updated);
@@ -1000,8 +1006,11 @@ void RenderEnd(render_state &rs, camera &Camera)
     }
 #endif
 
+    std::sort(rs.Renderables.begin(), rs.Renderables.begin() + rs.RenderableCount, SortRenderables);
+
     Bind(rs.ModelProgram);
 	SetUniform(rs.ModelProgram.BendRadius, rs.BendRadius);
+    SetUniform(rs.ModelProgram.RoadTangentPoint, *rs.RoadTangentPoint);
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -1041,6 +1050,7 @@ void DrawMeshPart(render_state &rs, mesh &Mesh, mesh_part &part, const transform
 {
     size_t Index = NextRenderable(rs);
     auto &r = rs.Renderables[Index];
+    r.SortNumber = rs.RenderableCount * 100;
     r.LineWidth = part.LineWidth;
     r.PrimitiveType = part.PrimitiveType;
     r.VertexOffset = part.Offset;
@@ -1053,7 +1063,7 @@ void DrawMeshPart(render_state &rs, mesh &Mesh, mesh_part &part, const transform
     AddRenderable(rs, Index, &part.Material);
 }
 
-void DrawModel(render_state &RenderState, model &Model, const transform &Transform)
+void DrawModel(render_state &rs, model &Model, const transform &Transform)
 {
     mesh *Mesh = Model.Mesh;
     for (auto &Part : Mesh->Parts)
@@ -1065,8 +1075,17 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
             Material = Model.Materials[i];
         }
 
-        size_t Index = NextRenderable(RenderState);
-        auto &r = RenderState.Renderables[Index];
+        size_t Index = NextRenderable(rs);
+        auto &r = rs.Renderables[Index];
+        if (Model.SortNumber > -1)
+        {
+            r.SortNumber = Model.SortNumber + i;
+        }
+        else
+        {
+            r.SortNumber = rs.RenderableCount * 100;
+        }
+
         r.LineWidth = Part.LineWidth;
         r.PrimitiveType = Part.PrimitiveType;
         r.VertexOffset = Part.Offset;
@@ -1076,7 +1095,7 @@ void DrawModel(render_state &RenderState, model &Model, const transform &Transfo
         r.Transform = Transform;
         r.Bounds = BoundsFromMinMax(Mesh->Min*Transform.Scale, Mesh->Max*Transform.Scale);
         r.Bounds.Center += Transform.Position;
-        AddRenderable(RenderState, Index, Material);
+        AddRenderable(rs, Index, Material);
     }
 }
 

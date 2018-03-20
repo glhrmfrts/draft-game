@@ -8,6 +8,7 @@ struct model
 {
     std::vector<material *> Materials;
     mesh *Mesh;
+    int SortNumber = -1;
     bool Visible = true;
 };
 
@@ -312,6 +313,9 @@ struct entity_world
 	std::function<void()> OnSpawnFinish;
 	bool ShouldSpawnFinish = false;
 	bool DisableRoadRepeat = false;
+
+    float RoadTangentPoint = std::numeric_limits<float>::infinity();
+    bool ShouldRoadTangent = false;
 };
 
 #endif

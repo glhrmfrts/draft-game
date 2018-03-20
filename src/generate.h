@@ -8,6 +8,8 @@
 
 #define NO_RESERVED_LANE 500
 
+#define GEN_PLAYER_OFFSET 250
+
 // generation flags
 #define GenFlag_Enabled         (1 << 0)
 #define GenFlag_Randomize       (1 << 1)

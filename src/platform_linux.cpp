@@ -8,20 +8,25 @@
 #include <sys/stat.h>      // fstat
 #include <sys/types.h>     // fstat
 #include <sys/time.h>
+#include "memory.cpp"
 
 #define GameLibraryPath       "./draft.so"
 #define GameLibraryReloadTime 1.0f
 
 struct game_library
 {
-    void *                  Library;
-    uint64                  LoadTime;
-    const char              *Path;
-    game_init_func          *GameInit;
-    game_update_func        *GameUpdate;
-    game_render_func        *GameRender;
-    game_destroy_func       *GameDestroy;
-    game_process_event_func *GameProcessEvent;
+    memory_arena                   Arena;
+    void *                         Library;
+    uint64                         LoadTime;
+    const char                    *Path;
+    game_init_func                *GameInit;
+	game_reload_func              *GameReload;
+	game_unload_func              *GameUnload;
+    game_update_func              *GameUpdate;
+    game_render_func              *GameRender;
+    game_destroy_func             *GameDestroy;
+    game_process_event_func       *GameProcessEvent;
+    std::vector<platform_thread *> Threads;
 };
 
 PLATFORM_GET_FILE_LAST_WRITE_TIME(PlatformGetFileLastWriteTime)
@@ -43,6 +48,18 @@ PLATFORM_GET_MILLISECONDS(PlatformGetMilliseconds)
     clock_gettime(CLOCK_MONOTONIC, &time);
     long ms = std::round(time.tv_nsec / 1.0e6);
     return ms;
+}
+
+PLATFORM_CREATE_THREAD(PlatformCreateThread)
+{
+    auto lib = (game_library *)g->GameLibrary;
+    auto result = PushStruct<platform_thread>(lib->Arena);
+    result->Name = name;
+    result->Arg = arg;
+    result->Func = (platform_thread::func *)dlsym(lib->Library, name);
+    result->Thread = std::thread(result->Func, arg);
+    lib->Threads.push_back(result);
+    return result;
 }
 
 void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
@@ -67,10 +84,18 @@ void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
         printf("Loading game library\n");
 
         Lib.GameInit = (game_init_func *)dlsym(Lib.Library, "GameInit");
+        Lib.GameReload = (game_reload_func *)dlsym(Lib.Library, "GameReload");
+        Lib.GameUnload = (game_unload_func *)dlsym(Lib.Library, "GameUnload");
         Lib.GameUpdate = (game_update_func *)dlsym(Lib.Library, "GameUpdate");
         Lib.GameRender = (game_render_func *)dlsym(Lib.Library, "GameRender");
         Lib.GameDestroy = (game_destroy_func *)dlsym(Lib.Library, "GameDestroy");
         Lib.GameProcessEvent = (game_process_event_func *)dlsym(Lib.Library, "GameProcessEvent");
+
+        for (auto t : Lib.Threads)
+        {
+            t->Func = (platform_thread::func *)dlsym(Lib.Library, t->Name);
+            t->Thread = std::thread(t->Func, t->Arg);
+        }
     }
     else
     {
@@ -81,12 +106,22 @@ void LoadGameLibrary(game_library &Lib, const char *Path, const char *TempPath)
 
 void UnloadGameLibrary(game_library &Lib)
 {
-    dlclose(Lib.Library);
-    Lib.Library = 0;
     Lib.GameInit = NULL;
+    Lib.GameReload = NULL;
+    Lib.GameUnload = NULL;
+    Lib.GameUpdate = NULL;
     Lib.GameRender = NULL;
     Lib.GameDestroy = NULL;
     Lib.GameProcessEvent = NULL;
+
+    for (auto t : Lib.Threads)
+    {
+        t->Thread.join();
+        t->Func = NULL;
+    }
+
+    dlclose(Lib.Library);
+    Lib.Library = 0;
 }
 
 bool GameLibraryChanged(game_library &Lib)

@@ -45,7 +45,7 @@ void InitLevel(game_main *g)
     ResetPool(l->IntroTextPool);
     ResetPool(l->ScoreTextPool);
     ResetPool(l->SequencePool);
-    
+
 	l->AssetLoader = &g->AssetLoader;
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
     l->IntroTextPool.Arena = &l->Arena;
@@ -68,7 +68,7 @@ void InitLevel(game_main *g)
     InitFormat(&l->HealthFormat, "Health: %d\n", 24, &l->Arena);
     InitFormat(&l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
     InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
-    
+
     l->Health = 50;
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
@@ -163,7 +163,7 @@ void AddIntroText(game_main *g, level_state *l, const char *text, color c)
 
 void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec3 pos, color c)
 {
-    vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(pos, g->RenderState.BendRadius), 1.0f};
+    vec4 v = g->FinalCamera.ProjectionView * vec4{WorldToRenderTransform(g->World, pos, g->RenderState.BendRadius), 1.0f};
     vec2 screenPos = vec2{v.x/v.w, v.y/v.w};
     screenPos.x = (g->Width/2) * screenPos.x + (g->Width/2);
     screenPos.y = (g->Height/2) * screenPos.y + (g->Height/2);
@@ -457,6 +457,11 @@ void SpawnFinish(game_main *g, level_state *l)
 	};
 }
 
+void RoadTangent(game_main *g, level_state *l)
+{
+    g->World.ShouldRoadTangent = true;
+}
+
 void PlayKick(void *arg)
 {
 	auto m = (music_master *)arg;
@@ -484,7 +489,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
         //l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
 		l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
 		l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
-        
+
         if (frame == 0)
         {
             AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
@@ -567,7 +572,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
     {
         l->PlayerMinVel = PLAYER_MIN_VEL + 15.0f;
         l->PlayerMaxVel = PLAYER_MIN_VEL + 50.0f;
-        
+
         if (frame == 0)
         {
             AddIntroText(g, l, "DODGE", IntColor(ShipPalette.Colors[SHIP_RED]));
@@ -589,7 +594,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
     {
         l->PlayerMinVel = PLAYER_MIN_VEL;
         l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
-        
+
         if (frame == 0)
         {
             AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
@@ -605,12 +610,12 @@ void UpdateClassicMode(game_main *g, level_state *l)
         }
         break;
     }
-    
+
     case 5:
     {
         l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
         l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
-        
+
         if (frame == 0)
         {
             AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
@@ -626,7 +631,7 @@ void UpdateClassicMode(game_main *g, level_state *l)
         }
     }
     }
-    
+
 }
 
 void UpdateLevel(game_main *g, float dt)
@@ -643,10 +648,10 @@ void UpdateLevel(game_main *g, float dt)
 	static float myPitch = 1.0f;
 	float targetPitch = std::max(std::round(playerEntity->Vel().y) / 50.0f * 0.7f, 1.0f);
 	targetPitch = std::min(targetPitch, 2.5f*0.7f);
-	
+
 	myPitch = Interp(myPitch, targetPitch, 0.5f, dt);
 	MusicMasterSetPitch(g->MusicMaster, myPitch);
-    
+
     if (IsJustPressed(g, Action_pause))
     {
         if (l->GameplayState == GameplayState_Playing)
@@ -667,7 +672,7 @@ void UpdateLevel(game_main *g, float dt)
             l->PlayerMaxVel += PLAYER_MAX_VEL_INCREASE_FACTOR * dt;
             l->PlayerMaxVel = std::min(l->PlayerMaxVel, PLAYER_MAX_VEL_LIMIT);
         }
-        
+
         l->TimeElapsed += dt;
         l->DamageTimer -= dt;
         l->DamageTimer = std::max(l->DamageTimer, 0.0f);
@@ -705,11 +710,11 @@ void UpdateLevel(game_main *g, float dt)
             //UpdateClassicMode(g, l);
 			LevelUpdate(l->Level, g, l, dt);
         }
-        
+
 		BeginProfileTimer("Gen state");
         UpdateGenState(g, world.GenState, (void *)l, dt);
 		EndProfileTimer("Gen state");
-        
+
         {
             // player movement
             float moveX = GetAxisValue(input, Action_horizontal);
@@ -1000,7 +1005,7 @@ void UpdateLevel(game_main *g, float dt)
 			}
 		}
 		EndProfileTimer("Game Entities");
-        
+
         l->Health = std::max(l->Health, 0);
         if (l->Health == 0 && l->GameplayState == GameplayState_Playing)
         {
@@ -1009,7 +1014,7 @@ void UpdateLevel(game_main *g, float dt)
             PlaySequence(g->TweenState, l->GameOverMenuSequence, true);
         }
     }
-    
+
     float menuMoveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
     if (l->GameplayState == GameplayState_Paused)
     {
@@ -1052,7 +1057,7 @@ void UpdateLevel(game_main *g, float dt)
 	}
 
 	l->CurrentCheckpointFrame++;
-	
+
 #if 0
 	BeginProfileTimer(g->Platform.GetMilliseconds(), "Update thread wait");
 	WaitUpdate(g->World);
@@ -1124,7 +1129,7 @@ void RenderLevel(game_main *g, float dt)
     float top = g->Height - GetRealPixels(g, 10.0f);
     DrawText(g->GUI, hudFont, Format(&l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
     DrawText(g->GUI, hudFont, Format(&l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
-    
+
     if (l->GameplayState == GameplayState_Paused)
     {
         DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, 1.0f, false);
@@ -1133,7 +1138,7 @@ void RenderLevel(game_main *g, float dt)
     {
         DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, l->GameOverAlpha, false);
     }
-    
+
     End(g->GUI);
 
     renderTime.End = g->Platform.GetMilliseconds();
@@ -1149,7 +1154,7 @@ MENU_FUNC(PauseMenuCallback)
         l->GameplayState = GameplayState_Playing;
         break;
     }
-    
+
     case 1:
     {
         InitMenu(g);
@@ -1173,14 +1178,14 @@ MENU_FUNC(GameOverMenuCallback)
         AddEntity(g->World, g->World.PlayerEntity);
         break;
     }
-    
+
     case 1:
     {
         // restart from the beginning
         RestartLevel(g);
         break;
     }
-    
+
     case 2:
     {
         DestroySequences(g->TweenState, l->GameOverMenuSequence, 1);

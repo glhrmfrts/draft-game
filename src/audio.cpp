@@ -275,7 +275,7 @@ extern "C" export_func void MusicMasterLoop(void *arg)
 					m->NextBeatCallbacks.CheckClear();
 				}
 			}
-			
+
 			for (int i = 0; i < m->Sources.size(); i++)
 			{
 				if (m->SourcesState[i])
@@ -336,10 +336,11 @@ extern "C" export_func void MusicMasterLoop(void *arg)
 		}
 		}
 	}
-} 
+}
 
 void MusicMasterInit(game_main *g, music_master &m)
 {
+    m.StepBeat = false;
 	m.Thread = g->Platform.CreateThread(g, "MusicMasterLoop", (void *)&m);
 	m.NextBeatCallbackPool.Arena = &m.Arena;
 }

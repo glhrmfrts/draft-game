@@ -5,7 +5,7 @@ SRC += $(wildcard deps/*.cpp)
 CFILES = deps/imgui.cpp deps/imgui_draw.cpp deps/imgui_demo.cpp deps/imgui_impl_sdl_gl3.cpp deps/lodepng.cpp src/draft.cpp
 EDITOR_CFILES = deps/imgui.cpp deps/imgui_draw.cpp deps/imgui_demo.cpp deps/imgui_impl_sdl_gl3.cpp deps/lodepng.cpp src/editor.cpp
 PLATFORM_CFILES = src/platform.cpp
-LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW -ldl
+LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW -ldl -lpthread
 
 INCLUDE_PATHS = -Ideps -Isimple_lisp
 

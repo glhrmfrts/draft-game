@@ -1,0 +1,26 @@
+name: WELCOME
+song: music
+
+checkpoint: {
+            player_vel: 50|75
+            frame_seconds: 0 {
+                           add_intro_text: HELLO FROM LINUX | CRYSTAL_COLOR
+            }
+
+            frame_seconds: 5 {
+                           enable: SHIPS
+                           ship_color: ALL
+            }
+
+            frame_seconds: 15 {
+                           disable: SHIPS
+            }
+
+            frame_seconds: 17 {
+                           road_tangent
+            }
+
+            frame_seconds: 18 {
+                           spawn_finish
+            }
+}

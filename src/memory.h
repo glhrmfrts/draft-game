@@ -111,7 +111,7 @@ struct fixed_array
     {
         if (count >= vec.size())
         {
-            throw std::exception("fixed array out of memory");
+            throw std::runtime_error("fixed array out of memory");
         }
         vec[count++] = elem;
     }

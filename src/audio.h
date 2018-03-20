@@ -85,7 +85,7 @@ struct music_master
 	std::mutex Mutex;
 	std::condition_variable ConditionVar;
 	std::queue<music_master_message> Queue;
-	std::atomic_bool StepBeat = false;
+	std::atomic_bool StepBeat;
 
 	null_array<next_beat_callback *, 32> NextBeatCallbacks;
 	generic_pool<next_beat_callback> NextBeatCallbackPool;

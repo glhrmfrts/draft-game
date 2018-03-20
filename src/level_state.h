@@ -63,16 +63,16 @@ struct level_state
     float DamageTimer = 0;
     int Health = 100;
     int CurrentCheckpointFrame = 0;
-	
+
 	// The player's current checkpoint
     int CheckpointNum = 0;
 
     int ForceShipColor = -1;
     gameplay_state GameplayState = GameplayState_Playing;
-    
+
     tween_sequence *GameOverMenuSequence;
     float GameOverAlpha;
-    
+
     entity *DraftTarget;
     float CurrentDraftTime = 0;
     float DraftCharge = 0;
@@ -90,5 +90,6 @@ void InitLevel(game_main *g);
 void AddIntroText(game_main *g, level_state *l, const char *text, color c);
 void SpawnCheckpoint(game_main *g, level_state *l);
 void SpawnFinish(game_main *g, level_state *l);
+void RoadTangent(game_main *g, level_state *l);
 
 #endif

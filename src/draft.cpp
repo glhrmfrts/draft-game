@@ -47,6 +47,9 @@ extern "C"
         InitTweenState(g->TweenState);
         InitEntityWorld(g, g->World);
 		MusicMasterInit(g, g->MusicMaster);
+
+        g->RenderState.RoadTangentPoint = &g->World.RoadTangentPoint;
+
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetEntryType_Texture,
@@ -54,7 +57,7 @@ extern "C"
                 "grid",
                 (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
             )
-        ); 
+        );
         g->Assets.push_back(
             CreateAssetEntry(
                 AssetEntryType_Texture,
@@ -167,7 +170,7 @@ extern "C"
 				NULL
 			)
 		);
-		
+
         InitLoadingScreen(g);
     }
 
@@ -187,7 +190,7 @@ extern "C"
 		//RestartThreadPool(game->World.UpdateThreadPool);
 	}
 
-    // @TODO: this exists only for imgui, remove in the future 
+    // @TODO: this exists only for imgui, remove in the future
     export_func GAME_PROCESS_EVENT(GameProcessEvent)
     {
         ImGui_ImplSdlGL3_ProcessEvent(event);
@@ -247,7 +250,7 @@ extern "C"
         case GameState_LoadingScreen:
             RenderLoadingScreen(g, dt);
             break;
-			
+
         case GameState_Level:
             RenderLevel(g, dt);
             break;
