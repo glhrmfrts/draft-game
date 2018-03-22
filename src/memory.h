@@ -62,6 +62,37 @@ struct null_array
     std::vector<T> vec;
     int numNulls;
 
+    class iterator
+    {
+        null_array<T, cap> *arr;
+        int i;
+
+        iterator(null_array<T, cap> *arr, int i)
+        {
+            this->arr = arr;
+            while (i < arr->vec.size() && arr->vec[i] == NULL)
+            {
+                i++;
+            }
+            this->i = i;
+        }
+
+        iterator operator ++()
+        {
+            return iterator(arr, i++);
+        }
+
+        bool operator !=(iterator &rhs)
+        {
+            return i != rhs.i;
+        }
+
+        T &operator *()
+        {
+            return arr->vec[i];
+        }
+    };
+
     void Add(T elem)
     {
         for (int i = 0; i < vec.size(); i++)
@@ -94,6 +125,22 @@ struct null_array
             vec.clear();
         }
     }
+
+    // std::vector aliases
+    int size() const
+    {
+        return vec.size();
+    }
+
+    iterator begin()
+    {
+        return iterator(this, 0);
+    }
+
+    iterator end()
+    {
+        return iterator(this, vec.size() - 1);
+    }
 };
 
 template<typename T, int cap>
@@ -119,6 +166,27 @@ struct fixed_array
     int Count() const
     {
         return count;
+    }
+
+    void Clear()
+    {
+        count = 0;
+    }
+
+    // std::vector aliases
+    int size() const
+    {
+        return count;
+    }
+
+    typename std::vector<T>::iterator begin()
+    {
+        return vec.begin();
+    }
+
+    typename std::vector<T>::iterator end()
+    {
+        return vec.begin() + count;
     }
 };
 

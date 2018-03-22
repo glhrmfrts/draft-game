@@ -14,6 +14,8 @@ enum level_command_type
 	LevelCommand_SpawnCheckpoint,
 	LevelCommand_SpawnFinish,
     LevelCommand_RoadTangent,
+    LevelCommand_PlayTrack,
+    LevelCommand_StopTrack,
 };
 
 struct level_command
@@ -48,10 +50,12 @@ struct level_checkpoint
 
 struct level
 {
+    std::vector<level_command> StatsScreenCommands;
 	std::vector<level_checkpoint> Checkpoints;
 	std::string Name;
 	std::string SongName;
 	song *Song;
+    bool HasRunStatsScreenCommands = false;
 };
 
 #endif

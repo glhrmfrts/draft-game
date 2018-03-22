@@ -288,7 +288,7 @@ vec2 MeasureText(bitmap_font *font, const char *text)
     return result;
 }
 
-uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bool CheckState = true)
+uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect &r, color c, bool CheckState = true)
 {
     int CurX = r.X;
     int CurY = r.Y;
@@ -333,12 +333,46 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect r, color c, bo
     return GUIElementState_none;
 }
 
+uint32 DrawTextPtr(gui &g, bitmap_font *Font, const char *text, rect &r, color c, vec2 *ptr, bool CheckState = true)
+{
+    uint32 result = DrawText(g, Font, text, r, c, CheckState);
+    ptr->x += rect.Width;
+    ptr->y += rect.Height;
+    return result;
+}
+
 uint32 DrawTextCentered(gui &g, bitmap_font *font, const char *text, rect r, color c, bool checkState = true)
 {
     vec2 size = MeasureText(font, text);
     r.X -= size.x/2;
     r.Y -= size.y/2;
     return DrawText(g, font, text, r, c, checkState);
+}
+
+void MeasureTextGroup(text_group *group)
+{
+    group->Size = {0, 0};
+    for (size_t i = 0; i < group->Items.size(); i++)
+    {
+        auto item = &group->Items[i];
+        item->Size = MeasureText(item->Font, item->Text);
+        group->Size.x += item->Size.x;
+        group->Size.y = std::max(group->Size.y, item->Size.y);
+    }
+}
+
+void DrawTextGroupCentered(gui &g, text_group *group, rect r)
+{
+    MeasureTextGroup(group);
+    r.X -= group->Size.x/2;
+    r.Y -= group->Size.y/2;
+    vec2 ptr = {r.X, r.Y};
+    for (size_t i = 0; i < group->Items.size(); i++)
+    {
+        DrawTextPtr(g, item->Font, item->Text, r, c, &ptr);
+        r.X = ptr->x;
+        r.Y = ptr->y;
+    }
 }
 
 void End(gui &g)
@@ -367,7 +401,7 @@ void End(gui &g)
             Unbind(*Cmd.Texture, 0);
         }
     }
-	 
+
     glBindVertexArray(0);
     UnbindShaderProgram();
     glDisable(GL_BLEND);
@@ -396,7 +430,7 @@ void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
 	const float optionWidth = 250;
 	const float optionX = centerX + itemWidth / 2;
 	switch (item.Type)
-	{ 
+	{
 	case MenuItemType_Text:
 		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX,baseY + textPadding,0,0 }, col);
 		break;
@@ -441,9 +475,25 @@ void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
 		break;
 	}
 	}
-} 
+}
 
 static menu_item backItem = {"BACK", MenuItemType_Text, true};
+
+void DrawHeader(game_main *g, const char *text, color c, float alpha = 1.0f)
+{
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
+
+    float halfX = g->Width*0.5f;
+    float halfY = g->Height*0.5f;
+    float baseY = 660.0f;
+    float lineWidth = g->Width*0.75f;
+
+    color _textColor = c;
+    _textColor.a *= alpha;
+
+    DrawTextCentered(g->GUI, titleFont, text, rect{halfX, GetRealPixels(g, baseY), 0, 0}, _textColor);
+    DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, _textColor);
+}
 
 void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.0f, bool drawBackItem = false)
 {
@@ -459,8 +509,7 @@ void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.
     _textColor.a *= alpha;
 
     DrawRect(g->GUI, rect{0,0, static_cast<float>(g->Width), static_cast<float>(g->Height)}, color{0,0,0,0.5f * alpha});
-    DrawTextCentered(g->GUI, titleFont, menu.Title, rect{halfX, GetRealPixels(g, baseY), 0, 0}, _textColor);
-    DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, _textColor);
+    DrawHeader(g, menu.Title, textColor, alpha);
 
     float height = g->Height*0.05f;
     baseY = GetRealPixels(g, baseY);

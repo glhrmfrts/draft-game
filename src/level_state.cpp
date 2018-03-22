@@ -61,12 +61,36 @@ void InitLevel(game_main *g)
     );
     AddSequences(g->TweenState, l->GameOverMenuSequence, 1);
 
+    l->StatsScreenSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+    l->StatsScreenSequence->Tweens.push_back(WaitTween(1.0f));
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(1.0f)
+            .SetEasing(TweenEasing_Linear)
+    );
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha + 1)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(1.0f)
+            .SetEasing(TweenEasing_Linear)
+    );
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha + 2)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(1.0f)
+            .SetEasing(TweenEasing_Linear)
+    );
+    AddSequences(g->TweenState, l->StatsScreenSequence, 1);
+
     g->Gravity = vec3(0, 0, 0);
     g->World.Camera = &g->Camera;
 	l->DraftBoostSound = FindSound(g->AssetLoader, "boost");
 
-    InitFormat(&l->HealthFormat, "Health: %d\n", 24, &l->Arena);
-    InitFormat(&l->ScoreFormat, "Score: %d\n", 24, &l->Arena);
+    InitFormat(&l->ScoreFormat, "%s: %d / %d (%d%%)\n", 40, &l->Arena);
     InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
 
     l->Health = 50;
@@ -1001,7 +1025,8 @@ void UpdateLevel(game_main *g, float dt)
 			else if (g->Camera.Position.y + 5.0f >= ent->Pos().y)
 			{
 				ent->Finish->Finished = true;
-				//l->GameplayState = GameplayState_Finished;
+				l->GameplayState = GameplayState_Stats;
+                PlaySequence(g->TweenState, l->StatsScreenSequence);
 			}
 		}
 		EndProfileTimer("Game Entities");
@@ -1119,24 +1144,42 @@ void RenderLevel(game_main *g, float dt)
     PostProcessEnd(g->RenderState);
 
     Begin(g->GUI, g->GUICamera);
-    DrawRect(g->GUI, rect{20,20,200,20},
-             IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
 
-    DrawRect(g->GUI, rect{25,25,190 * l->DraftCharge,10},
-             IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
-
-    float left = GetRealPixels(g, 10.0f);
-    float top = g->Height - GetRealPixels(g, 10.0f);
-    DrawText(g->GUI, hudFont, Format(&l->ScoreFormat, l->Score), rect{left, top - fontSize, 0, 0}, Color_white);
-    DrawText(g->GUI, hudFont, Format(&l->HealthFormat, l->Health), rect{left + 400, top - fontSize, 0, 0}, Color_white);
-
-    if (l->GameplayState == GameplayState_Paused)
+    switch (l->GameplayState)
     {
+    case GameplayState_Playing:
+        DrawRect(g->GUI, rect{20,20,200,20},
+                 IntColor(FirstPalette.Colors[2]), GL_LINE_LOOP, false);
+
+        DrawRect(g->GUI, rect{25,25,190 * l->DraftCharge,10},
+                 IntColor(FirstPalette.Colors[3]), GL_TRIANGLES, false);
+        break;
+
+    case GameplayState_Paused:
         DrawMenu(g, pauseMenu, g->GUI.MenuChangeTimer, 1.0f, false);
-    }
-    else if (l->GameplayState == GameplayState_GameOver)
-    {
+        break;
+
+    case GameplayState_GameOver:
         DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, l->GameOverAlpha, false);
+        break;
+
+    case GameplayState_Stats:
+        DrawHeader(g, "STATS", Color_black, l->StatsAlpha[0]);
+        DrawTextCentered(
+            g->GUI,
+            textFont,
+            Format(&l->ScoreFormat, "SCORE", l->Score, 1500, 0),
+            rect{g->Width*0.5f, g->Height*0.75f, 0, 0},
+            Color_black * l->StatsAlpha[1]
+        );
+        DrawTextCentered(
+            g->GUI,
+            textFont,
+            Format(&l->ScoreFormat, "TARGET", 1200, 1500, 80),
+            rect{g->Width*0.5f, g->Height*0.7f, 0, 0},
+            Color_black * l->StatsAlpha[1]
+        );
+        break;
     }
 
     End(g->GUI);

@@ -42,6 +42,7 @@ enum gameplay_state
     GameplayState_Playing,
     GameplayState_Paused,
     GameplayState_GameOver,
+    GameplayState_Stats,
 };
 
 struct level_state
@@ -72,6 +73,9 @@ struct level_state
 
     tween_sequence *GameOverMenuSequence;
     float GameOverAlpha;
+
+    tween_sequence *StatsScreenSequence;
+    float StatsAlpha[3];
 
     entity *DraftTarget;
     float CurrentDraftTime = 0;

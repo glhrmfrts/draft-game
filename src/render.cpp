@@ -902,8 +902,8 @@ void RenderBegin(render_state &rs, float deltaTime)
 	rs.DeltaTime = deltaTime;
     rs.LastVAO = -1;
     rs.RenderableCount = 0;
-    rs.FrameSolidRenderables.clear();
-    rs.FrameTransparentRenderables.clear();
+    rs.FrameSolidRenderables.Clear();
+    rs.FrameTransparentRenderables.Clear();
 
 #ifdef DRAFT_DEBUG
     ResetBuffer(rs.DebugBuffer);
@@ -981,10 +981,15 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
 
 static material DebugMaterial{Color_white, 0.0f, 0.0f, NULL, MaterialFlag_PolygonLines};
 
-static bool SortRenderables(renderable &a, renderable &b)
+struct renderable_sorter
 {
-    return a.SortNumber < b.SortNumber;
-}
+    render_state *rs;
+
+    bool operator()(size_t a, size_t b)
+    {
+        return rs->Renderables[a].SortNumber < rs->Renderables[b].SortNumber;
+    }
+};
 
 void RenderEnd(render_state &rs, camera &Camera)
 {
@@ -1001,12 +1006,15 @@ void RenderEnd(render_state &rs, camera &Camera)
         r.Material = &DebugMaterial;
         r.PrimitiveType = GL_LINES;
         r.Transform = transform{};
-        rs.FrameSolidRenderables.push_back(i);
+        rs.FrameSolidRenderables.Add(i);
         UploadVertices(rs.DebugBuffer, GL_DYNAMIC_DRAW);
     }
 #endif
 
-    std::sort(rs.Renderables.begin(), rs.Renderables.begin() + rs.RenderableCount, SortRenderables);
+    renderable_sorter sorter;
+    sorter.rs = &rs;
+    std::sort(rs.FrameSolidRenderables.begin(), rs.FrameSolidRenderables.end(), sorter);
+    std::sort(rs.FrameTransparentRenderables.begin(), rs.FrameTransparentRenderables.end(), sorter);
 
     Bind(rs.ModelProgram);
 	SetUniform(rs.ModelProgram.BendRadius, rs.BendRadius);
@@ -1014,15 +1022,15 @@ void RenderEnd(render_state &rs, camera &Camera)
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    for (auto RenderableIndex : rs.FrameSolidRenderables)
+    for (auto renderableIndex : rs.FrameSolidRenderables)
     {
-        RenderRenderable(rs, Camera, rs.Renderables[RenderableIndex]);
+        RenderRenderable(rs, Camera, rs.Renderables[renderableIndex]);
     }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    for (auto RenderableIndex : rs.FrameTransparentRenderables)
+    for (auto renderableIndex : rs.FrameTransparentRenderables)
     {
-        RenderRenderable(rs, Camera, rs.Renderables[RenderableIndex]);
+        RenderRenderable(rs, Camera, rs.Renderables[renderableIndex]);
     }
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
@@ -1032,11 +1040,11 @@ void AddRenderable(render_state &rs, size_t index, material *material)
 {
     if (material->DiffuseColor.a < 1.0f || (material->Flags & MaterialFlag_ForceTransparent))
     {
-        rs.FrameTransparentRenderables.push_back(index);
+        rs.FrameTransparentRenderables.Add(index);
     }
     else
     {
-        rs.FrameSolidRenderables.push_back(index);
+        rs.FrameSolidRenderables.Add(index);
     }
 }
 

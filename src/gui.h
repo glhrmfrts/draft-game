@@ -65,7 +65,7 @@ struct gui
     shader_program Program;
     game_input *Input;
     float EmissionValue;
-    
+
     // menu stuff
     tween_sequence MenuChangeSequence;
     menu_axis HorizontalAxis;
@@ -138,6 +138,20 @@ struct menu_data
     menu_func *SelectFunc; // function called when an item in the submenu is selected
     menu_item Items[8];
     int HotItem=0;
+};
+
+struct text_group_item
+{
+    color Color;
+    vec2 Size;
+    const char *Text;
+    bitmap_font *Font;
+};
+
+struct text_group
+{
+    std::vector<text_group_item> Items;
+    vec2 Size;
 };
 
 #endif

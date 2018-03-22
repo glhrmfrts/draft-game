@@ -333,8 +333,8 @@ struct render_state
     std::vector<renderable> Renderables;
     size_t RenderableCount;
 
-    std::vector<size_t> FrameSolidRenderables;
-    std::vector<size_t> FrameTransparentRenderables;
+    fixed_array<size_t, 128> FrameSolidRenderables;
+    fixed_array<size_t, 128> FrameTransparentRenderables;
 
     uint32 Width;
     uint32 Height;

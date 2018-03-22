@@ -10,7 +10,7 @@ LIBS = -lfreetype -L/usr/lib64 -lSDL2 -lm -lGL -lGLU -lopenal -lsndfile -lGLEW -
 INCLUDE_PATHS = -Ideps -Isimple_lisp
 
 CC = clang++
-CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter $(INCLUDE_PATHS) -DDRAFT_DEBUG
+CFLAGS = -g -std=c++14 -Wall -Wextra -Wno-unused-parameter -Wno-missing-braces -Wno-switch $(INCLUDE_PATHS) -DDRAFT_DEBUG
 LDFLAGS = $(LIBS)
 
 OUT = build/draft.so
