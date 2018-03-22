@@ -162,14 +162,19 @@ extern "C"
 				NULL
 			)
 		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Level,
-				"data/levels/1.level",
-				"1",
-				NULL
-			)
-		);
+
+#define NUM_LEVELS 2
+		for (int i = 1; i <= NUM_LEVELS; i++)
+		{
+			g->Assets.push_back(
+				CreateAssetEntry(
+					AssetEntryType_Level,
+					"data/levels/" + std::to_string(i) + ".level",
+					std::to_string(i),
+					NULL
+				)
+			);
+		}
 
         InitLoadingScreen(g);
     }

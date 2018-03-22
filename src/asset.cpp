@@ -428,7 +428,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 		for (json::iterator it = j["names"].begin(); it != j["names"].end(); ++it)
 		{
-			result->Names[it.key()] = it.value();
+			result->Names[hash_string()(it.key())] = it.value();
 		}
 
 		//free((void *)content);

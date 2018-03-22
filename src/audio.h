@@ -23,7 +23,7 @@ struct song
 	int Bpm;
 	std::vector<audio_clip *> Tracks;
 	std::vector<std::string> Files;
-	std::unordered_map<std::string, int> Names;
+	std::unordered_map<hash_string::result_type, int> Names;
 };
 
 struct next_beat_callback

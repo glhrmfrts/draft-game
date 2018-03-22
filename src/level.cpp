@@ -1,20 +1,18 @@
 // Copyright
 
-using hash_string = std::hash<std::string>;
-
-static std::unordered_map<size_t, color> LevelColors = {
+static std::unordered_map<hash_string::result_type, color> LevelColors = {
 	{ hash_string()("CRYSTAL_COLOR"), CRYSTAL_COLOR },
 	{ hash_string()("SHIP_BLUE_COLOR"), IntColor(ShipPalette.Colors[SHIP_BLUE]) },
 	{ hash_string()("SHIP_ORANGE_COLOR"), IntColor(ShipPalette.Colors[SHIP_ORANGE]) },
 };
 
-static std::unordered_map<size_t, gen_type> LevelGenTypes = {
+static std::unordered_map<hash_string::result_type, gen_type> LevelGenTypes = {
 	{ hash_string()("CRYSTALS"), GenType_Crystal },
 	{ hash_string()("SHIPS"), GenType_Ship },
 	{ hash_string()("RED_SHIPS"), GenType_RedShip },
 };
 
-static std::unordered_map<size_t, int> LevelShipColors = {
+static std::unordered_map<hash_string::result_type, int> LevelShipColors = {
 	{ hash_string()("SHIP_BLUE"), SHIP_BLUE },
 	{ hash_string()("SHIP_ORANGE"), SHIP_ORANGE },
 	{ hash_string()("ALL"), -1 },
@@ -70,12 +68,24 @@ bool ParseGenericCommand(const std::string &cmd, const std::vector<std::string> 
     else if (cmd == "play_track")
     {
         c->Type = LevelCommand_PlayTrack;
-        c->Hash = hash_string()(args[0]);
+        c->Track.TrackHash = hash_string()(args[0]);
+		c->Track.BeatDivisor = 1;
+		if (args.size() == 2)
+		{
+			c->Track.BeatDivisor = atoi(args[1].c_str());
+		}
+		return true;
     }
     else if (cmd == "stop_track")
     {
         c->Type = LevelCommand_StopTrack;
-        c->Hash = hash_string()(args[0]);
+		c->Track.TrackHash = hash_string()(args[0]);
+		c->Track.BeatDivisor = 1;
+		if (args.size() == 2)
+		{
+			c->Track.BeatDivisor = atoi(args[1].c_str());
+		}
+		return true;
     }
 
     return false;
@@ -165,6 +175,10 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 			{
 				result->SongName = args[0];
 			}
+			else if (cmd == "next")
+			{
+				result->Next = args[0];
+			}
             else if (cmd == "stats_screen")
             {
                 parseState = Parse_StatsScreen;
@@ -243,6 +257,14 @@ static void RunCommands(game_main *g, level_state *state, const std::vector<leve
         case LevelCommand_RoadTangent:
             RoadTangent(g, state);
             break;
+
+		case LevelCommand_PlayTrack:
+			PlayTrack(g, state, cmd.Track.TrackHash, cmd.Track.BeatDivisor);
+			break;
+
+		case LevelCommand_StopTrack:
+			StopTrack(g, state, cmd.Track.TrackHash, cmd.Track.BeatDivisor);
+			break;
         }
     }
 }

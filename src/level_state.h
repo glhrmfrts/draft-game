@@ -37,6 +37,12 @@ struct level_intro_text
     tween_sequence *PosSequence = NULL;
 };
 
+struct track_args
+{
+	game_main *Game;
+	hash_string::result_type TrackHash;
+};
+
 enum gameplay_state
 {
     GameplayState_Playing,
@@ -56,6 +62,7 @@ struct level_state
     generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;
     generic_pool<level_intro_text> IntroTextPool;
+	generic_pool<track_args> TrackArgsPool;
 
     std::vector<collision_result> CollisionCache;
     float PlayerMinVel = PLAYER_MIN_VEL;
@@ -74,8 +81,13 @@ struct level_state
     tween_sequence *GameOverMenuSequence;
     float GameOverAlpha;
 
+	// stats screen stuff
     tween_sequence *StatsScreenSequence;
     float StatsAlpha[3];
+	text_group ScoreTextGroup;
+	text_group TargetTextGroup;
+	string_format ScorePercentFormat;
+	string_format ScoreRatioFormat;
 
     entity *DraftTarget;
     float CurrentDraftTime = 0;
@@ -83,17 +95,18 @@ struct level_state
     int NumTrailCollisions = 0;
     bool DraftActive = false;
     string_format HealthFormat;
-    string_format ScoreFormat;
     string_format ScoreNumberFormat;
     int Score = 0;
     std::list<level_score_text *> ScoreTextList;
     std::list<level_intro_text *> IntroTextList;
 };
 
-void InitLevel(game_main *g);
+void InitLevel(game_main *g, const std::string &levelNumber = "1");
 void AddIntroText(game_main *g, level_state *l, const char *text, color c);
 void SpawnCheckpoint(game_main *g, level_state *l);
 void SpawnFinish(game_main *g, level_state *l);
 void RoadTangent(game_main *g, level_state *l);
+void PlayTrack(game_main *g, level_state *l, hash_string::result_type trackHash, int divisor);
+void StopTrack(game_main *g, level_state *l, hash_string::result_type trackHash, int divisor);
 
 #endif

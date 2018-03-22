@@ -36,7 +36,7 @@ static menu_data gameOverMenu = {
 
 static song *firstSong;
 
-void InitLevel(game_main *g)
+void InitLevel(game_main *g, const std::string &levelNumber)
 {
     g->State = GameState_Level;
 
@@ -45,12 +45,14 @@ void InitLevel(game_main *g)
     ResetPool(l->IntroTextPool);
     ResetPool(l->ScoreTextPool);
     ResetPool(l->SequencePool);
+	ResetPool(l->TrackArgsPool);
 
 	l->AssetLoader = &g->AssetLoader;
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
     l->IntroTextPool.Arena = &l->Arena;
     l->ScoreTextPool.Arena = &l->Arena;
     l->SequencePool.Arena = &l->Arena;
+	l->TrackArgsPool.Arena = &l->Arena;
     l->GameOverMenuSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
     l->GameOverMenuSequence->Tweens.push_back(
         tween(&l->GameOverAlpha)
@@ -61,6 +63,9 @@ void InitLevel(game_main *g)
     );
     AddSequences(g->TweenState, l->GameOverMenuSequence, 1);
 
+	l->StatsAlpha[0] = 0;
+	l->StatsAlpha[1] = 0;
+	l->StatsAlpha[2] = 0;
     l->StatsScreenSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
     l->StatsScreenSequence->Tweens.push_back(WaitTween(1.0f));
     l->StatsScreenSequence->Tweens.push_back(
@@ -90,21 +95,40 @@ void InitLevel(game_main *g)
     g->World.Camera = &g->Camera;
 	l->DraftBoostSound = FindSound(g->AssetLoader, "boost");
 
-    InitFormat(&l->ScoreFormat, "%s: %d / %d (%d%%)\n", 40, &l->Arena);
+    InitFormat(&l->ScorePercentFormat, "%s: %d%%\n", 24, &l->Arena);
+	InitFormat(&l->ScoreRatioFormat, " (%d / %d)", 24, &l->Arena);
     InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
+
+	static auto smallFont = FindBitmapFont(g->AssetLoader, "vcr_16");
+	static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+	l->ScoreTextGroup.Items = {
+		text_group_item(Color_white, textFont),
+		text_group_item(Color_white, smallFont)
+	};
+
+	l->TargetTextGroup.Items = {
+		text_group_item(Color_white, textFont),
+		text_group_item(Color_white, smallFont)
+	};
 
     l->Health = 50;
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
     l->GameplayState = GameplayState_Playing;
-	l->Level = FindLevel(g->AssetLoader, "1");
+	l->Level = FindLevel(g->AssetLoader, levelNumber);
 
 	g->MusicMaster.StepBeat = true;
-	MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["hats"]);
-	MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["pad_chords"]);
+	//MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["hats"]);
+	//MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["pad_chords"]);
 
 	auto gen = g->World.GenState->GenParams + GenType_SideTrail;
 	gen->Flags |= GenFlag_Enabled;
+}
+
+void CleanupLevel(game_main *g, level_state *l)
+{
+	DestroySequences(g->TweenState, l->StatsScreenSequence, 1);
+	DestroySequences(g->TweenState, l->GameOverMenuSequence, 1);
 }
 
 void RemoveGameplayEntities(entity_world &w)
@@ -134,6 +158,11 @@ void RemoveGameplayEntities(entity_world &w)
         if (!ent) continue;
         RemoveEntity(w, ent);
     }
+	for (auto ent : w.FinishEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
 }
 
 void RestartLevel(game_main *g)
@@ -141,7 +170,7 @@ void RestartLevel(game_main *g)
     g->LevelState.Health = 50;
     RemoveGameplayEntities(g->World);
     AddEntity(g->World, g->World.PlayerEntity);
-    InitLevel(g);
+    InitLevel(g, "1");
 }
 
 void AddIntroText(game_main *g, level_state *l, const char *text, color c)
@@ -486,176 +515,59 @@ void RoadTangent(game_main *g, level_state *l)
     g->World.ShouldRoadTangent = true;
 }
 
-void PlayKick(void *arg)
+track_args *GetTrackArg(game_main *g, level_state *l, hash_string::result_type trackHash)
 {
-	auto m = (music_master *)arg;
-	MusicMasterPlayTrack(*m, firstSong->Names["kick"]);
+	auto entry = GetEntry(l->TrackArgsPool);
+	auto result = PushStruct<track_args>(entry);
+	result->Game = g;
+	result->TrackHash = trackHash;
+	return result;
 }
 
-void PlaySnare(void *arg)
+static void PlayTrackFunc(void *arg)
 {
-	auto m = (music_master *)arg;
-	MusicMasterPlayTrack(*m, firstSong->Names["snare"]);
+	auto args = (track_args *)arg;
+	auto sng = args->Game->LevelState.Level->Song;
+	MusicMasterPlayTrack(args->Game->MusicMaster, sng->Names[args->TrackHash]);
 }
 
-void UpdateClassicMode(game_main *g, level_state *l)
+void PlayTrack(game_main *g, level_state *l, hash_string::result_type trackHash, int divisor)
 {
-    auto crystals = g->World.GenState->GenParams + GenType_Crystal;
-    auto ships = g->World.GenState->GenParams + GenType_Ship;
-    auto redShips = g->World.GenState->GenParams + GenType_RedShip;
-    auto asteroids = g->World.GenState->GenParams + GenType_Asteroid;
-    int frame = l->CurrentCheckpointFrame;
-    switch (l->CheckpointNum)
-    {
-    case 0:
-    {
-        //l->PlayerMinVel = PLAYER_MIN_VEL;
-        //l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
-		l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
-		l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
+	if (divisor > 0)
+	{
+		auto arg = GetTrackArg(g, l, trackHash);
+		MusicMasterOnNextBeat(g->MusicMaster, PlayTrackFunc, (void *)arg, divisor);
+	}
+	else
+	{
+		MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names[trackHash]);
+	}
+}
 
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "COLLECT", CRYSTAL_COLOR);
-			RoadChange(g->World, RoadChange_NarrowRight);
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            Enable(crystals);
-            Randomize(crystals);
-			RoadChange(g->World, RoadChange_WidensLeft);
-        }
-		if (frame == FRAME_SECONDS(7))
-		{
-			RoadChange(g->World, RoadChange_NarrowLeft);
-		}
-		if (frame == FRAME_SECONDS(9))
-		{
-			RoadChange(g->World, RoadChange_WidensRight);
-		}
-		if (frame == FRAME_SECONDS(11))
-		{
-			RoadChange(g->World, RoadChange_NarrowCenter);
-		}
-		if (frame == FRAME_SECONDS(13))
-		{
-			RoadChange(g->World, RoadChange_WidensCenter);
-		}
-        if (frame == FRAME_SECONDS(25))
-        {
-            Disable(crystals);
-            SpawnCheckpoint(g, l);
-        }
-        break;
-    }
+static void StopTrackFunc(void *arg)
+{
+	auto args = (track_args *)arg;
+	auto sng = args->Game->LevelState.Level->Song;
+	MusicMasterStopTrack(args->Game->MusicMaster, sng->Names[args->TrackHash]);
+}
 
-    case 1:
-    {
-		l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
-		l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
+void StopTrack(game_main *g, level_state *l, hash_string::result_type trackHash, int divisor)
+{
+	if (divisor > 0)
+	{
+		auto arg = GetTrackArg(g, l, trackHash);
+		MusicMasterOnNextBeat(g->MusicMaster, StopTrackFunc, (void *)arg, divisor);
+	}
+	else
+	{
+		MusicMasterStopTrack(g->MusicMaster, l->Level->Song->Names[trackHash]);
+	}
+}
 
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
-			MusicMasterOnNextBeat(g->MusicMaster, PlayKick, &g->MusicMaster, 4);
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            l->ForceShipColor = SHIP_BLUE;
-            Enable(ships);
-        }
-        if (frame == FRAME_SECONDS(40))
-        {
-            Disable(ships);
-            SpawnCheckpoint(g, l);
-        }
-        break;
-    }
-
-    case 2:
-    {
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
-			MusicMasterOnNextBeat(g->MusicMaster, PlaySnare, &g->MusicMaster, 2);
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            l->ForceShipColor = SHIP_ORANGE;
-            Enable(ships);
-        }
-        if (frame == FRAME_SECONDS(40))
-        {
-            Disable(ships);
-            SpawnCheckpoint(g, l);
-        }
-        break;
-    }
-
-    case 3:
-    {
-        l->PlayerMinVel = PLAYER_MIN_VEL + 15.0f;
-        l->PlayerMaxVel = PLAYER_MIN_VEL + 50.0f;
-
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "DODGE", IntColor(ShipPalette.Colors[SHIP_RED]));
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            RemoveFlags(redShips, GenFlag_ReserveLane);
-            Enable(redShips);
-        }
-        if (frame == FRAME_SECONDS(25))
-        {
-            Disable(redShips);
-            SpawnCheckpoint(g, l);
-        }
-        break;
-    }
-
-    case 4:
-    {
-        l->PlayerMinVel = PLAYER_MIN_VEL;
-        l->PlayerMaxVel = PLAYER_MIN_VEL + 30.0f;
-
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "ASTEROIDS", ASTEROID_COLOR);
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            Enable(asteroids);
-        }
-        if (frame == FRAME_SECONDS(25))
-        {
-            Disable(asteroids);
-            SpawnCheckpoint(g, l);
-        }
-        break;
-    }
-
-    case 5:
-    {
-        l->PlayerMinVel = PLAYER_MIN_VEL + 50.0f;
-        l->PlayerMaxVel = PLAYER_MIN_VEL + 100.0f;
-
-        if (frame == 0)
-        {
-            AddIntroText(g, l, "DRAFT & BLAST", IntColor(ShipPalette.Colors[SHIP_BLUE]));
-        }
-        if (frame == FRAME_SECONDS(1))
-        {
-            AddIntroText(g, l, "DRAFT & MISS", IntColor(ShipPalette.Colors[SHIP_ORANGE]));
-        }
-        if (frame == FRAME_SECONDS(5))
-        {
-            l->ForceShipColor = -1;
-            Enable(ships);
-        }
-    }
-    }
-
+static void LevelStateToStats(game_main *g, level_state *l)
+{
+	l->GameplayState = GameplayState_Stats;
+	PlaySequence(g->TweenState, l->StatsScreenSequence);
 }
 
 void UpdateLevel(game_main *g, float dt)
@@ -682,11 +594,22 @@ void UpdateLevel(game_main *g, float dt)
         {
             l->GameplayState = GameplayState_Paused;
         }
-        else
+        else if (l->GameplayState == GameplayState_Paused)
         {
             l->GameplayState = GameplayState_Playing;
         }
     }
+	if (IsJustPressed(g, Action_select))
+	{
+		if (l->GameplayState == GameplayState_Stats)
+		{
+			CleanupLevel(g, l);
+			RemoveGameplayEntities(g->World);
+			AddEntity(g->World, g->World.PlayerEntity);
+			InitLevel(g, l->Level->Next);
+			return;
+		}
+	}
 
     dt *= Global_Game_TimeSpeed;
     if (l->GameplayState != GameplayState_Paused)
@@ -729,7 +652,7 @@ void UpdateLevel(game_main *g, float dt)
         }
 #endif
 
-        if (l->GameplayState == GameplayState_Playing)
+        if (l->GameplayState == GameplayState_Playing || l->GameplayState == GameplayState_Stats)
         {
             //UpdateClassicMode(g, l);
 			LevelUpdate(l->Level, g, l, dt);
@@ -1025,8 +948,7 @@ void UpdateLevel(game_main *g, float dt)
 			else if (g->Camera.Position.y + 5.0f >= ent->Pos().y)
 			{
 				ent->Finish->Finished = true;
-				l->GameplayState = GameplayState_Stats;
-                PlaySequence(g->TweenState, l->StatsScreenSequence);
+				LevelStateToStats(g, l);
 			}
 		}
 		EndProfileTimer("Game Entities");
@@ -1081,7 +1003,10 @@ void UpdateLevel(game_main *g, float dt)
 		}
 	}
 
-	l->CurrentCheckpointFrame++;
+	if (l->GameplayState == GameplayState_Playing)
+	{
+		l->CurrentCheckpointFrame++;
+	}
 
 #if 0
 	BeginProfileTimer(g->Platform.GetMilliseconds(), "Update thread wait");
@@ -1165,20 +1090,18 @@ void RenderLevel(game_main *g, float dt)
 
     case GameplayState_Stats:
         DrawHeader(g, "STATS", Color_black, l->StatsAlpha[0]);
-        DrawTextCentered(
-            g->GUI,
-            textFont,
-            Format(&l->ScoreFormat, "SCORE", l->Score, 1500, 0),
-            rect{g->Width*0.5f, g->Height*0.75f, 0, 0},
-            Color_black * l->StatsAlpha[1]
-        );
-        DrawTextCentered(
-            g->GUI,
-            textFont,
-            Format(&l->ScoreFormat, "TARGET", 1200, 1500, 80),
-            rect{g->Width*0.5f, g->Height*0.7f, 0, 0},
-            Color_black * l->StatsAlpha[1]
-        );
+		{
+			rect container;
+			DrawContainerPolygon(g, Color_black * 0.75f * l->StatsAlpha[1], container);
+
+			l->ScoreTextGroup.Items[0].Text = Format(&l->ScorePercentFormat, "SCORE", int(l->Score / (float)1500 * 100));
+			l->ScoreTextGroup.Items[1].Text = Format(&l->ScoreRatioFormat, l->Score, 1500);
+			DrawTextGroupCentered(g->GUI, &l->ScoreTextGroup, rect{ g->Width*0.5f, g->Height*0.6f, 0, 0 }, color{ 1, 1, 1, l->StatsAlpha[1] });
+
+			l->TargetTextGroup.Items[0].Text = Format(&l->ScorePercentFormat, "TARGET", int(1200 / (float)1500 * 100));
+			l->TargetTextGroup.Items[1].Text = "(0)";
+			DrawTextGroupCentered(g->GUI, &l->TargetTextGroup, rect{ g->Width*0.5f, g->Height*0.525f, 0, 0 }, color{ 1, 1, 1, l->StatsAlpha[1] });
+		}
         break;
     }
 

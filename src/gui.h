@@ -145,7 +145,10 @@ struct text_group_item
     color Color;
     vec2 Size;
     const char *Text;
-    bitmap_font *Font;
+	bitmap_font *Font;
+
+	text_group_item(color c, bitmap_font *font)
+		: Color(c), Font(font) {}
 };
 
 struct text_group

@@ -3,7 +3,7 @@
 
 #define CRYSTAL_COLOR     IntColor(FirstPalette.Colors[1])
 
-#define FRAME_SECONDS(s) (s * 60)
+#define FRAME_SECONDS(s)  (s * 60)
 
 enum level_command_type
 {
@@ -26,11 +26,17 @@ struct level_command
 	{
 		struct
 		{
-			size_t ColorHash;
+			hash_string::result_type  ColorHash;
 			const char *Text;
 		} AddIntroText;
 
-		size_t Hash;
+		struct
+		{
+			hash_string::result_type TrackHash;
+			int BeatDivisor;
+		} Track;
+
+		hash_string::result_type  Hash;
 	};
 };
 
@@ -54,6 +60,7 @@ struct level
 	std::vector<level_checkpoint> Checkpoints;
 	std::string Name;
 	std::string SongName;
+	std::string Next;
 	song *Song;
     bool HasRunStatsScreenCommands = false;
 };

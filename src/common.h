@@ -56,6 +56,8 @@ using std::string;
 using std::vector;
 using std::unordered_map;
 
+using hash_string = std::hash<std::string>;
+
 #define ArrayCount(Arr) (sizeof(Arr)/sizeof(Arr[0]))
 
 enum direction

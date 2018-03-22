@@ -245,10 +245,10 @@ uint32 DrawCircle(gui &g, vec2 center, float radius, color c, GLuint PrimType)
 	return GUIElementState_none;
 }
 
-uint32 DrawPolygon(gui &g, vec2 *Vertices, size_t Count, color c)
+uint32 DrawPolygon(gui &g, vec2 *Vertices, size_t Count, color c, GLuint PrimType = GL_LINE_LOOP)
 {
 	PushDrawCommand(g);
-	g.CurrentDrawCommand = NextDrawCommand(g, GL_LINE_LOOP, 0, Color_white, NULL);
+	g.CurrentDrawCommand = NextDrawCommand(g, PrimType, 0, Color_white, NULL);
 
 	for (size_t i = 0; i < Count; i++)
 	{
@@ -336,8 +336,8 @@ uint32 DrawText(gui &g, bitmap_font *Font, const char *text, rect &r, color c, b
 uint32 DrawTextPtr(gui &g, bitmap_font *Font, const char *text, rect &r, color c, vec2 *ptr, bool CheckState = true)
 {
     uint32 result = DrawText(g, Font, text, r, c, CheckState);
-    ptr->x += rect.Width;
-    ptr->y += rect.Height;
+    ptr->x += r.Width;
+    ptr->y += r.Height;
     return result;
 }
 
@@ -361,7 +361,7 @@ void MeasureTextGroup(text_group *group)
     }
 }
 
-void DrawTextGroupCentered(gui &g, text_group *group, rect r)
+void DrawTextGroupCentered(gui &g, text_group *group, rect r, color multiplyColor)
 {
     MeasureTextGroup(group);
     r.X -= group->Size.x/2;
@@ -369,9 +369,10 @@ void DrawTextGroupCentered(gui &g, text_group *group, rect r)
     vec2 ptr = {r.X, r.Y};
     for (size_t i = 0; i < group->Items.size(); i++)
     {
-        DrawTextPtr(g, item->Font, item->Text, r, c, &ptr);
-        r.X = ptr->x;
-        r.Y = ptr->y;
+		auto item = &group->Items[i];
+        DrawTextPtr(g, item->Font, item->Text, r, item->Color * multiplyColor, &ptr);
+        r.X = ptr.x;
+        r.Y = ptr.y;
     }
 }
 
@@ -493,6 +494,28 @@ void DrawHeader(game_main *g, const char *text, color c, float alpha = 1.0f)
 
     DrawTextCentered(g->GUI, titleFont, text, rect{halfX, GetRealPixels(g, baseY), 0, 0}, _textColor);
     DrawLine(g->GUI, vec2{halfX - lineWidth*0.5f,GetRealPixels(g,640.0f)}, vec2{halfX + lineWidth*0.5f,GetRealPixels(g,640.0f)}, _textColor);
+}
+
+void DrawContainerPolygon(game_main *g, color c, rect &r)
+{
+	float halfX = g->Width*0.5f;
+	float halfY = g->Height*0.5f;
+	float width = g->Width*0.75f;
+	float height = g->Height*0.5f;
+	float borderRadius = GetRealPixels(g, 100);
+
+	static vec2 vertices[] = {
+		{ halfX - width/2, halfY - height/2 },
+		{ halfX + width / 2 - borderRadius, halfY - height / 2 },
+		{ halfX + width / 2, halfY + height / 2 },
+		{ halfX - width / 2 + borderRadius, halfY + height / 2 },
+	};
+	DrawPolygon(g->GUI, vertices, ARRAY_COUNT(vertices), c, GL_TRIANGLE_FAN);
+
+	r.X = halfX - width / 2;
+	r.Y = halfY - height / 2;
+	r.Width = width;
+	r.Height = height;
 }
 
 void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.0f, bool drawBackItem = false)
