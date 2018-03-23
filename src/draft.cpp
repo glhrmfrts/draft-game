@@ -39,14 +39,15 @@ extern "C"
         ImGui_ImplSdlGL3_Init(g->Window);
 
         RegisterInputActions(g->Input);
-        InitGUI(g->GUI, g->TweenState, g->Input);
         MakeCameraOrthographic(g->GUICamera, 0, Width, 0, Height, -1, 1);
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height, g->ViewportWidth, g->ViewportHeight);
         InitTweenState(g->TweenState);
+		InitGUI(g->GUI, g->TweenState, g->Input);
         InitEntityWorld(g, g->World);
 		MusicMasterInit(g, g->MusicMaster);
+		InitLevelState(g, &g->LevelState);
 
         g->RenderState.RoadTangentPoint = &g->World.RoadTangentPoint;
 
@@ -218,7 +219,7 @@ extern "C"
         switch (g->State)
         {
         case GameState_LoadingScreen:
-            UpdateLoadingScreen(g, dt, InitMenu);
+            UpdateLoadingScreen(g, dt, InitMenuState);
             break;
 
         case GameState_Level:
@@ -226,7 +227,7 @@ extern "C"
             break;
 
         case GameState_Menu:
-            UpdateMenu(g, dt);
+            UpdateMenuState(g, dt);
             break;
         }
 
@@ -261,9 +262,17 @@ extern "C"
             break;
 
         case GameState_Menu:
-            RenderMenu(g, dt);
+            RenderMenuState(g, dt);
             break;
         }
+
+		if (g->ScreenRectAlpha > 0.0f)
+		{
+			Begin(g->GUI, g->GUICamera, 0.0f);
+			DrawRect(g->GUI, rect{ 0, 0, (float)g->Width, (float)g->Height }, Color_black * g->ScreenRectAlpha, GL_TRIANGLES, false);
+			End(g->GUI);
+		}
+
         DrawDebugUI(g, dt);
         ImGui::Render();
     }

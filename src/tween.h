@@ -1,6 +1,9 @@
 #ifndef DRAFT_TWEEN_H
 #define DRAFT_TWEEN_H
 
+#define FAST_TWEEN_DURATION 0.5f
+#define SLOW_TWEEN_DURATION 1.0f
+
 #define TWEEN_FUNC(name) float name(float t)
 typedef TWEEN_FUNC(tween_func);
 
@@ -12,6 +15,7 @@ enum tween_easing
 
 struct tween
 {
+    std::function<void()> Callback;
     float *Value;
     float From;
     float To;
@@ -44,6 +48,12 @@ struct tween
         Easing = e;
         return *this;
     }
+
+    inline tween &SetCallback(std::function<void()> callback)
+    {
+        Callback = callback;
+        return *this;
+    }
 };
 
 struct tween_sequence
@@ -54,10 +64,14 @@ struct tween_sequence
     bool Complete = false;
     bool Active = false;
     bool Loop = false;
+	bool OneShot = false;
 };
 
 struct tween_state
 {
+	memory_arena Arena;
+	generic_pool<tween_sequence> SequencePool;
+
     std::vector<tween_sequence *> Sequences;
     tween_func *Funcs[TweenEasing_MAX];
 };

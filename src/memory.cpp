@@ -212,6 +212,7 @@ void *PushSize(allocator *alloc, size_t size, const char *name)
 template<typename T>
 T *PushStruct(allocator *alloc)
 {
+	const char *typeName = typeid(T).name();
     auto arena = dynamic_cast<memory_arena *>(alloc);
     if (arena)
     {

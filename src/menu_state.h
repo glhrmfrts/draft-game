@@ -15,7 +15,8 @@ enum menu_screen
 
 struct menu_state
 {
-    tween_sequence FadeOutSequence;
+	tween_sequence *FadeInSequence;
+    tween_sequence *FadeOutSequence;
 	menu_screen Screen = MenuScreen_Main;
     float Alpha = 1;
     int HotMainMenu = 0;

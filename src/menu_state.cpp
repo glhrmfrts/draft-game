@@ -6,7 +6,7 @@ MENU_FUNC(PlayMenuCallback)
 	{
 	case 0: // campaign mode
 	{
-		PlaySequence(g->TweenState, &g->MenuState.FadeOutSequence, true);
+		PlaySequence(g->TweenState, g->MenuState.FadeOutSequence, true);
 		break;
 	}
 	}
@@ -103,26 +103,31 @@ void UpdateFinalCamera(game_main *g)
     UpdateProjectionView(fc);
 }
 
-void InitMenu(game_main *g)
+void ResetMenuState(game_main *g)
 {
-    g->State = GameState_Menu;
-    InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
+	g->State = GameState_Menu;
+	InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
 
+	auto m = &g->MenuState;
+	m->Alpha = 1.0f;
+	m->Screen = MenuScreen_Main;
+
+	PlaySequence(g->TweenState, m->FadeInSequence);
+}
+
+void InitMenuState(game_main *g)
+{
     auto m = &g->MenuState;
-    if (m->FadeOutSequence.Tweens.size() == 0)
-    {
-        m->FadeOutSequence.Tweens.push_back(
-            tween(&m->Alpha)
-                .SetFrom(1.0f)
-                .SetTo(0.0f)
-                .SetDuration(1.0f)
-                .SetEasing(TweenEasing_Linear)
-        );
-        AddSequences(g->TweenState, &m->FadeOutSequence, 1);
-    }
+	m->FadeInSequence = CreateSequence(g->TweenState);
+	m->FadeInSequence->Tweens.push_back(FadeOutTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION));
 
-    m->Alpha = 1.0f;
-    m->FadeOutSequence.Complete = false;
+	m->FadeOutSequence = CreateSequence(g->TweenState);
+	m->FadeOutSequence->Tweens.push_back(FadeOutTween(&m->Alpha, FAST_TWEEN_DURATION).SetCallback([g]()
+	{
+		ResetLevelState(g, &g->LevelState, "1");
+	}));
+
+	ResetMenuState(g);
 
 	auto sng = FindSong(g->AssetLoader, "music");
 	MusicMasterLoadSong(g->MusicMaster, sng);
@@ -135,7 +140,7 @@ void InitMenu(game_main *g)
 	GraphicsMenu.Items[0].Options.SelectedIndex = g->Options->Values["graphics/resolution"]->Int;
 	for (int i = 0; i < ARRAY_COUNT(Global_Resolutions); i++)
 	{
-		GraphicsMenu.Items[0].Options.Values.Add(Global_ResolutionTexts[i]);
+		GraphicsMenu.Items[0].Options.Values.push_back(Global_ResolutionTexts[i]);
 	}
 
 	GraphicsMenu.Items[1].Switch.Value = &g->Options->Values["graphics/fullscreen"]->Bool;
@@ -166,7 +171,7 @@ void SaveOptions(game_main *g)
 	);
 }
 
-void UpdateMenu(game_main *g, float dt)
+void UpdateMenuState(game_main *g, float dt)
 {
     auto m = &g->MenuState;
     float moveX = GetMenuAxisValue(g->Input, g->GUI.HorizontalAxis, dt);
@@ -192,7 +197,7 @@ void UpdateMenu(game_main *g, float dt)
         m->HotMainMenu = glm::clamp(m->HotMainMenu, 0, (int)ARRAY_COUNT(Menus) - 1);
         if (prevHotMenu != m->HotMainMenu)
         {
-            PlaySequence(g->TweenState, &g->GUI.MenuChangeSequence, true);
+            PlaySequence(g->TweenState, g->GUI.MenuChangeSequence, true);
         }
 
         if (IsJustPressed(g, Action_select))
@@ -236,14 +241,9 @@ void UpdateMenu(game_main *g, float dt)
 			m->Screen = MenuScreen_Main;
         }
     }
-
-    if (m->FadeOutSequence.Complete)
-    {
-        InitLevel(g);
-    }
 }
 
-void RenderMenu(game_main *g, float dt)
+void RenderMenuState(game_main *g, float dt)
 {
     static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
     auto m = &g->MenuState;

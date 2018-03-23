@@ -718,6 +718,9 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.ShipEntities.clear();
     w.TrailGroupEntities.clear();
 	w.RoadPieceEntities.clear();
+	w.AudioEntities.clear();
+	w.PowerupEntities.clear();
+	w.FinishEntities.clear();
 
     ResetPool(w.AsteroidPool);
     ResetPool(w.CheckpointPool);
@@ -761,9 +764,21 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     }
 	SetRoadPieceBounds(&w.RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
 
+	w.DisableRoadRepeat = false;
+
     w.BackgroundState.RandomTexture = FindTexture(*loader, "random");
 	w.BackgroundState.Instances.push_back(background_instance{ color(0, 1, 1, 1), vec2(0.0f) });
 	w.BackgroundState.Instances.push_back(background_instance{ color(1, 0, 1, 1), vec2(1060, 476) });
+}
+
+void ResetRoadPieces(entity_world &world, float baseY)
+{
+    world.DisableRoadRepeat = false;
+    for (int i = 0; i < ROAD_SEGMENT_COUNT; i++)
+    {
+        auto ent = world.RoadPieceEntities[i];
+        ent->Pos().y = baseY + i*ROAD_SEGMENT_SIZE;
+    }
 }
 
 entity_update_args *GetUpdateArg(entity_world &world, entity *ent, float dt)

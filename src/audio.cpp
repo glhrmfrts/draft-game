@@ -64,15 +64,6 @@ void AudioSourceSetClip(audio_source *source, audio_clip *clip)
 	{
 		alSourcei(source->ID, AL_BUFFER, clip->Buffers[0]);
 	}
-	else
-	{
-		if (!Stream(source, clip->Buffers[0]) || !Stream(source, clip->Buffers[1]))
-		{
-			Println("error streaming");
-			return;
-		}
-		alSourceQueueBuffers(source->ID, clip->NumBuffers, clip->Buffers);
-	}
 }
 
 void AudioSourceCreate(audio_source *source, audio_clip *buffer)
@@ -106,18 +97,35 @@ void AudioSourceSetGain(audio_source *source, float gain = 1)
 
 void AudioSourcePlay(audio_source *source)
 {
+	auto clip = source->Clip;
+	if (clip->Type == AudioClipType_Stream)
+	{
+		if (!Stream(source, clip->Buffers[0]) || !Stream(source, clip->Buffers[1]))
+		{
+			Println("error streaming");
+			return;
+		}
+		alSourceQueueBuffers(source->ID, clip->NumBuffers, clip->Buffers);
+	}
+
 	alSourcePlay(source->ID);
 }
 
 void AudioSourcePlay(audio_source *source, audio_clip *buffer)
 {
 	AudioSourceSetClip(source, buffer);
-	alSourcePlay(source->ID);
+	AudioSourcePlay(source);
 }
 
 void AudioSourceStop(audio_source *source)
 {
 	alSourceStop(source->ID);
+	if (source->Clip->Type == AudioClipType_Stream)
+	{
+		ALuint buffers[2];
+		alSourceUnqueueBuffers(source->ID, 2, buffers);
+		sf_seek(source->Clip->SndFile, 0, SEEK_SET);
+	}
 }
 
 bool IsPlaying(audio_source *source)
@@ -260,19 +268,19 @@ extern "C" export_func void MusicMasterLoop(void *arg)
 					m->Timer = (m->Timer - m->BeatTime);
 					m->Beat++;
 
-					for (int i = 0; i < m->NextBeatCallbacks.Count(); i++)
+					for (int i = 0; i < m->NextBeatCallbacks.size(); i++)
 					{
-						auto beatMsg = m->NextBeatCallbacks.vec[i];
+						auto beatMsg = m->NextBeatCallbacks[i];
 						if (beatMsg == NULL) continue;
 
 						if ((m->Beat % beatMsg->Divisor) == 0)
 						{
 							beatMsg->Func(beatMsg->Arg);
-							m->NextBeatCallbacks.Remove(i);
+							m->NextBeatCallbacks.remove(i);
 						}
 					}
 
-					m->NextBeatCallbacks.CheckClear();
+					m->NextBeatCallbacks.check_clear();
 				}
 			}
 
@@ -292,16 +300,22 @@ extern "C" export_func void MusicMasterLoop(void *arg)
 		case MusicMasterMessageType_PlayTrack:
 		{
 			int track = msg.PlayTrack.Track;
-			m->SourcesState[track] = true;
-			AudioSourcePlay(m->Sources[track]);
+			if (!m->SourcesState[track])
+			{
+				m->SourcesState[track] = true;
+				AudioSourcePlay(m->Sources[track]);
+			}
 			break;
 		}
 
 		case MusicMasterMessageType_StopTrack:
 		{
 			int track = msg.PlayTrack.Track;
-			m->SourcesState[track] = false;
-			AudioSourceStop(m->Sources[track]);
+			if (m->SourcesState[track])
+			{
+				m->SourcesState[track] = false;
+				AudioSourceStop(m->Sources[track]);
+			}
 			break;
 		}
 
@@ -309,7 +323,7 @@ extern "C" export_func void MusicMasterLoop(void *arg)
 		{
 			auto cb = PushStruct<next_beat_callback>(GetEntry(m->NextBeatCallbackPool));
 			*cb = msg.NextBeatCallback;
-			m->NextBeatCallbacks.Add(cb);
+			m->NextBeatCallbacks.push_back(cb);
 			break;
 		}
 

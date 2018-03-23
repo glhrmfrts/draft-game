@@ -12,9 +12,9 @@
 #include "thread_pool.h"
 #include "config.h"
 #include "common.h"
-#include "tween.h"
 #include "collision.h"
 #include "memory.h"
+#include "tween.h"
 #include "options.h"
 #include "render.h"
 #include "audio.h"
@@ -240,6 +240,7 @@ struct game_main
     menu_state MenuState;
 
     random_series ExplosionEntropy;
+	float ScreenRectAlpha;
 
 	void *GameLibrary;
     platform_api Platform;

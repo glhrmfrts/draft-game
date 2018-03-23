@@ -31,6 +31,7 @@ enum asset_entry_type
 	AssetEntryType_OptionsLoad,
 	AssetEntryType_OptionsSave,
     AssetEntryType_Level,
+	AssetEntryType_Mesh,
 };
 enum asset_completion
 {
@@ -98,7 +99,19 @@ struct asset_entry
         {
             level *Result;
         } Level;
+
+		struct
+		{
+			std::vector<float> Vertices;
+			std::vector<int> Indices;
+			std::vector<mesh_part> Parts;
+			uint32 Flags = 0;
+			mesh *Result;
+		} Mesh;
     };
+
+	asset_entry() {}
+	~asset_entry() {}
 };
 
 struct platform_api;

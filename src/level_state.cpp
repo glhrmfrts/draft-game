@@ -36,69 +36,30 @@ static menu_data gameOverMenu = {
 
 static song *firstSong;
 
-void InitLevel(game_main *g, const std::string &levelNumber)
+// sets the level and it's initial state
+void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumber)
 {
-    g->State = GameState_Level;
+	g->State = GameState_Level;
 
-    auto l = &g->LevelState;
-    FreeArena(l->Arena);
-    ResetPool(l->IntroTextPool);
-    ResetPool(l->ScoreTextPool);
-    ResetPool(l->SequencePool);
-	ResetPool(l->TrackArgsPool);
+    l->Health = 50;
+    l->CheckpointNum = 0;
+    l->CurrentCheckpointFrame = 0;
+    l->GameplayState = GameplayState_Playing;
+    l->Level = FindLevel(g->AssetLoader, levelNumber);
+    ResetLevel(l->Level);
 
-	l->AssetLoader = &g->AssetLoader;
-    l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
-    l->IntroTextPool.Arena = &l->Arena;
-    l->ScoreTextPool.Arena = &l->Arena;
-    l->SequencePool.Arena = &l->Arena;
-	l->TrackArgsPool.Arena = &l->Arena;
-    l->GameOverMenuSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
-    l->GameOverMenuSequence->Tweens.push_back(
-        tween(&l->GameOverAlpha)
-            .SetFrom(0.0f)
-            .SetTo(1.0f)
-            .SetDuration(1.0f)
-            .SetEasing(TweenEasing_Linear)
-    );
-    AddSequences(g->TweenState, l->GameOverMenuSequence, 1);
+    l->PlayerMinVel = l->Level->Checkpoints[0].PlayerMinVel;
+    l->PlayerMaxVel = l->Level->Checkpoints[0].PlayerMaxVel;
 
-	l->StatsAlpha[0] = 0;
-	l->StatsAlpha[1] = 0;
-	l->StatsAlpha[2] = 0;
-    l->StatsScreenSequence = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
-    l->StatsScreenSequence->Tweens.push_back(WaitTween(1.0f));
-    l->StatsScreenSequence->Tweens.push_back(
-        tween(l->StatsAlpha)
-            .SetFrom(0.0f)
-            .SetTo(1.0f)
-            .SetDuration(1.0f)
-            .SetEasing(TweenEasing_Linear)
-    );
-    l->StatsScreenSequence->Tweens.push_back(
-        tween(l->StatsAlpha + 1)
-            .SetFrom(0.0f)
-            .SetTo(1.0f)
-            .SetDuration(1.0f)
-            .SetEasing(TweenEasing_Linear)
-    );
-    l->StatsScreenSequence->Tweens.push_back(
-        tween(l->StatsAlpha + 2)
-            .SetFrom(0.0f)
-            .SetTo(1.0f)
-            .SetDuration(1.0f)
-            .SetEasing(TweenEasing_Linear)
-    );
-    AddSequences(g->TweenState, l->StatsScreenSequence, 1);
+    g->MusicMaster.StepBeat = true;
 
-    g->Gravity = vec3(0, 0, 0);
-    g->World.Camera = &g->Camera;
+    auto gen = g->World.GenState->GenParams + GenType_SideTrail;
+    gen->Flags |= GenFlag_Enabled;
+
+	// get sounds
 	l->DraftBoostSound = FindSound(g->AssetLoader, "boost");
 
-    InitFormat(&l->ScorePercentFormat, "%s: %d%%\n", 24, &l->Arena);
-	InitFormat(&l->ScoreRatioFormat, " (%d / %d)", 24, &l->Arena);
-    InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
-
+	// get fonts to gui
 	static auto smallFont = FindBitmapFont(g->AssetLoader, "vcr_16");
 	static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32");
 	l->ScoreTextGroup.Items = {
@@ -110,54 +71,35 @@ void InitLevel(game_main *g, const std::string &levelNumber)
 		text_group_item(Color_white, textFont),
 		text_group_item(Color_white, smallFont)
 	};
-
-    l->Health = 50;
-    l->CheckpointNum = 0;
-    l->CurrentCheckpointFrame = 0;
-    l->GameplayState = GameplayState_Playing;
-	l->Level = FindLevel(g->AssetLoader, levelNumber);
-
-	g->MusicMaster.StepBeat = true;
-	//MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["hats"]);
-	//MusicMasterPlayTrack(g->MusicMaster, l->Level->Song->Names["pad_chords"]);
-
-	auto gen = g->World.GenState->GenParams + GenType_SideTrail;
-	gen->Flags |= GenFlag_Enabled;
-}
-
-void CleanupLevel(game_main *g, level_state *l)
-{
-	DestroySequences(g->TweenState, l->StatsScreenSequence, 1);
-	DestroySequences(g->TweenState, l->GameOverMenuSequence, 1);
 }
 
 void RemoveGameplayEntities(entity_world &w)
 {
-    for (auto ent : w.CheckpointEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.AsteroidEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.PowerupEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.ShipEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
-    for (auto ent : w.CrystalEntities)
-    {
-        if (!ent) continue;
-        RemoveEntity(w, ent);
-    }
+	for (auto ent : w.CheckpointEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
+	for (auto ent : w.AsteroidEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
+	for (auto ent : w.PowerupEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
+	for (auto ent : w.ShipEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
+	for (auto ent : w.CrystalEntities)
+	{
+		if (!ent) continue;
+		RemoveEntity(w, ent);
+	}
 	for (auto ent : w.FinishEntities)
 	{
 		if (!ent) continue;
@@ -165,12 +107,102 @@ void RemoveGameplayEntities(entity_world &w)
 	}
 }
 
+void CleanupLevel(game_main *g, level_state *l)
+{
+	DestroySequence(g->TweenState, l->StatsScreenSequence);
+	DestroySequence(g->TweenState, l->GameOverMenuSequence);
+	DestroySequence(g->TweenState, l->ChangeLevelSequence);
+	DestroySequence(g->TweenState, l->ExitSequence);
+}
+
+void InitLevelState(game_main *g, level_state *l)
+{
+    // clean memory
+    FreeArena(l->Arena);
+    ResetPool(l->IntroTextPool);
+    ResetPool(l->ScoreTextPool);
+	ResetPool(l->TrackArgsPool);
+
+    l->AssetLoader = &g->AssetLoader;
+    l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
+    l->IntroTextPool.Arena = &l->Arena;
+    l->ScoreTextPool.Arena = &l->Arena;
+    l->TrackArgsPool.Arena = &l->Arena;
+    g->Gravity = vec3(0, 0, 0);
+    g->World.Camera = &g->Camera;
+
+    // init string formats
+    InitFormat(&l->ScorePercentFormat, "%s: %d%%\n", 24, &l->Arena);
+    InitFormat(&l->ScoreRatioFormat, " (%d / %d)", 24, &l->Arena);
+    InitFormat(&l->ScoreNumberFormat, "%s +%d", 16, &l->Arena);
+
+    // create sequences
+	l->GameOverMenuSequence = CreateSequence(g->TweenState);
+    l->GameOverMenuSequence->Tweens.push_back(
+        tween(&l->GameOverAlpha)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(1.0f)
+            .SetEasing(TweenEasing_Linear)
+    );
+
+    l->StatsScreenSequence = CreateSequence(g->TweenState);
+	l->StatsScreenSequence->Tweens.push_back(CallbackTween([l]()
+	{ 
+		l->StatsAlpha[0] = 0;
+		l->StatsAlpha[1] = 0;
+		l->StatsAlpha[2] = 0;
+		l->DrawStats = true;
+	}));
+    l->StatsScreenSequence->Tweens.push_back(WaitTween(1.0f));
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(FAST_TWEEN_DURATION)
+            .SetEasing(TweenEasing_Linear)
+    );
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha + 1)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(FAST_TWEEN_DURATION)
+            .SetEasing(TweenEasing_Linear)
+    );
+    l->StatsScreenSequence->Tweens.push_back(
+        tween(l->StatsAlpha + 2)
+            .SetFrom(0.0f)
+            .SetTo(1.0f)
+            .SetDuration(FAST_TWEEN_DURATION)
+            .SetEasing(TweenEasing_Linear)
+    );
+
+    l->ChangeLevelSequence = CreateSequence(g->TweenState);
+    l->ChangeLevelSequence->Tweens.push_back(CallbackTween([l](){ l->GameplayState = GameplayState_ChangingLevel; }));
+    l->ChangeLevelSequence->Tweens.push_back(FadeInTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([g, l]()
+        {
+			l->DrawStats = false;
+            RemoveGameplayEntities(g->World);
+			ResetLevelState(g, l, l->Level->Next);
+            ResetRoadPieces(g->World, g->World.PlayerEntity->Pos().y);
+        }));
+    l->ChangeLevelSequence->Tweens.push_back(WaitTween(FAST_TWEEN_DURATION));
+    l->ChangeLevelSequence->Tweens.push_back(FadeOutTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([l](){ l->GameplayState = GameplayState_Playing; }));
+
+	l->ExitSequence = CreateSequence(g->TweenState);
+	l->ExitSequence->Tweens.push_back(FadeInTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([g, l]()
+	{
+		RemoveGameplayEntities(g->World);
+		ResetMenuState(g);
+	}));
+}
+
 void RestartLevel(game_main *g)
 {
     g->LevelState.Health = 50;
     RemoveGameplayEntities(g->World);
     AddEntity(g->World, g->World.PlayerEntity);
-    InitLevel(g, "1");
+    InitLevelState(g, &g->LevelState);
 }
 
 void AddIntroText(game_main *g, level_state *l, const char *text, color c)
@@ -180,19 +212,20 @@ void AddIntroText(game_main *g, level_state *l, const char *text, color c)
     introText->Text = text;
     introText->Pos = vec2{g->Width*0.5f, g->Height*0.75f};
 
-    auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+	auto seq = CreateSequence(g->TweenState);
+	seq->OneShot = true;
     if (l->IntroTextList.size() > 0)
     {
         for (auto ctext : l->IntroTextList)
         {
-            auto cseq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+			auto cseq = CreateSequence(g->TweenState);
+			cseq->OneShot = true;
             cseq->Tweens.push_back(tween(&ctext->Pos.y)
                                    .SetFrom(ctext->Pos.y)
                                    .SetTo(ctext->Pos.y - GetRealPixels(g, 60.0f))
                                    .SetDuration(0.5f));
 
             ctext->PosSequence = cseq;
-            AddSequences(g->TweenState, cseq, 1);
             PlaySequence(g->TweenState, cseq, true);
         }
         seq->Tweens.push_back(WaitTween(0.5f));
@@ -208,7 +241,6 @@ void AddIntroText(game_main *g, level_state *l, const char *text, color c)
     seq->Tweens.push_back(ReverseTween(twn));
 
     introText->Sequence = seq;
-    AddSequences(g->TweenState, seq, 1);
     PlaySequence(g->TweenState, seq, true);
 
     l->IntroTextList.push_back(introText);
@@ -226,7 +258,10 @@ void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec
     float maxOffsetY = GetRealPixels(g, 300.0f);
     vec2 targetPos = vec2{RandomBetween(l->Entropy, -offsetX, offsetX),
                           RandomBetween(l->Entropy, -minOffsetY, -maxOffsetY)};
-    auto seq = PushStruct<tween_sequence>(GetEntry(l->SequencePool));
+
+	auto seq = CreateSequence(g->TweenState);
+	seq->OneShot = true;
+
     auto scoreText = PushStruct<level_score_text>(GetEntry(l->ScoreTextPool));
     scoreText->Color = c;
     scoreText->Pos = screenPos;
@@ -245,7 +280,7 @@ void AddScoreText(game_main *g, level_state *l, const char *text, int score, vec
                           .SetTo(0.0f)
                           .SetDuration(0.5f)
                           .SetEasing(TweenEasing_Linear));
-    AddSequences(g->TweenState, seq, 1);
+
     PlaySequence(g->TweenState, seq, true);
     l->ScoreTextList.push_back(scoreText);
 }
@@ -603,10 +638,10 @@ void UpdateLevel(game_main *g, float dt)
 	{
 		if (l->GameplayState == GameplayState_Stats)
 		{
-			CleanupLevel(g, l);
-			RemoveGameplayEntities(g->World);
-			AddEntity(g->World, g->World.PlayerEntity);
-			InitLevel(g, l->Level->Next);
+            if (!l->ChangeLevelSequence->Active)
+            {
+                PlaySequence(g->TweenState, l->ChangeLevelSequence);
+            }
 			return;
 		}
 	}
@@ -980,8 +1015,6 @@ void UpdateLevel(game_main *g, float dt)
 		if (scoreText && scoreText->Sequence->Complete)
 		{
 			l->ScoreTextList.pop_front();
-			DestroySequences(g->TweenState, scoreText->Sequence, 1);
-			FreeEntryFromData(l->SequencePool, scoreText->Sequence);
 			FreeEntryFromData(l->ScoreTextPool, scoreText);
 		}
 	}
@@ -992,13 +1025,6 @@ void UpdateLevel(game_main *g, float dt)
 		if (introText && introText->Sequence->Complete)
 		{
 			l->IntroTextList.pop_front();
-			DestroySequences(g->TweenState, introText->Sequence, 1);
-			if (introText->PosSequence)
-			{
-				DestroySequences(g->TweenState, introText->PosSequence, 1);
-				FreeEntryFromData(l->SequencePool, introText->PosSequence);
-			}
-			FreeEntryFromData(l->SequencePool, introText->Sequence);
 			FreeEntryFromData(l->IntroTextPool, introText);
 		}
 	}
@@ -1087,9 +1113,11 @@ void RenderLevel(game_main *g, float dt)
     case GameplayState_GameOver:
         DrawMenu(g, gameOverMenu, g->GUI.MenuChangeTimer, l->GameOverAlpha, false);
         break;
+    }
 
-    case GameplayState_Stats:
-        DrawHeader(g, "STATS", Color_black, l->StatsAlpha[0]);
+	if (l->DrawStats)
+	{
+		DrawHeader(g, "STATS", Color_black, l->StatsAlpha[0]);
 		{
 			rect container;
 			DrawContainerPolygon(g, Color_black * 0.75f * l->StatsAlpha[1], container);
@@ -1102,8 +1130,7 @@ void RenderLevel(game_main *g, float dt)
 			l->TargetTextGroup.Items[1].Text = "(0)";
 			DrawTextGroupCentered(g->GUI, &l->TargetTextGroup, rect{ g->Width*0.5f, g->Height*0.525f, 0, 0 }, color{ 1, 1, 1, l->StatsAlpha[1] });
 		}
-        break;
-    }
+	}
 
     End(g->GUI);
 
@@ -1123,7 +1150,7 @@ MENU_FUNC(PauseMenuCallback)
 
     case 1:
     {
-        InitMenu(g);
+		PlaySequence(g->TweenState, l->ExitSequence);
         break;
     }
     }
@@ -1154,8 +1181,7 @@ MENU_FUNC(GameOverMenuCallback)
 
     case 2:
     {
-        DestroySequences(g->TweenState, l->GameOverMenuSequence, 1);
-        InitMenu(g);
+		PlaySequence(g->TweenState, l->ExitSequence);
         break;
     }
     }

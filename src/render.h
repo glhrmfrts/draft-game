@@ -55,8 +55,9 @@ struct mesh_vertex
 
 struct vertex_buffer
 {
-    vector<float> Vertices;
-    GLuint VAO, VBO;
+    std::vector<float> Vertices;
+	std::vector<int> Indices;
+    GLuint VAO, VBO, IBO;
     size_t RawIndex;
     size_t VertexCount;
     size_t VertexSize;
@@ -314,6 +315,8 @@ struct renderable
 #define BloomBlurPassCount 3
 struct render_state
 {
+    memory_arena Arena;
+    
     model_program ModelProgram;
     blur_program BlurHorizontalProgram;
     blur_program BlurVerticalProgram;

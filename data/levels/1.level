@@ -1,0 +1,71 @@
+name: WELCOME
+song: music
+next: 2
+
+stats_screen: {
+	stop_track: hats
+}
+
+checkpoint: {
+	player_vel: 50|80
+
+	frame_seconds: 0 | {
+		play_track: hats|0
+		play_track: pad_chords|0
+		add_intro_text: DRAFT & BLAST | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		spawn_finish
+	}
+}
+
+checkpoint: {
+	player_vel: 50|80
+
+	frame_seconds: 0 | {
+		add_intro_text: DRAFT & MISS | SHIP_ORANGE_COLOR
+	}
+
+	frame_seconds: 5 | {
+		enable: SHIPS
+		ship_color: SHIP_ORANGE
+	}
+
+	frame_seconds: 30 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 32 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 50|80
+
+	frame_seconds: 0 | {
+		add_intro_text: DRAFT & BLAST | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		add_intro_text: DRAFT & MISS | SHIP_ORANGE_COLOR
+	}
+
+	frame_seconds: 5 | {
+		enable: SHIPS
+		ship_color: ALL
+	}
+
+	frame_seconds: 40 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 45 | {
+		road_tangent
+	}
+
+	frame_seconds: 47 | {
+		spawn_finish
+	}
+}

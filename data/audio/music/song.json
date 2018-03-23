@@ -1,0 +1,19 @@
+{
+	"bpm": 120,
+	"tracks": [
+		"data/audio/music/bg_amb.wav",
+		"data/audio/music/kick.wav",
+		"data/audio/music/hats.wav",
+		"data/audio/music/pad_dmaj.wav",
+		"data/audio/music/pad_chords.wav",
+		"data/audio/music/snare.wav"
+	],
+	"names": {
+		"bg_amb": 0,
+		"kick": 1,
+		"hats": 2,
+		"pad_dmaj": 3,
+		"pad_chords": 4,
+		"snare": 5
+	}
+}

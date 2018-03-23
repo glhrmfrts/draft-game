@@ -10,11 +10,11 @@ static void LoadAssetThreadSafePart(void *Arg);
 void InitAssetLoader(game_main *g, asset_loader &Loader, platform_api &Platform)
 {
     int Error = FT_Init_FreeType(&Loader.FreeTypeLib);
-    if (Error) 
+    if (Error)
     {
         Println("error font lib");
         exit(EXIT_FAILURE);
-    } 
+    }
 
     CreateThreadPool(Loader.Pool, g, 1, 32);
     Loader.NumLoadedEntries = 0; 
@@ -102,13 +102,19 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
 		Entry.Level.Result = PushStruct<level>(Loader.Arena);
 		break;
 	}
+
+	case AssetEntryType_Mesh:
+	{
+		Entry.Mesh.Result = PushStruct<mesh>(Loader.Arena);
+		break;
+	}
     }
-    Loader.Entries.Add(Entry);
+    Loader.Entries.push_back(Entry);
 	Loader.Active = true;
 
 	if (KickLoadingNow)
 	{
-		AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Loader.Entries.vec[Loader.Entries.Count() - 1]);
+		AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Loader.Entries[Loader.Entries.size() - 1]);
 	}
 }
 
@@ -134,9 +140,9 @@ AddShaderProgramEntries(asset_loader &Loader, shader_program &Program)
 inline bitmap_font *
 FindBitmapFont(asset_loader &Loader, const string &ID)
 {
-    for (int i = 0; i < Loader.Entries.Count(); i++)
+    for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
         if (Entry.Type == AssetEntryType_Font && Entry.ID == ID)
         {
             return Entry.Font.Result;
@@ -148,9 +154,9 @@ FindBitmapFont(asset_loader &Loader, const string &ID)
 inline texture *
 FindTexture(asset_loader &Loader, const string &ID)
 {
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
         if (Entry.Type == AssetEntryType_Texture && Entry.ID == ID)
         {
             return Entry.Texture.Result;
@@ -162,9 +168,9 @@ FindTexture(asset_loader &Loader, const string &ID)
 inline audio_clip *
 FindSound(asset_loader &Loader, const string &ID)
 {
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
         if (Entry.Type == AssetEntryType_Sound && Entry.ID == ID)
         {
             return Entry.Sound.Result;
@@ -176,9 +182,9 @@ FindSound(asset_loader &Loader, const string &ID)
 inline audio_clip *
 FindStream(asset_loader &Loader, const string &ID)
 {
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
 		if (Entry.Type == AssetEntryType_Stream && Entry.ID == ID)
 		{
 			return Entry.Stream.Result;
@@ -190,9 +196,9 @@ FindStream(asset_loader &Loader, const string &ID)
 inline song *
 FindSong(asset_loader &Loader, const string &ID)
 {
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
 		if (Entry.Type == AssetEntryType_Song && Entry.ID == ID)
 		{
 			return Entry.Song.Result;
@@ -204,9 +210,9 @@ FindSong(asset_loader &Loader, const string &ID)
 inline options *
 FindOptions(asset_loader &loader, const string &id)
 {
-	for (int i = 0; i < loader.Entries.Count(); i++)
+	for (int i = 0; i < loader.Entries.size(); i++)
 	{
-		auto &entry = loader.Entries.vec[i];
+		auto &entry = loader.Entries[i];
 		if (entry.Type == AssetEntryType_OptionsLoad && entry.ID == id)
 		{
 			return entry.Options.Result;
@@ -218,9 +224,9 @@ FindOptions(asset_loader &loader, const string &id)
 inline level *
 FindLevel(asset_loader &loader, const string &id)
 {
-	for (int i = 0; i < loader.Entries.Count(); i++)
+	for (int i = 0; i < loader.Entries.size(); i++)
 	{
-		auto &entry = loader.Entries.vec[i];
+		auto &entry = loader.Entries[i];
 		if (entry.Type == AssetEntryType_Level && entry.ID == id)
 		{
 			return entry.Level.Result;
@@ -474,6 +480,221 @@ static void LoadAssetThreadSafePart(void *Arg)
 		AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Song, songPath, result->SongName, NULL));
 		break;
 	}
+
+	case AssetEntryType_Mesh:
+	{
+		std::ifstream file(Entry->Filename);
+		if (Entry->Filename.find(".obj") != std::string::npos)
+		{
+			struct mesh_obj_data
+			{
+				std::vector<vec3> Vertices;
+				std::vector<vec2> Uvs;
+				std::vector<vec3> Normals;
+				std::vector<color> Colors;
+			};
+
+			struct mesh_obj_face_group
+			{
+				std::vector<int> Data;
+				std::string Material;
+				int NumFaces = 0;
+				bool HasUvs = false;
+				bool HasNormals = false;
+				bool HasColors = false;
+			};
+
+			mesh_obj_data data = {};
+			mesh_obj_face_group *currentFaceGroup = NULL;
+			std::vector<mesh_obj_face_group> faceGroups;
+			std::string line;
+			while (std::getline(file, line))
+			{
+				std::istringstream iss;
+				std::string field;
+
+				float x, y, z;
+				if (iss >> field)
+				{
+					if (field == "mtllib")
+					{
+						iss >> field;
+						std::string path = GetParentPath(Entry->Filename) + "/" + field;
+						AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Material, path, path, NULL));
+					}
+					else if (field == "v")
+					{
+						iss >> x >> y >> z;
+						data.Vertices.push_back(vec3(x, y, z));
+					}
+					else if (field == "vt")
+					{
+						iss >> x >> y;
+						data.Uvs.push_back(vec2(x, y));
+					}
+					else if (field == "vn")
+					{
+						iss >> x >> y >> z;
+						data.Normals.push_back(vec3(x, y, z));
+					}
+					else if (field == "usemtl")
+					{
+						iss >> field;
+						faceGroups.emplace_back();
+						currentFaceGroup = &faceGroups[faceGroups.size() - 1];
+						currentFaceGroup->Material = field;
+					}
+					else if (field == "o" || field == "g")
+					{
+					}
+					else if (field == "f")
+					{
+						std::string parts;
+						std::vector<vec3> faceData;
+
+						while (iss >> parts)
+						{
+							size_t pos = 0;
+							size_t index = 0;
+							std::string part;
+							std::string delim = "/";
+							faceData.push_back(vec3());
+							auto &vertex = faceData.back();
+
+							while (true)
+							{
+								pos = parts.find(delim);
+								if (pos == string::npos)
+								{
+									if (parts.empty()) break;
+									pos = parts.size();
+								}
+
+								part = parts.substr(0, pos);
+								if (!part.empty())
+								{
+									int i = atoi(part.c_str());
+									if (index == 0)
+									{
+										vertex.x = i;
+									}
+									else if (index == 1)
+									{
+										vertex.y = i;
+										currentFaceGroup->HasUvs = true;
+									}
+									else if (index == 2)
+									{
+										vertex.z = i;
+										currentFaceGroup->HasNormals = true;
+									}
+								}
+
+								parts.erase(0, pos + delim.length());
+								index++;
+							}
+
+							currentFaceGroup->NumFaces++;
+						}
+
+						if (faceData.size() > 3)
+						{
+							std::vector<vec3> newFaceData;
+
+							for (size_t i = 1; i < faceData.size() - 1; i++)
+							{
+								newFaceData.push_back(faceData[0]);
+								newFaceData.push_back(faceData[i]);
+								newFaceData.push_back(faceData[i + 1]);
+							}
+
+							faceData = newFaceData;
+						}
+
+						for (auto const &face : faceData)
+						{
+							currentFaceGroup->Data.push_back(face.x);
+							if (currentFaceGroup->HasUvs) currentFaceGroup->Data.push_back(face.y);
+							if (currentFaceGroup->HasNormals) currentFaceGroup->Data.push_back(face.z);
+						}
+					}
+				}
+
+				std::unordered_map<std::string, int> indexMap;
+				auto &combinedVertices = Entry->Mesh.Vertices;
+				auto &combinedIndices = Entry->Mesh.Indices;
+				auto &parts = Entry->Mesh.Parts;
+				size_t offset = 0;
+				for (size_t i = 0; i < faceGroups.size(); i++)
+				{
+					auto &fg = faceGroups[i];
+					int numElements = fg.Data.size();
+
+					int nextIndex = 0;
+					for (int d = 0; d < numElements;)
+					{
+						std::string indexKey;
+						int vertIndex, uvIndex, normIndex;
+						vec3 vert;
+						vec2 uv;
+						vec3 normal;
+
+						vertIndex = fg.Data[d++] - 1;
+						vert = data.Vertices[vertIndex];
+						indexKey.append(std::to_string(vertIndex));
+
+						if (fg.HasUvs)
+						{
+							uvIndex = fg.Data[d++] - 1;
+							uv = data.Uvs[uvIndex];
+							indexKey.append(std::to_string(uvIndex));
+							Entry->Mesh.Flags |= MeshFlag_HasUvs;
+						}
+						if (fg.HasNormals)
+						{
+							normIndex = fg.Data[d++] - 1;
+							normal = data.Normals[normIndex];
+							indexKey.append(std::to_string(normIndex));
+							Entry->Mesh.Flags |= MeshFlag_HasNormals;
+						}
+
+						int combinedIndex = 0;
+						if (indexMap.find(indexKey) == indexMap.end())
+						{
+							combinedIndex = nextIndex++;
+							indexMap[indexKey] = combinedIndex;
+
+							combinedVertices.insert(combinedVertices.end(), &vert[0], &vert[0] + 2);
+							if (fg.HasUvs)
+							{
+								combinedVertices.insert(combinedVertices.end(), &uv[0], &uv[0] + 1);
+							}
+							if (fg.HasNormals)
+							{
+								combinedVertices.insert(combinedVertices.end(), &normal[0], &normal[2]);
+							}
+						}
+						else
+						{
+							combinedIndex = indexMap[indexKey];
+						}
+						combinedIndices.push_back(combinedIndex);
+					}
+
+					mesh_part part;
+					part.PrimitiveType = GL_TRIANGLES;
+					part.Offset = offset;
+					part.Count = combinedIndices.size() - offset;
+					parts.push_back(part);
+
+					offset += combinedIndices.size();
+				}
+
+				Entry->Mesh.Flags |= MeshFlag_HasIndices;
+			}
+		}
+		break;
+	}
 	}
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -572,6 +793,63 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 		result->Song = FindSong(*Entry->Loader, result->SongName);
 		break;
 	}
+
+	case AssetEntryType_Mesh:
+	{
+		auto result = Entry->Mesh.Result;
+		size_t vertexSize = Entry->Mesh.VertexSize;
+		size_t vertexCount = Entry->Mesh.VertexCount;
+		size_t stride = vertexSize * sizeof(float);
+		size_t offset = 0;
+		size_t location = 0;
+		std::unordered_map<std::string, std::string> defines;
+
+		std::vector<vertex_attribute> attrs = { vertex_attribute{ location, 3, GL_FLOAT, stride, offset * sizeof(float) } };
+		location += 1;
+		offset += 3;
+
+		if (Entry->Mesh.Flags & MeshFlag_HasUvs)
+		{
+			defines["A_UV"] = location;
+			attrs.push_back(vertex_attribute{ location, 2, GL_FLOAT, stride, offset * sizeof(float)});
+			location += 1;
+			offset += 2;
+		}
+		if (Entry->Mesh.Flags & MeshFlag_HasNormals)
+		{
+			defines["A_NORMAL"] = location;
+			attrs.push_back(vertex_attribute{ location, 3, GL_FLOAT, stride, offset * sizeof(float) });
+			location += 1;
+			offset += 3;
+		}
+		if (Entry->Mesh.Flags & MeshFlag_HasColors)
+		{
+			defines["A_COLOR"] = location;
+			attrs.push_back(vertex_attribute{ location, 4, GL_FLOAT, stride, offset * sizeof(float) });
+			location += 1;
+			offset += 4;
+		}
+
+		InitBuffer(result->Buffer, vertexSize, attrs);
+		SetIndices(result->Buffer, Entry->Mesh.Indices);
+
+		for (size_t i = 0; i < vertexSize * vertexCount; i += vertexSize)
+		{
+			float *data = &Entry->Mesh.Vertices[i];
+			PushVertex(result->Buffer, data);
+		}
+		
+		for (size_t i = 0; i < Entry->Mesh.Parts.size(); i++)
+		{
+			auto &part = Entry->Mesh.Parts[i];
+			part.Program = CompileModelProgram(defines);
+			part.Material = *FindMaterial(*Entry->Loader, Entry->Mesh.Materials[i]);
+			AddPart(result, part);
+		}
+		EndMesh(result, GL_STATIC_DRAW);
+
+		break;
+	}
     }
 
     Entry->Completion = AssetCompletion_ThreadUnsafe;
@@ -586,9 +864,9 @@ bool Update(asset_loader &Loader)
     if (Loader.Active && !int(Loader.Pool.NumJobs))
     {
 		Loader.Active = false;
-		for (int i = 0; i < Loader.Entries.Count(); i++)
+		for (int i = 0; i < Loader.Entries.size(); i++)
 		{
-			auto &Entry = Loader.Entries.vec[i];
+			auto &Entry = Loader.Entries[i];
             if (Entry.Completion == AssetCompletion_ThreadSafe)
             {
                 LoadAssetThreadUnsafePart(&Entry);
@@ -602,9 +880,9 @@ bool Update(asset_loader &Loader)
 void CheckAssetsChange(asset_loader &Loader)
 {
     Update(Loader);
-	for (int i = 0; i < Loader.Entries.Count(); i++)
+	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
-		auto &Entry = Loader.Entries.vec[i];
+		auto &Entry = Loader.Entries[i];
 		if (Entry.Completion == AssetCompletion_Done) continue;
 
         uint64 LastWriteTime = Loader.Platform->GetFileLastWriteTime(Entry.Filename.c_str());

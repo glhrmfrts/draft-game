@@ -59,135 +59,108 @@ struct string_format
 template<typename T, int cap>
 struct null_array
 {
-    std::vector<T> vec;
-    int numNulls;
+    std::vector<T> Data;
+    int Count = 0;
+    int NumNulls = 0;
 
-    class iterator
+	null_array()
+	{
+		Data.resize(cap);
+	}
+
+    void push_back(T elem)
     {
-        null_array<T, cap> *arr;
-        int i;
-
-        iterator(null_array<T, cap> *arr, int i)
+        for (int i = 0; i < Count; i++)
         {
-            this->arr = arr;
-            while (i < arr->vec.size() && arr->vec[i] == NULL)
+            if (Data[i] == NULL)
             {
-                i++;
-            }
-            this->i = i;
-        }
-
-        iterator operator ++()
-        {
-            return iterator(arr, i++);
-        }
-
-        bool operator !=(iterator &rhs)
-        {
-            return i != rhs.i;
-        }
-
-        T &operator *()
-        {
-            return arr->vec[i];
-        }
-    };
-
-    void Add(T elem)
-    {
-        for (int i = 0; i < vec.size(); i++)
-        {
-            if (vec[i] == NULL)
-            {
-                vec[i] = elem;
-                numNulls--;
+                Data[i] = elem;
+                NumNulls--;
                 return;
             }
         }
-        vec.push_back(elem);
+        Data[Count++] = elem;
     }
 
-	int Count() const
+	int size() const
 	{
-		return vec.size();
+		return Count;
 	}
 
-    void Remove(int i)
+    void remove(int i)
     {
-        vec[i] = NULL;
-        numNulls++;
+        Data[i] = NULL;
+        NumNulls++;
     }
 
-    void CheckClear()
+    void check_clear()
     {
-        if (numNulls == cap)
+        if (NumNulls == cap)
         {
-            vec.clear();
+            Count = 0;
         }
     }
 
-    // std::vector aliases
-    int size() const
+    typename std::vector<T>::iterator begin()
     {
-        return vec.size();
+		return Data.begin();
     }
 
-    iterator begin()
+	typename std::vector<T>::iterator end()
     {
-        return iterator(this, 0);
+		return Data.begin() + Count;
     }
 
-    iterator end()
-    {
-        return iterator(this, vec.size() - 1);
-    }
+	T &operator[](int i)
+	{
+		return Data[i];
+	}
 };
 
 template<typename T, int cap>
 struct fixed_array
 {
-    std::vector<T> vec;
-    int count = 0;
+	std::vector<T> Data;
+    int Count = 0;
 
-    fixed_array()
-    {
-        vec.resize(cap);
-    }
+	fixed_array()
+	{
+		Data.resize(cap);
+	}
 
-    void Add(T elem)
+    void push_back(T elem)
     {
-        if (count >= vec.size())
+        if (Count >= cap)
         {
             throw std::runtime_error("fixed array out of memory");
         }
-        vec[count++] = elem;
+        Data[Count++] = elem;
     }
 
-    int Count() const
-    {
-        return count;
-    }
-
-    void Clear()
-    {
-        count = 0;
-    }
-
-    // std::vector aliases
     int size() const
     {
-        return count;
+        return Count;
     }
 
-    typename std::vector<T>::iterator begin()
+    void clear()
     {
-        return vec.begin();
+        Count = 0;
     }
 
-    typename std::vector<T>::iterator end()
+	typename std::vector<T>::iterator begin()
     {
-        return vec.begin() + count;
+		return Data.begin();
     }
+
+	typename std::vector<T>::iterator end()
+    {
+		return Data.begin() + Count;
+    }
+
+	T &operator[](int i)
+	{
+		return Data[i];
+	}
 };
 
 #endif

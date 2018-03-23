@@ -1,0 +1,21 @@
+name: WELCOME_2
+song: music
+next: 1
+
+stats_screen: {
+	stop_track: hats
+}
+
+checkpoint: {
+	player_vel: 50|80
+
+	frame_seconds: 0 | {
+		play_track: hats
+		play_track: pad_chords
+		add_intro_text: DRAFT & BLAST LEVEL 2 | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		spawn_finish
+	}
+}

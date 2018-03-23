@@ -50,7 +50,7 @@ void RenderLoadingScreen(game_main *Game, float DeltaTime)
     float Height = Game->Height * 0.05f;
     float x = (float)Game->Width/2 - Width/2;
     float y = (float)Game->Height/2 - Height/2;
-    float LoadingPercentage = (float)(int)Game->AssetLoader.NumLoadedEntries / (float)Game->AssetLoader.Entries.Count();
+    float LoadingPercentage = (float)(int)Game->AssetLoader.NumLoadedEntries / (float)Game->AssetLoader.Entries.size();
     float ProgressBarWidth = Width*LoadingPercentage;
 
     UpdateProjectionView(Game->GUICamera);

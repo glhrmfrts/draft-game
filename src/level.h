@@ -51,6 +51,8 @@ struct level_checkpoint
 	std::vector<level_frame> Frames;
 	float PlayerMinVel;
 	float PlayerMaxVel;
+
+	// transient
 	int CurrentFrameIndex = 0;
 };
 

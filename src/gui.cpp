@@ -86,20 +86,21 @@ void InitGUI(gui &g, tween_state &tweenState, game_input &Input)
 {
     g.Input = &Input;
     CompileGUIShader(g);
-    InitBuffer(g.Buffer, GUIVertexSize, 3,
-               vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
-               vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
-               vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)});
+	InitBuffer(g.Buffer, GUIVertexSize, {
+			   vertex_attribute{0, 2, GL_FLOAT, 8 * sizeof(float), 0},
+			   vertex_attribute{1, 2, GL_FLOAT, 8 * sizeof(float), 2 * sizeof(float)},
+			   vertex_attribute{2, 4, GL_FLOAT, 8 * sizeof(float), 4 * sizeof(float)}
+	});
 
     g.MenuChangeTimer = 1.0f;
-    g.MenuChangeSequence.Tweens.push_back(
+	g.MenuChangeSequence = CreateSequence(tweenState);
+    g.MenuChangeSequence->Tweens.push_back(
         tween(&g.MenuChangeTimer)
         .SetFrom(0.0f)
         .SetTo(1.0f)
         .SetDuration(0.25f)
         .SetEasing(TweenEasing_Linear)
     );
-    AddSequences(tweenState, &g.MenuChangeSequence, 1);
 
     g.HorizontalAxis.Type = Action_horizontal;
     g.VerticalAxis.Type = Action_vertical;
@@ -472,7 +473,7 @@ void DrawMenuItem(game_main *g, bitmap_font *font, menu_item &item,
 	case MenuItemType_Options:
 	{
 		DrawTextCentered(g->GUI, font, item.Text, rect{ centerX - itemWidth / 2, baseY + textPadding,0,0 }, col);
-		DrawTextCentered(g->GUI, font, item.Options.Values.vec[item.Options.SelectedIndex], rect{ centerX + itemWidth / 2, baseY + textPadding, 0, 0 }, col);
+		DrawTextCentered(g->GUI, font, item.Options.Values[item.Options.SelectedIndex], rect{ centerX + itemWidth / 2, baseY + textPadding, 0, 0 }, col);
 		break;
 	}
 	}
@@ -607,7 +608,7 @@ void UpdateMenuItem(menu_item &item, float inputX, float menuInputX)
 		{
 			item.Options.SelectedIndex--;
 		}
-		item.Options.SelectedIndex = glm::clamp(item.Options.SelectedIndex, 0, item.Options.Values.Count() - 1);
+		item.Options.SelectedIndex = glm::clamp(item.Options.SelectedIndex, 0, item.Options.Values.size() - 1);
 		break;
 	}
 	}
@@ -638,7 +639,7 @@ bool UpdateMenuSelection(game_main *g, menu_data &menu, float inputX, float menu
 
     if (prevHotItem != menu.HotItem)
     {
-        PlaySequence(g->TweenState, &g->GUI.MenuChangeSequence, true);
+        PlaySequence(g->TweenState, g->GUI.MenuChangeSequence, true);
     }
 
     bool backSelected = menu.HotItem == menu.NumItems;

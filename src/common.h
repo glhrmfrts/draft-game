@@ -172,6 +172,14 @@ static const char *ReadFile(const char *filename)
 	return (const char *)buffer;
 }
 
+static inline std::string GetParentPath(const std::string &path)
+{
+	size_t pos = path.find_last_of("/");
+	if (pos == string::npos) return path;
+
+	return path.substr(0, pos);
+}
+
 // trim from start (in place)
 static inline void ltrim(std::string &s) {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {

@@ -49,6 +49,7 @@ enum gameplay_state
     GameplayState_Paused,
     GameplayState_GameOver,
     GameplayState_Stats,
+    GameplayState_ChangingLevel,
 };
 
 struct level_state
@@ -59,7 +60,6 @@ struct level_state
 	audio_clip *DraftBoostSound;
 	level *Level;
 
-    generic_pool<tween_sequence> SequencePool;
     generic_pool<level_score_text> ScoreTextPool;
     generic_pool<level_intro_text> IntroTextPool;
 	generic_pool<track_args> TrackArgsPool;
@@ -83,11 +83,15 @@ struct level_state
 
 	// stats screen stuff
     tween_sequence *StatsScreenSequence;
+    tween_sequence *ChangeLevelSequence;
     float StatsAlpha[3];
 	text_group ScoreTextGroup;
 	text_group TargetTextGroup;
 	string_format ScorePercentFormat;
 	string_format ScoreRatioFormat;
+	bool DrawStats = false;
+
+	tween_sequence *ExitSequence;
 
     entity *DraftTarget;
     float CurrentDraftTime = 0;
@@ -101,7 +105,8 @@ struct level_state
     std::list<level_intro_text *> IntroTextList;
 };
 
-void InitLevel(game_main *g, const std::string &levelNumber = "1");
+void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumber);
+void InitLevelState(game_main *g, level_state *l);
 void AddIntroText(game_main *g, level_state *l, const char *text, color c);
 void SpawnCheckpoint(game_main *g, level_state *l);
 void SpawnFinish(game_main *g, level_state *l);

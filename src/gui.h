@@ -67,7 +67,7 @@ struct gui
     float EmissionValue;
 
     // menu stuff
-    tween_sequence MenuChangeSequence;
+    tween_sequence *MenuChangeSequence;
     menu_axis HorizontalAxis;
     menu_axis VerticalAxis;
     float MenuChangeTimer = 0;

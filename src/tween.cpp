@@ -7,27 +7,22 @@ TWEEN_FUNC(TweenFuncLinear)
 
 void InitTweenState(tween_state &state)
 {
+	state.SequencePool.Arena = &state.Arena;
     state.Funcs[TweenEasing_Linear] = TweenFuncLinear;
 }
 
-void AddSequences(tween_state &state, tween_sequence *seqs, int count)
+tween_sequence *CreateSequence(tween_state &state)
 {
-    for (int i = 0; i < count; i++)
-    {
-        auto seq = seqs + i;
-        state.Sequences.push_back(seq);
-        seq->ID = state.Sequences.size() - 1;
-    }
+	auto result = PushStruct<tween_sequence>(GetEntry(state.SequencePool));
+	state.Sequences.push_back(result);
+	result->ID = state.Sequences.size() - 1;
+	return result;
 }
 
-void DestroySequences(tween_state &state, tween_sequence *seqs, int count)
+void DestroySequence(tween_state &state, tween_sequence *seq)
 {
-    for (int i = 0; i < count; i++)
-    {
-        auto seq = seqs + i;
-        seq->Tweens.clear();
-        state.Sequences[seq->ID] = NULL;
-    }
+	state.Sequences[seq->ID] = NULL;
+	FreeEntryFromData(state.SequencePool, seq);
 }
 
 inline void Clear(tween_state &state)
@@ -73,6 +68,11 @@ void Update(tween_state &state, float delta)
             }
             if (t.Timer >= t.Duration)
             {
+				t.Timer = 0;
+				if (t.Callback)
+				{
+					t.Callback();
+				}
                 seq->CurrentTween++;
                 if (seq->CurrentTween >= seq->Tweens.size())
                 {
@@ -82,6 +82,10 @@ void Update(tween_state &state, float delta)
                         seq->Complete = true;
                         seq->Active = false;
                     }
+					else if (seq->OneShot)
+					{
+						DestroySequence(state, seq);
+					}
                 }
             }
 
@@ -102,4 +106,22 @@ inline tween ReverseTween(const tween &t)
         .SetTo(t.From)
         .SetDuration(t.Duration)
         .SetEasing(t.Easing);
+}
+
+inline tween FadeInTween(float *value, float duration)
+{
+    return tween(value)
+        .SetFrom(0.0f)
+        .SetTo(1.0f)
+        .SetDuration(duration);
+}
+
+inline tween FadeOutTween(float *value, float duration)
+{
+    return ReverseTween(FadeInTween(value, duration));
+}
+
+inline tween CallbackTween(std::function<void()> callback)
+{
+    return tween(NULL).SetCallback(callback);
 }

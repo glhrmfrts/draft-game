@@ -6,39 +6,6 @@ static void EnableVertexAttribute(vertex_attribute Attr)
     glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
-static void vInitBuffer(vertex_buffer &Buffer, size_t AttrCount, va_list Args)
-{
-    glGenVertexArrays(1, &Buffer.VAO);
-    glGenBuffers(1, &Buffer.VBO);
-
-    glBindVertexArray(Buffer.VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, Buffer.VBO);
-    for (size_t i = 0; i < AttrCount; i++)
-    {
-        vertex_attribute Attr = va_arg(Args, vertex_attribute);
-        EnableVertexAttribute(Attr);
-    }
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-#define InitialVertexBufferSize 16
-static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
-{
-    if (Buffer.RawIndex + Size > Buffer.Vertices.size())
-    {
-        if (Buffer.Vertices.size() == 0)
-        {
-            Buffer.Vertices.resize(InitialVertexBufferSize * Buffer.VertexSize);
-        }
-        else
-        {
-            Buffer.Vertices.resize(Buffer.Vertices.size() * 2);
-        }
-    }
-}
-
 static void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 {
     Buffer.VertexCount = Index;
@@ -47,15 +14,23 @@ static void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 
 // InitBuffer accepts a variadic number of vertex_attributes, it
 // initializes the buffer and enable the passed attributes
-static void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCount, ...)
+static void InitBuffer(vertex_buffer &buffer, size_t vertexSize, const std::vector<vertex_attribute> &attributes)
 {
-    Buffer.VertexSize = VertexSize;
-    ResetBuffer(Buffer);
+	buffer.VertexSize = vertexSize;
+	ResetBuffer(buffer);
 
-    va_list Args;
-    va_start(Args, AttrCount);
-    vInitBuffer(Buffer, AttrCount, Args);
-    va_end(Args);
+	glGenVertexArrays(1, &buffer.VAO);
+	glGenBuffers(1, &buffer.VBO);
+
+	glBindVertexArray(buffer.VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, buffer.VBO);
+	for (size_t i = 0; i < attributes.size(); i++)
+	{
+		EnableVertexAttribute(attributes[i]);
+	}
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 // InitMeshBuffer initializes a vertex_buffer with the common attributes
@@ -63,11 +38,27 @@ static void InitBuffer(vertex_buffer &Buffer, size_t VertexSize, size_t AttrCoun
 void InitMeshBuffer(vertex_buffer &Buffer)
 {
     size_t Stride = sizeof(mesh_vertex);
-    InitBuffer(Buffer, 12, 4,
-               vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
-               vertex_attribute{1, 2, GL_FLOAT, Stride, 3*sizeof(float)}, // uv
-               vertex_attribute{2, 4, GL_FLOAT, Stride, 5*sizeof(float)}, // color
-               vertex_attribute{3, 3, GL_FLOAT, Stride, 9*sizeof(float)}); // normal
+	InitBuffer(Buffer, 12, {
+			   vertex_attribute{0, 3, GL_FLOAT, Stride, 0}, // position
+			   vertex_attribute{1, 2, GL_FLOAT, Stride, 3 * sizeof(float)}, // uv
+			   vertex_attribute{2, 4, GL_FLOAT, Stride, 5 * sizeof(float)}, // color
+			   vertex_attribute{3, 3, GL_FLOAT, Stride, 9 * sizeof(float)} }); // normal
+}
+
+#define InitialVertexBufferSize 16
+static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
+{
+	if (Buffer.RawIndex + Size > Buffer.Vertices.size())
+	{
+		if (Buffer.Vertices.size() == 0)
+		{
+			Buffer.Vertices.resize(InitialVertexBufferSize * Buffer.VertexSize);
+		}
+		else
+		{
+			Buffer.Vertices.resize(Buffer.Vertices.size() * 2);
+		}
+	}
 }
 
 // PushVertex pushes a single vertex to the buffer, the vertex size
@@ -721,9 +712,10 @@ static void InitRenderState(render_state &r, uint32 width, uint32 height, uint32
 	);
 
     InitMeshBuffer(r.SpriteBuffer);
-    InitBuffer(r.ScreenBuffer, 4, 2,
-               vertex_attribute{0, 2, GL_FLOAT, 4*sizeof(float), 0},
-               vertex_attribute{1, 2, GL_FLOAT, 4*sizeof(float), 2*sizeof(float)});
+	InitBuffer(r.ScreenBuffer, 4, {
+		vertex_attribute{0, 2, GL_FLOAT, 4 * sizeof(float), 0},
+		vertex_attribute{1, 2, GL_FLOAT, 4 * sizeof(float), 2 * sizeof(float)}
+	});
 
 	float data[24] = {
 		-1, -1, 0, 0,
@@ -902,8 +894,8 @@ void RenderBegin(render_state &rs, float deltaTime)
 	rs.DeltaTime = deltaTime;
     rs.LastVAO = -1;
     rs.RenderableCount = 0;
-    rs.FrameSolidRenderables.Clear();
-    rs.FrameTransparentRenderables.Clear();
+    rs.FrameSolidRenderables.clear();
+    rs.FrameTransparentRenderables.clear();
 
 #ifdef DRAFT_DEBUG
     ResetBuffer(rs.DebugBuffer);
@@ -1006,7 +998,7 @@ void RenderEnd(render_state &rs, camera &Camera)
         r.Material = &DebugMaterial;
         r.PrimitiveType = GL_LINES;
         r.Transform = transform{};
-        rs.FrameSolidRenderables.Add(i);
+        rs.FrameSolidRenderables.push_back(i);
         UploadVertices(rs.DebugBuffer, GL_DYNAMIC_DRAW);
     }
 #endif
@@ -1014,7 +1006,7 @@ void RenderEnd(render_state &rs, camera &Camera)
     renderable_sorter sorter;
     sorter.rs = &rs;
     std::sort(rs.FrameSolidRenderables.begin(), rs.FrameSolidRenderables.end(), sorter);
-    std::sort(rs.FrameTransparentRenderables.begin(), rs.FrameTransparentRenderables.end(), sorter);
+    //std::sort(rs.FrameTransparentRenderables.begin(), rs.FrameTransparentRenderables.end(), sorter);
 
     Bind(rs.ModelProgram);
 	SetUniform(rs.ModelProgram.BendRadius, rs.BendRadius);
@@ -1040,11 +1032,11 @@ void AddRenderable(render_state &rs, size_t index, material *material)
 {
     if (material->DiffuseColor.a < 1.0f || (material->Flags & MaterialFlag_ForceTransparent))
     {
-        rs.FrameTransparentRenderables.Add(index);
+        rs.FrameTransparentRenderables.push_back(index);
     }
     else
     {
-        rs.FrameSolidRenderables.Add(index);
+        rs.FrameSolidRenderables.push_back(index);
     }
 }
 

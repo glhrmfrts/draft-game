@@ -224,6 +224,15 @@ void ParseLevel(std::istream &stream, allocator *alloc, level *result)
 	}
 }
 
+void ResetLevel(level *l)
+{
+	l->HasRunStatsScreenCommands = false;
+	for (auto &cp : l->Checkpoints)
+	{
+		cp.CurrentFrameIndex = 0;
+	}
+}
+
 static void RunCommands(game_main *g, level_state *state, const std::vector<level_command> &commands)
 {
     for (auto &cmd : commands)
