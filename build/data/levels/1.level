@@ -8,19 +8,14 @@ checkpoint: {
             }
 
             frame_seconds: 5 {
-                           enable: SHIPS
-                           ship_color: ALL
-            }
-
-            frame_seconds: 15 {
-                           disable: SHIPS
-            }
-
-            frame_seconds: 17 {
                            road_tangent
             }
 
-            frame_seconds: 18 {
+            frame_seconds: 7 {
                            spawn_finish
             }
+}
+
+stats_screen: {
+            stop_track: dmaj
 }

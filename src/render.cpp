@@ -1,12 +1,14 @@
 // Copyright
 
+#include "uber_shader.h"
+
 static void EnableVertexAttribute(vertex_attribute Attr)
 {
     glEnableVertexAttribArray(Attr.Location);
     glVertexAttribPointer(Attr.Location, Attr.Size, Attr.Type, false, Attr.Stride, (void *)Attr.Offset);
 }
 
-static void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
+void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 {
     Buffer.VertexCount = Index;
     Buffer.RawIndex = Index * Buffer.VertexSize;
@@ -14,7 +16,7 @@ static void ResetBuffer(vertex_buffer &Buffer, size_t Index = 0)
 
 // InitBuffer accepts a variadic number of vertex_attributes, it
 // initializes the buffer and enable the passed attributes
-static void InitBuffer(vertex_buffer &buffer, size_t vertexSize, const std::vector<vertex_attribute> &attributes)
+void InitBuffer(vertex_buffer &buffer, size_t vertexSize, const std::vector<vertex_attribute> &attributes)
 {
 	buffer.VertexSize = vertexSize;
 	ResetBuffer(buffer);
@@ -59,6 +61,13 @@ static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 			Buffer.Vertices.resize(Buffer.Vertices.size() * 2);
 		}
 	}
+}
+
+inline void SetIndices(vertex_buffer &buf, std::vector<uint32> &indices)
+{
+    glGenBuffers(1, &buf.IBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf.IBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32), &indices[0], GL_STATIC_DRAW);
 }
 
 // PushVertex pushes a single vertex to the buffer, the vertex size
@@ -129,8 +138,7 @@ void ReserveVertices(vertex_buffer &Buffer, size_t Size, GLenum Usage)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-static void
-CompileShader(GLuint Shader, const char *Source)
+static void CompileShader(GLuint Shader, const char *Source)
 {
     glShaderSource(Shader, 1, &Source, NULL);
     glCompileShader(Shader);
@@ -151,8 +159,7 @@ CompileShader(GLuint Shader, const char *Source)
     }
 }
 
-static void
-LinkShaderProgram(shader_program &Prog)
+static void LinkShaderProgram(shader_program &Prog)
 {
     if (!Prog.ID)
     {
@@ -181,51 +188,43 @@ LinkShaderProgram(shader_program &Prog)
     glDeleteShader(Prog.FragmentShader);
 }
 
-inline void
-SetUniform(GLuint Location, int Value)
+inline void SetUniform(GLuint Location, int Value)
 {
     glUniform1i(Location, Value);
 }
 
-inline void
-SetUniform(GLuint Location, float Value)
+inline void SetUniform(GLuint Location, float Value)
 {
     glUniform1fv(Location, 1, &Value);
 }
 
-inline void
-SetUniform(GLuint Location, const vec2 &Value)
+inline void SetUniform(GLuint Location, const vec2 &Value)
 {
     glUniform2fv(Location, 1, &Value[0]);
 }
 
-inline void
-SetUniform(GLuint Location, const vec3 &Value)
+inline void SetUniform(GLuint Location, const vec3 &Value)
 {
     glUniform3fv(Location, 1, &Value[0]);
 }
 
-inline void
-SetUniform(GLuint Location, const vec4 &Value)
+inline void SetUniform(GLuint Location, const vec4 &Value)
 {
     glUniform4fv(Location, 1, &Value[0]);
 }
 
 #define MatrixRowMajor false
-inline void
-SetUniform(GLuint Location, const mat4 &Value)
+inline void SetUniform(GLuint Location, const mat4 &Value)
 {
     glUniformMatrix4fv(Location, 1, MatrixRowMajor, (float *)&Value);
 }
 
-inline void
-Bind(shader_program &Prog)
+inline void Bind(shader_program &Prog)
 {
     glUseProgram(Prog.ID);
 }
 
-inline void
-UnbindShaderProgram()
+inline void UnbindShaderProgram()
 {
     glUseProgram(0);
 }
@@ -401,8 +400,7 @@ static GLenum FramebufferColorAttachments[] = {
     GL_COLOR_ATTACHMENT15,
 };
 
-static void
-CreateFramebufferTexture(render_state &RenderState, texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
+static void CreateFramebufferTexture(render_state &RenderState, texture &Texture, GLuint Target, uint32 Width, uint32 Height, GLint Filter, GLuint Format)
 {
     Texture.Target = Target;
     Texture.Width = Width;
@@ -419,8 +417,7 @@ CreateFramebufferTexture(render_state &RenderState, texture &Texture, GLuint Tar
     Unbind(Texture, 0);
 }
 
-static void
-InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Flags, size_t ColorTextureCount)
+static void InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Width, uint32 Height, uint32 Flags, size_t ColorTextureCount)
 {
     Framebuffer.Width = Width;
     Framebuffer.Height = Height;
@@ -458,8 +455,7 @@ InitFramebuffer(render_state &RenderState, framebuffer &Framebuffer, uint32 Widt
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-static void
-DestroyFramebuffer(framebuffer &Framebuffer)
+static void DestroyFramebuffer(framebuffer &Framebuffer)
 {
     //DestroyTexture(Framebuffer.DepthTexture);
     for (size_t i = 0; i < Framebuffer.ColorTextureCount; i++)
@@ -469,15 +465,13 @@ DestroyFramebuffer(framebuffer &Framebuffer)
     glDeleteFramebuffers(1, &Framebuffer.ID);
 }
 
-static void
-BindFramebuffer(framebuffer &Framebuffer)
+static void BindFramebuffer(framebuffer &Framebuffer)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, Framebuffer.ID);
     glViewport(0, 0, Framebuffer.Width, Framebuffer.Height);
 }
 
-static void
-UnbindFramebuffer(render_state &rs)
+static void UnbindFramebuffer(render_state &rs)
 {
     // @TODO: un-hardcode this
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -513,8 +507,7 @@ void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
 }
 
 // returns the index of the next available renderable
-static size_t
-NextRenderable(render_state &RenderState)
+static size_t NextRenderable(render_state &RenderState)
 {
     size_t Size = RenderState.Renderables.size();
     if (RenderState.RenderableCount >= Size)
@@ -653,6 +646,46 @@ static void InitShaderProgram(shader_program &Program, const string &vsPath, con
         &Program,
         Callback,
     };
+}
+
+model_program *CompileUberModelProgram(allocator *alloc, std::unordered_map<std::string, std::string> &defines)
+{
+    static std::unordered_map<std::string, model_program *> shaderCache;
+    std::string key = "";
+    for (auto it : defines)
+    {
+        key.append(it.first);
+    }
+    if (shaderCache.find(key) != shaderCache.end())
+    {
+        return shaderCache[key];
+    }
+
+    auto result = PushStruct<model_program>(alloc);
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    std::string vertexSource = "#version 330\n";
+    std::string fragmentSource = "#version 330\n";
+    for (auto it : defines)
+    {
+        std::string str = "#define " + it.first + " " + it.second + "\n";
+        vertexSource.append(str);
+        fragmentSource.append(str);
+    }
+
+    vertexSource.append(UberVertexShaderSource);
+    fragmentSource.append(UberFragmentShaderSource);
+
+    CompileShader(vertexShader, vertexSource.c_str());
+    CompileShader(fragmentShader, fragmentSource.c_str());
+
+    shader_asset_param param = {};
+    param.ShaderProgram = result;
+    ModelProgramCallback(&param);
+
+    shaderCache[key] = result;
+    return result;
 }
 
 static void InitRenderState(render_state &r, uint32 width, uint32 height, uint32 viewportWidth, uint32 viewportHeight)
@@ -933,16 +966,30 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
         glLineWidth(r.LineWidth);
     }
 
-    auto &program = rs.ModelProgram;
-    SetUniform(program.FogStart, Global_Renderer_FogStart);
-    SetUniform(program.FogEnd, Global_Renderer_FogEnd);
-    SetUniform(program.FogColor, rs.FogColor);
-    SetUniform(program.ProjectionView, Camera.ProjectionView);
-    SetUniform(program.CamPos, Camera.Position);
-    SetUniform(program.Transform, GetTransformMatrix(r.Transform));
+    static model_program *previousProgram = NULL;
+    auto program = &rs.ModelProgram;
+    if (r.Program)
+    {
+        program = r.Program;
+    }
+
+    if (program != previousProgram)
+    {
+        Bind(*program);
+        previousProgram = program;
+    }
+
+    SetUniform(program->BendRadius, rs.BendRadius);
+    SetUniform(program->RoadTangentPoint, *rs.RoadTangentPoint);
+    SetUniform(program->FogStart, Global_Renderer_FogStart);
+    SetUniform(program->FogEnd, Global_Renderer_FogEnd);
+    SetUniform(program->FogColor, rs.FogColor);
+    SetUniform(program->ProjectionView, Camera.ProjectionView);
+    SetUniform(program->CamPos, Camera.Position);
+    SetUniform(program->Transform, GetTransformMatrix(r.Transform));
 
     // @TODO: check why this breaks the floor model
-    SetUniform(program.NormalTransform, mat4(1.0f));
+    SetUniform(program->NormalTransform, mat4(1.0f));
 
     if (r.Material->Texture)
     {
@@ -952,14 +999,14 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
-    SetUniform(program.MaterialFlags, (int)r.Material->Flags);
-    SetUniform(program.DiffuseColor, r.Material->DiffuseColor);
-    SetUniform(program.TexWeight, r.Material->TexWeight);
-    SetUniform(program.FogWeight, r.Material->FogWeight);
-    SetUniform(program.Emission, r.Material->Emission);
-    SetUniform(program.UvScale, r.Material->UvScale);
-    SetUniform(program.ExplosionLightColor, rs.ExplosionLightColor);
-    SetUniform(program.ExplosionLightTimer, rs.ExplosionLightTimer);
+    SetUniform(program->MaterialFlags, (int)r.Material->Flags);
+    SetUniform(program->DiffuseColor, r.Material->DiffuseColor);
+    SetUniform(program->TexWeight, r.Material->TexWeight);
+    SetUniform(program->FogWeight, r.Material->FogWeight);
+    SetUniform(program->Emission, r.Material->Emission);
+    SetUniform(program->UvScale, r.Material->UvScale);
+    SetUniform(program->ExplosionLightColor, rs.ExplosionLightColor);
+    SetUniform(program->ExplosionLightTimer, rs.ExplosionLightTimer);
     glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
     if (r.Material->Flags & MaterialFlag_PolygonLines)
     {
@@ -1008,10 +1055,6 @@ void RenderEnd(render_state &rs, camera &Camera)
     std::sort(rs.FrameSolidRenderables.begin(), rs.FrameSolidRenderables.end(), sorter);
     //std::sort(rs.FrameTransparentRenderables.begin(), rs.FrameTransparentRenderables.end(), sorter);
 
-    Bind(rs.ModelProgram);
-	SetUniform(rs.ModelProgram.BendRadius, rs.BendRadius);
-    SetUniform(rs.ModelProgram.RoadTangentPoint, *rs.RoadTangentPoint);
-
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     for (auto renderableIndex : rs.FrameSolidRenderables)
@@ -1051,6 +1094,7 @@ void DrawMeshPart(render_state &rs, mesh &Mesh, mesh_part &part, const transform
     size_t Index = NextRenderable(rs);
     auto &r = rs.Renderables[Index];
     r.SortNumber = rs.RenderableCount * 100;
+    r.Program = part.Program;
     r.LineWidth = part.LineWidth;
     r.PrimitiveType = part.PrimitiveType;
     r.VertexOffset = part.Offset;
@@ -1086,6 +1130,7 @@ void DrawModel(render_state &rs, model &Model, const transform &Transform)
             r.SortNumber = rs.RenderableCount * 100;
         }
 
+        r.Program = Part.Program;
         r.LineWidth = Part.LineWidth;
         r.PrimitiveType = Part.PrimitiveType;
         r.VertexOffset = Part.Offset;

@@ -1,0 +1,8 @@
+{
+    "audio/music_gain": 0.0,
+    "audio/sfx_gain": 0.0,
+    "graphics/aa": true,
+    "graphics/bloom": true,
+    "graphics/fullscreen": false,
+    "graphics/resolution": 3
+}

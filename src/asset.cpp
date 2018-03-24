@@ -17,7 +17,7 @@ void InitAssetLoader(game_main *g, asset_loader &Loader, platform_api &Platform)
     }
 
     CreateThreadPool(Loader.Pool, g, 1, 32);
-    Loader.NumLoadedEntries = 0; 
+    Loader.NumLoadedEntries = 0;
     Loader.Platform = &Platform;
 	Loader.Arena.Free = false;
 }
@@ -106,8 +106,15 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
 	case AssetEntryType_Mesh:
 	{
 		Entry.Mesh.Result = PushStruct<mesh>(Loader.Arena);
+        Entry.Mesh.Data = PushStruct<mesh_asset_data>(Loader.Arena);
 		break;
 	}
+
+    case AssetEntryType_MaterialLib:
+    {
+        Entry.MaterialLib.Result = PushStruct<material_lib>(Loader.Arena);
+        break;
+    }
     }
     Loader.Entries.push_back(Entry);
 	Loader.Active = true;
@@ -230,6 +237,34 @@ FindLevel(asset_loader &loader, const string &id)
 		if (entry.Type == AssetEntryType_Level && entry.ID == id)
 		{
 			return entry.Level.Result;
+		}
+	}
+	return NULL;
+}
+
+inline mesh *
+FindMesh(asset_loader &loader, const string &id)
+{
+    for (int i = 0; i < loader.Entries.size(); i++)
+	{
+		auto &entry = loader.Entries[i];
+		if (entry.Type == AssetEntryType_Mesh && entry.ID == id)
+		{
+			return entry.Mesh.Result;
+		}
+	}
+	return NULL;
+}
+
+inline material_lib *
+FindMaterialLib(asset_loader &loader, const string &id)
+{
+    for (int i = 0; i < loader.Entries.size(); i++)
+	{
+		auto &entry = loader.Entries[i];
+		if (entry.Type == AssetEntryType_MaterialLib && entry.ID == id)
+		{
+			return entry.MaterialLib.Result;
 		}
 	}
 	return NULL;
@@ -444,7 +479,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 	case AssetEntryType_OptionsLoad:
 	{
 		std::string content(ReadFile(Entry->Filename.c_str()));
-		
+
 		options *result = Entry->Options.Result;
 		ParseOptions(content, &Entry->Loader->Arena, result);
 		break;
@@ -504,6 +539,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 				bool HasColors = false;
 			};
 
+            auto meshData = Entry->Mesh.Data;
 			mesh_obj_data data = {};
 			mesh_obj_face_group *currentFaceGroup = NULL;
 			std::vector<mesh_obj_face_group> faceGroups;
@@ -520,7 +556,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 					{
 						iss >> field;
 						std::string path = GetParentPath(Entry->Filename) + "/" + field;
-						AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Material, path, path, NULL));
+						AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_MaterialLib, path, path, NULL));
 					}
 					else if (field == "v")
 					{
@@ -543,6 +579,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 						faceGroups.emplace_back();
 						currentFaceGroup = &faceGroups[faceGroups.size() - 1];
 						currentFaceGroup->Material = field;
+                        meshData->Materials.push_back(field);
 					}
 					else if (field == "o" || field == "g")
 					{
@@ -621,9 +658,10 @@ static void LoadAssetThreadSafePart(void *Arg)
 				}
 
 				std::unordered_map<std::string, int> indexMap;
-				auto &combinedVertices = Entry->Mesh.Vertices;
-				auto &combinedIndices = Entry->Mesh.Indices;
-				auto &parts = Entry->Mesh.Parts;
+				auto &combinedVertices = meshData->Vertices;
+				auto &combinedIndices = meshData->Indices;
+				auto &parts = meshData->Parts;
+                size_t vertexSize = 0;
 				size_t offset = 0;
 				for (size_t i = 0; i < faceGroups.size(); i++)
 				{
@@ -642,20 +680,23 @@ static void LoadAssetThreadSafePart(void *Arg)
 						vertIndex = fg.Data[d++] - 1;
 						vert = data.Vertices[vertIndex];
 						indexKey.append(std::to_string(vertIndex));
+                        vertexSize = 3;
 
 						if (fg.HasUvs)
 						{
 							uvIndex = fg.Data[d++] - 1;
 							uv = data.Uvs[uvIndex];
 							indexKey.append(std::to_string(uvIndex));
-							Entry->Mesh.Flags |= MeshFlag_HasUvs;
+							meshData->Flags |= mesh_flags::HasUvs;
+                            vertexSize += 2;
 						}
 						if (fg.HasNormals)
 						{
 							normIndex = fg.Data[d++] - 1;
 							normal = data.Normals[normIndex];
 							indexKey.append(std::to_string(normIndex));
-							Entry->Mesh.Flags |= MeshFlag_HasNormals;
+							meshData->Flags |= mesh_flags::HasNormals;
+                            vertexSize += 3;
 						}
 
 						int combinedIndex = 0;
@@ -690,11 +731,49 @@ static void LoadAssetThreadSafePart(void *Arg)
 					offset += combinedIndices.size();
 				}
 
-				Entry->Mesh.Flags |= MeshFlag_HasIndices;
+				meshData->Flags |= mesh_flags::HasIndices;
+                meshData->VertexSize = vertexSize;
 			}
 		}
 		break;
 	}
+
+    case AssetEntryType_MaterialLib:
+    {
+        std::ifstream file(Entry->Filename);
+        std::string line;
+
+        auto lib = Entry->MaterialLib.Result;
+        material *currentMaterial = NULL;
+        while (std::getline(file, line))
+        {
+            std::istringstream iss;
+            std::string field;
+
+            if (iss >> field)
+            {
+                if (field == "newmtl")
+                {
+                    iss >> field;
+                    currentMaterial = PushStruct<material>(Entry->Loader->Arena);
+                    lib->Materials[field] = currentMaterial;
+                }
+                else if (field == "Ka" || field == "Kd")
+                {
+                    float r,g,b;
+                    iss >> r >> g >> b;
+                    currentMaterial->DiffuseColor = color(r,g,b,1);
+                }
+                else if (field == "d")
+                {
+                    float d;
+                    iss >> d;
+                    currentMaterial->DiffuseColor.a = d;
+                }
+            }
+        }
+        break;
+    }
 	}
 
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
@@ -797,54 +876,56 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 	case AssetEntryType_Mesh:
 	{
 		auto result = Entry->Mesh.Result;
-		size_t vertexSize = Entry->Mesh.VertexSize;
-		size_t vertexCount = Entry->Mesh.VertexCount;
+        auto meshData = Entry->Mesh.Data;
+		size_t vertexSize = meshData->VertexSize;
+		size_t vertexCount = meshData->Vertices.size() / meshData->VertexSize;
 		size_t stride = vertexSize * sizeof(float);
 		size_t offset = 0;
-		size_t location = 0;
+		unsigned location = 0;
 		std::unordered_map<std::string, std::string> defines;
 
 		std::vector<vertex_attribute> attrs = { vertex_attribute{ location, 3, GL_FLOAT, stride, offset * sizeof(float) } };
 		location += 1;
 		offset += 3;
 
-		if (Entry->Mesh.Flags & MeshFlag_HasUvs)
+		if (meshData->Flags & mesh_flags::HasUvs)
 		{
-			defines["A_UV"] = location;
+			defines["A_UV"] = std::to_string(location);
 			attrs.push_back(vertex_attribute{ location, 2, GL_FLOAT, stride, offset * sizeof(float)});
 			location += 1;
 			offset += 2;
 		}
-		if (Entry->Mesh.Flags & MeshFlag_HasNormals)
+		if (meshData->Flags & mesh_flags::HasNormals)
 		{
-			defines["A_NORMAL"] = location;
+			defines["A_NORMAL"] = std::to_string(location);
 			attrs.push_back(vertex_attribute{ location, 3, GL_FLOAT, stride, offset * sizeof(float) });
 			location += 1;
 			offset += 3;
 		}
-		if (Entry->Mesh.Flags & MeshFlag_HasColors)
+		if (meshData->Flags & mesh_flags::HasColors)
 		{
-			defines["A_COLOR"] = location;
+			defines["A_COLOR"] = std::to_string(location);
 			attrs.push_back(vertex_attribute{ location, 4, GL_FLOAT, stride, offset * sizeof(float) });
 			location += 1;
 			offset += 4;
 		}
 
 		InitBuffer(result->Buffer, vertexSize, attrs);
-		SetIndices(result->Buffer, Entry->Mesh.Indices);
+		SetIndices(result->Buffer, meshData->Indices);
 
 		for (size_t i = 0; i < vertexSize * vertexCount; i += vertexSize)
 		{
-			float *data = &Entry->Mesh.Vertices[i];
+			float *data = &meshData->Vertices[i];
 			PushVertex(result->Buffer, data);
 		}
-		
-		for (size_t i = 0; i < Entry->Mesh.Parts.size(); i++)
+
+        auto lib = FindMaterialLib(*Entry->Loader, meshData->MaterialLib);
+		for (size_t i = 0; i < meshData->Parts.size(); i++)
 		{
-			auto &part = Entry->Mesh.Parts[i];
-			part.Program = CompileModelProgram(defines);
-			part.Material = *FindMaterial(*Entry->Loader, Entry->Mesh.Materials[i]);
-			AddPart(result, part);
+			auto &part = meshData->Parts[i];
+			part.Program = CompileUberModelProgram(&Entry->Loader->Arena, defines);
+			part.Material = *lib->Materials[meshData->Materials[i]];
+			result->Parts.push_back(part);
 		}
 		EndMesh(result, GL_STATIC_DRAW);
 

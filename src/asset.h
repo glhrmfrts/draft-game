@@ -32,6 +32,7 @@ enum asset_entry_type
 	AssetEntryType_OptionsSave,
     AssetEntryType_Level,
 	AssetEntryType_Mesh,
+    AssetEntryType_MaterialLib,
 };
 enum asset_completion
 {
@@ -39,6 +40,24 @@ enum asset_completion
     AssetCompletion_ThreadSafe,
     AssetCompletion_ThreadUnsafe,
 	AssetCompletion_Done,
+};
+
+struct material;
+
+struct material_lib
+{
+    std::unordered_map<std::string, material *> Materials;
+};
+
+struct mesh_asset_data
+{
+    std::vector<float> Vertices;
+    std::vector<uint32> Indices;
+    std::vector<mesh_part> Parts;
+    std::vector<std::string> Materials;
+    std::string MaterialLib;
+    mesh_flags::type Flags = 0;
+    size_t VertexSize;
 };
 
 struct asset_loader;
@@ -102,12 +121,14 @@ struct asset_entry
 
 		struct
 		{
-			std::vector<float> Vertices;
-			std::vector<int> Indices;
-			std::vector<mesh_part> Parts;
-			uint32 Flags = 0;
+            mesh_asset_data *Data;
 			mesh *Result;
 		} Mesh;
+
+        struct
+        {
+            material_lib *Result;
+        } MaterialLib;
     };
 
 	asset_entry() {}

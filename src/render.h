@@ -185,17 +185,30 @@ struct material
 };
 static material BlankMaterial{Color_white, 0, 0, NULL};
 
+struct model_program;
+
 struct mesh_part
 {
     material Material;
     size_t Offset;
     size_t Count;
+    model_program *Program = NULL;
     GLuint PrimitiveType;
     float LineWidth = DEFAULT_LINE_WIDTH;
 
     mesh_part() {}
     mesh_part(material m, size_t o, size_t c, GLuint p, float lw = DEFAULT_LINE_WIDTH)
         : Material(m), Offset(o), Count(c), PrimitiveType(p), LineWidth(lw) {}
+};
+
+struct mesh_flags
+{
+    typedef uint32 type;
+
+    static constexpr type HasUvs = 0x1;
+    static constexpr type HasNormals = 0x2;
+    static constexpr type HasColors = 0x4;
+    static constexpr type HasIndices = 0x8;
 };
 
 struct mesh
@@ -303,6 +316,7 @@ struct renderable
 {
     transform Transform;
     bounding_box Bounds;
+    model_program *Program;
     material *Material;
     size_t VertexOffset;
     size_t VertexCount;
@@ -316,7 +330,7 @@ struct renderable
 struct render_state
 {
     memory_arena Arena;
-    
+
     model_program ModelProgram;
     blur_program BlurHorizontalProgram;
     blur_program BlurVerticalProgram;
