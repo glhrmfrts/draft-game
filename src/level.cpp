@@ -10,12 +10,22 @@ static std::unordered_map<hash_string::result_type, gen_type> LevelGenTypes = {
 	{ hash_string()("CRYSTALS"), GenType_Crystal },
 	{ hash_string()("SHIPS"), GenType_Ship },
 	{ hash_string()("RED_SHIPS"), GenType_RedShip },
+	{ hash_string()("SKULLS"), GenType_EnemySkull },
 };
 
 static std::unordered_map<hash_string::result_type, int> LevelShipColors = {
 	{ hash_string()("SHIP_BLUE"), SHIP_BLUE },
 	{ hash_string()("SHIP_ORANGE"), SHIP_ORANGE },
 	{ hash_string()("ALL"), -1 },
+};
+
+static std::unordered_map<hash_string::result_type, road_change> LevelRoadChangeTypes = {
+	{ hash_string()("NARROW_LEFT"), RoadChange_NarrowLeft },
+	{ hash_string()("NARROW_RIGHT"), RoadChange_NarrowRight },
+	{ hash_string()("NARROW_CENTER"), RoadChange_NarrowCenter },
+	{ hash_string()("WIDENS_LEFT"), RoadChange_WidensLeft },
+	{ hash_string()("WIDENS_RIGHT"), RoadChange_WidensRight },
+	{ hash_string()("WIDENS_CENTER"), RoadChange_WidensCenter },
 };
 
 bool ParseGenericCommand(const std::string &cmd, const std::vector<std::string> &args, allocator *alloc, level_command *c)
@@ -65,6 +75,12 @@ bool ParseGenericCommand(const std::string &cmd, const std::vector<std::string> 
         c->Type = LevelCommand_RoadTangent;
         return true;
     }
+	else if (cmd == "road_change")
+	{
+		c->Type = LevelCommand_RoadChange;
+		c->Hash = hash_string()(args[0]);
+		return true;
+	}
     else if (cmd == "play_track")
     {
         c->Type = LevelCommand_PlayTrack;
@@ -266,6 +282,10 @@ static void RunCommands(game_main *g, level_state *state, const std::vector<leve
         case LevelCommand_RoadTangent:
             RoadTangent(g, state);
             break;
+
+		case LevelCommand_RoadChange:
+			RoadChange(g->World, LevelRoadChangeTypes[cmd.Hash]);
+			break;
 
 		case LevelCommand_PlayTrack:
 			PlayTrack(g, state, cmd.Track.TrackHash, cmd.Track.BeatDivisor);

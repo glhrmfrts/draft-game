@@ -540,13 +540,14 @@ static void LoadAssetThreadSafePart(void *Arg)
 			};
 
             auto meshData = Entry->Mesh.Data;
+			meshData->Flags = (mesh_flags::type)Entry->Param;
 			mesh_obj_data data = {};
 			mesh_obj_face_group *currentFaceGroup = NULL;
 			std::vector<mesh_obj_face_group> faceGroups;
 			std::string line;
 			while (std::getline(file, line))
 			{
-				std::istringstream iss;
+				std::istringstream iss(line);
 				std::string field;
 
 				float x, y, z;
@@ -557,11 +558,19 @@ static void LoadAssetThreadSafePart(void *Arg)
 						iss >> field;
 						std::string path = GetParentPath(Entry->Filename) + "/" + field;
 						AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_MaterialLib, path, path, NULL));
+						meshData->MaterialLib = path;
 					}
 					else if (field == "v")
 					{
 						iss >> x >> y >> z;
-						data.Vertices.push_back(vec3(x, y, z));
+						if (meshData->Flags & mesh_flags::UpY)
+						{
+							data.Vertices.push_back(vec3(x, -z, y));
+						}
+						else
+						{
+							data.Vertices.push_back(vec3(x, y, z));
+						}
 					}
 					else if (field == "vt")
 					{
@@ -571,7 +580,14 @@ static void LoadAssetThreadSafePart(void *Arg)
 					else if (field == "vn")
 					{
 						iss >> x >> y >> z;
-						data.Normals.push_back(vec3(x, y, z));
+						if (meshData->Flags & mesh_flags::UpY)
+						{
+							data.Normals.push_back(vec3(x, -z, y));
+						}
+						else
+						{
+							data.Normals.push_back(vec3(x, y, z));
+						}
 					}
 					else if (field == "usemtl")
 					{
@@ -579,7 +595,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 						faceGroups.emplace_back();
 						currentFaceGroup = &faceGroups[faceGroups.size() - 1];
 						currentFaceGroup->Material = field;
-                        meshData->Materials.push_back(field);
+						meshData->Materials.push_back(field);
 					}
 					else if (field == "o" || field == "g")
 					{
@@ -656,84 +672,124 @@ static void LoadAssetThreadSafePart(void *Arg)
 						}
 					}
 				}
+			}
 
-				std::unordered_map<std::string, int> indexMap;
-				auto &combinedVertices = meshData->Vertices;
-				auto &combinedIndices = meshData->Indices;
-				auto &parts = meshData->Parts;
-                size_t vertexSize = 0;
-				size_t offset = 0;
-				for (size_t i = 0; i < faceGroups.size(); i++)
+			std::unordered_map<std::string, int> indexMap;
+			mesh_obj_data combinedData;
+            size_t vertexSize = 0;
+			size_t offset = 0;
+			int nextIndex = 0;
+			int procNormIndex = 0;
+			for (size_t i = 0; i < faceGroups.size(); i++)
+			{
+				auto &fg = faceGroups[i];
+				int numElements = fg.Data.size();
+
+				for (int d = 0; d < numElements;)
 				{
-					auto &fg = faceGroups[i];
-					int numElements = fg.Data.size();
+					std::string indexKey;
+					int vertIndex, uvIndex, normIndex;
+					vec3 vert;
+					vec2 uv;
+					vec3 normal;
 
-					int nextIndex = 0;
-					for (int d = 0; d < numElements;)
+					vertIndex = fg.Data[d++] - 1;
+					vert = data.Vertices[vertIndex];
+					indexKey.append(std::to_string(vertIndex));
+                    vertexSize = 3;
+
+					if (fg.HasUvs)
 					{
-						std::string indexKey;
-						int vertIndex, uvIndex, normIndex;
-						vec3 vert;
-						vec2 uv;
-						vec3 normal;
+						uvIndex = fg.Data[d++] - 1;
+						uv = data.Uvs[uvIndex];
+						indexKey.append(std::to_string(uvIndex));
+						meshData->Flags |= mesh_flags::HasUvs;
+                        vertexSize += 2;
+					}
+					if (fg.HasNormals)
+					{
+						normIndex = fg.Data[d++] - 1;
+						normal = data.Normals[normIndex];
+						indexKey.append(std::to_string(normIndex));
+						meshData->Flags |= mesh_flags::HasNormals;
+                        vertexSize += 3;
+					}
 
-						vertIndex = fg.Data[d++] - 1;
-						vert = data.Vertices[vertIndex];
-						indexKey.append(std::to_string(vertIndex));
-                        vertexSize = 3;
+					int combinedIndex = 0;
+					if (indexMap.find(indexKey) == indexMap.end())
+					{
+						combinedIndex = nextIndex++;
+						indexMap[indexKey] = combinedIndex;
 
+						combinedData.Vertices.push_back(vert);
 						if (fg.HasUvs)
 						{
-							uvIndex = fg.Data[d++] - 1;
-							uv = data.Uvs[uvIndex];
-							indexKey.append(std::to_string(uvIndex));
-							meshData->Flags |= mesh_flags::HasUvs;
-                            vertexSize += 2;
+							combinedData.Uvs.push_back(uv);
 						}
 						if (fg.HasNormals)
 						{
-							normIndex = fg.Data[d++] - 1;
-							normal = data.Normals[normIndex];
-							indexKey.append(std::to_string(normIndex));
-							meshData->Flags |= mesh_flags::HasNormals;
-                            vertexSize += 3;
+							combinedData.Normals.push_back(normal);
 						}
-
-						int combinedIndex = 0;
-						if (indexMap.find(indexKey) == indexMap.end())
-						{
-							combinedIndex = nextIndex++;
-							indexMap[indexKey] = combinedIndex;
-
-							combinedVertices.insert(combinedVertices.end(), &vert[0], &vert[0] + 2);
-							if (fg.HasUvs)
-							{
-								combinedVertices.insert(combinedVertices.end(), &uv[0], &uv[0] + 1);
-							}
-							if (fg.HasNormals)
-							{
-								combinedVertices.insert(combinedVertices.end(), &normal[0], &normal[2]);
-							}
-						}
-						else
-						{
-							combinedIndex = indexMap[indexKey];
-						}
-						combinedIndices.push_back(combinedIndex);
 					}
-
-					mesh_part part;
-					part.PrimitiveType = GL_TRIANGLES;
-					part.Offset = offset;
-					part.Count = combinedIndices.size() - offset;
-					parts.push_back(part);
-
-					offset += combinedIndices.size();
+					else
+					{
+						combinedIndex = indexMap[indexKey];
+					}
+					meshData->Indices.push_back(combinedIndex);
 				}
 
-				meshData->Flags |= mesh_flags::HasIndices;
-                meshData->VertexSize = vertexSize;
+				mesh_part part;
+				part.PrimitiveType = GL_TRIANGLES;
+				part.Offset = offset;
+				part.Count = meshData->Indices.size() - offset;
+				meshData->Parts.push_back(part);
+
+				offset = meshData->Indices.size();
 			}
+
+			if (!(meshData->Flags & mesh_flags::HasNormals))
+			{
+				vertexSize += 3;
+				combinedData.Normals.resize(combinedData.Vertices.size());
+
+				for (size_t i = 0; i < meshData->Indices.size(); i += 3)
+				{
+					uint32 idx1 = meshData->Indices[i];
+					uint32 idx2 = meshData->Indices[i+1];
+					uint32 idx3 = meshData->Indices[i+2];
+					vec3 v1 = combinedData.Vertices[idx1];
+					vec3 v2 = combinedData.Vertices[idx2];
+					vec3 v3 = combinedData.Vertices[idx3];
+					vec3 normal = glm::cross(v2 - v1, v3 - v1);
+
+					combinedData.Normals[idx1] += normal;
+					combinedData.Normals[idx2] += normal;
+					combinedData.Normals[idx3] += normal;
+				}
+
+				for (size_t i = 0; i < combinedData.Normals.size(); i++)
+				{
+					combinedData.Normals[i] = glm::normalize(combinedData.Normals[i]);
+				}
+			}
+
+			for (size_t i = 0; i < combinedData.Vertices.size(); i++)
+			{
+				vec3 vert = combinedData.Vertices[i];
+				meshData->Vertices.insert(meshData->Vertices.end(), &vert[0], &vert[0] + 3);
+
+				if (meshData->Flags & mesh_flags::HasUvs)
+				{
+					vec2 uv = combinedData.Uvs[i];
+					meshData->Vertices.insert(meshData->Vertices.end(), &uv[0], &uv[0] + 2);
+				}
+
+				vec3 normal = combinedData.Normals[i];
+				meshData->Vertices.insert(meshData->Vertices.end(), &normal[0], &normal[0] + 3);
+			}
+
+			meshData->Flags |= mesh_flags::HasIndices | mesh_flags::HasNormals;
+            meshData->VertexSize = vertexSize;
 		}
 		break;
 	}
@@ -747,7 +803,7 @@ static void LoadAssetThreadSafePart(void *Arg)
         material *currentMaterial = NULL;
         while (std::getline(file, line))
         {
-            std::istringstream iss;
+			std::istringstream iss(line);
             std::string field;
 
             if (iss >> field)
@@ -755,8 +811,16 @@ static void LoadAssetThreadSafePart(void *Arg)
                 if (field == "newmtl")
                 {
                     iss >> field;
-                    currentMaterial = PushStruct<material>(Entry->Loader->Arena);
-                    lib->Materials[field] = currentMaterial;
+
+					if (lib->Materials.find(field) == lib->Materials.end())
+					{
+						currentMaterial = PushStruct<material>(Entry->Loader->Arena);
+						lib->Materials[field] = currentMaterial;
+					}
+					else
+					{
+						currentMaterial = lib->Materials[field];
+					}
                 }
                 else if (field == "Ka" || field == "Kd")
                 {
@@ -764,12 +828,44 @@ static void LoadAssetThreadSafePart(void *Arg)
                     iss >> r >> g >> b;
                     currentMaterial->DiffuseColor = color(r,g,b,1);
                 }
+				else if (field == "Ks")
+				{
+					float r, g, b;
+					iss >> r >> g >> b;
+					currentMaterial->SpecularColor = color(r, g, b, 1);
+				}
+				else if (field == "Ke")
+				{
+					float r, g, b;
+					iss >> r >> g >> b;
+					currentMaterial->EmissiveColor = color(r, g, b, 1);
+				}
+				else if (field == "Ns")
+				{
+					float s;
+					iss >> s;
+					currentMaterial->Shininess = s;
+				}
                 else if (field == "d")
                 {
                     float d;
                     iss >> d;
                     currentMaterial->DiffuseColor.a = d;
                 }
+				else if (field == "e")
+				{
+					float e;
+					iss >> e;
+					currentMaterial->Emission = e;
+				}
+				else if (field == "cull")
+				{
+					iss >> field;
+					if (field == "on")
+					{
+						currentMaterial->Flags |= MaterialFlag_CullFace;
+					}
+				}
             }
         }
         break;
@@ -924,7 +1020,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 		{
 			auto &part = meshData->Parts[i];
 			part.Program = CompileUberModelProgram(&Entry->Loader->Arena, defines);
-			part.Material = *lib->Materials[meshData->Materials[i]];
+			part.Material = lib->Materials[meshData->Materials[i]];
 			result->Parts.push_back(part);
 		}
 		EndMesh(result, GL_STATIC_DRAW);

@@ -130,9 +130,9 @@ struct fixed_array
 
     void push_back(T elem)
     {
-        if (Count >= cap)
+        if (Count+1 >= cap)
         {
-            throw std::runtime_error("fixed array out of memory");
+            throw std::runtime_error(std::string(typeid(T).name()) + " fixed array out of memory");
         }
         Data[Count++] = elem;
     }

@@ -15,17 +15,6 @@ inline float LaneIndexToPitch(int index)
 	return (index + 2)*0.25f;
 }
 
-static material *CreateMaterial(allocator *alloc, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
-{
-    auto result = PushStruct<material>(alloc);
-    result->DiffuseColor = Color;
-    result->Emission = Emission;
-    result->TexWeight = TexWeight;
-    result->Texture = Texture;
-    result->Flags = Flags;
-    return result;
-}
-
 static model *CreateModel(allocator *alloc, mesh *Mesh)
 {
     auto result = PushStruct<model>(alloc);
@@ -65,7 +54,7 @@ static trail *CreateTrail(allocator *alloc, entity *Owner, color Color,
 	return result;
 }
 
-#define TRAIL_GROUP_SIZE(n) (sizeof(trail_group) + (sizeof(entity)*n) + (TRAIL_SIZE*n) + (TRAIL_COUNT*4*sizeof(vec3)*n))
+#define TRAIL_GROUP_SIZE(n) (sizeof(trail_group) + (sizeof(entity)*n) + (sizeof(material)*3) + (TRAIL_SIZE*n) + (TRAIL_COUNT*4*sizeof(vec3)*n))
 static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
                                      float radius = 0.5f, bool renderOnly = false, size_t count = 1)
 {
@@ -84,13 +73,13 @@ static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
     const float emission = 4.0f;
 
     // planes
-    AddPart(&result->Mesh, {{c, 0, 0, NULL, MaterialFlag_ForceTransparent}, 0, PlaneCount, GL_TRIANGLES});
+    AddPart(&result->Mesh, {CreateMaterial(alloc, c, 0, 0, NULL, MaterialFlag_ForceTransparent), 0, PlaneCount, GL_TRIANGLES});
 
     // left line
-    AddPart(&result->Mesh, {{c, emission, 0, NULL}, PlaneCount, LineCount, GL_LINES});
+    AddPart(&result->Mesh, { CreateMaterial(alloc, c, emission, 0, NULL), PlaneCount, LineCount, GL_LINES});
 
     // right line
-    AddPart(&result->Mesh, {{c, emission, 0, NULL}, PlaneCount + LineCount, LineCount, GL_LINES});
+    AddPart(&result->Mesh, { CreateMaterial(alloc, c, emission, 0, NULL), PlaneCount + LineCount, LineCount, GL_LINES});
 
 	ReserveVertices(result->Mesh.Buffer, PlaneCount + LineCount * 2, GL_DYNAMIC_DRAW);
 
@@ -284,6 +273,18 @@ static entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *
 	return result;
 }
 
+#define ENEMY_SKULL_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_GROUP_SIZE(1))
+static entity *CreateEnemySkullEntity(allocator *alloc, mesh *skullMesh)
+{
+	auto result = CreateEntity(alloc);
+	result->Type = EntityType_EnemySkull;
+	result->Model = CreateModel(alloc, skullMesh);
+	result->Collider = CreateCollider(alloc, ColliderType_EnemySkull);
+	result->TrailGroup = CreateTrailGroup(alloc, result, skullMesh->Parts[0].Material->DiffuseColor);
+	result->SetScl(vec3(0.02f, 0.01f, 0.02f));
+	return result;
+}
+
 static float Interp(float c, float t, float a, float dt)
 {
     if (c == t)
@@ -455,6 +456,7 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.AsteroidPool.ElemSize = ASTEROID_ENTITY_SIZE;
     world.CheckpointPool.ElemSize = CHECKPOINT_ENTITY_SIZE;
 	world.FinishPool.ElemSize = FINISH_ENTITY_SIZE;
+	world.EnemySkullPool.ElemSize = ENEMY_SKULL_ENTITY_SIZE;
 
     world.ShipPool.Arena = &world.Arena;
     world.CrystalPool.Arena = &world.Arena;
@@ -464,6 +466,7 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.CheckpointPool.Arena = &world.Arena;
 	world.FinishPool.Arena = &world.Arena;
 	world.UpdateArgsPool.Arena = &world.Arena;
+	world.EnemySkullPool.Arena = &world.Arena;
 
     world.ShipPool.Name = "ShipPool";
     world.CrystalPool.Name = "CrystalPool";
@@ -471,6 +474,8 @@ void InitEntityWorld(game_main *g, entity_world &world)
     world.ExplosionPool.Name = "ExplosionPool";
     world.AsteroidPool.Name = "AsteroidPool";
     world.CheckpointPool.Name = "CheckpointPool";
+	world.FinishPool.Name = "FinishPool";
+	world.EnemySkullPool.Name = "EnemySkullPool";
 
 	CreateThreadPool(world.UpdateThreadPool, g, std::thread::hardware_concurrency(), 8);
 }
@@ -492,6 +497,10 @@ void AddEntityToList(std::vector<entity *> &list, entity *ent)
 
 void AddEntity(entity_world &world, entity *ent)
 {
+	if (ent->Type == EntityType_EnemySkull)
+	{
+		AddEntityToList(world.EnemySkullEntities, ent);
+	}
 	if (ent->RoadPiece)
 	{
 		AddEntityToList(world.RoadPieceEntities, ent);
@@ -599,6 +608,10 @@ void RemoveEntityFromList(std::vector<entity *> &list, entity *ent)
 
 void RemoveEntity(entity_world &world, entity *ent)
 {
+	if (ent->Type == EntityType_EnemySkull)
+	{
+		RemoveEntityFromList(world.EnemySkullEntities, ent);
+	}
 	if (ent->RoadPiece)
 	{
 		RemoveEntityFromList(world.RoadPieceEntities, ent);
@@ -970,7 +983,7 @@ void UpdateExplosionEntityJob(void *arg)
 
 	for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
 	{
-		meshPart.Material.DiffuseColor.a = alpha;
+		meshPart.Material->DiffuseColor.a = alpha;
 	}
 
 	ENTITY_JOB_FREE_ARGS(args);

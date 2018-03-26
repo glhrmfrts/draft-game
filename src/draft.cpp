@@ -163,6 +163,22 @@ extern "C"
 				NULL
 			)
 		);
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Mesh,
+				"data/models/deer.obj",
+				"deer",
+				(void *)(mesh_flags::UpY)
+			)
+		);
+		g->Assets.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Mesh,
+				"data/models/skull.obj",
+				"skull",
+				(void *)(mesh_flags::UpY)
+			)
+		);
 
 #define NUM_LEVELS 2
 		for (int i = 1; i <= NUM_LEVELS; i++)

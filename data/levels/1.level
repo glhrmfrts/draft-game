@@ -13,9 +13,26 @@ checkpoint: {
 		play_track: hats|0
 		play_track: pad_chords|0
 		add_intro_text: DRAFT & BLAST | SHIP_BLUE_COLOR
+		enable: SKULLS
 	}
 
-	frame_seconds: 2 | {
+	frame_seconds: 5 | {
+		road_change: NARROW_LEFT
+	}
+
+	frame_seconds: 10 | {
+		road_change: WIDENS_RIGHT
+	}
+
+	frame_seconds: 20 | {
+		road_change: NARROW_RIGHT
+	}
+
+	frame_seconds: 25 | {
+		road_change: WIDENS_LEFT
+	}
+
+	frame_seconds: 40 | {
 		spawn_finish
 	}
 }

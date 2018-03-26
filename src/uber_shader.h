@@ -101,7 +101,10 @@ static const char *UberFragmentShaderSource = R"EOF(
 
 uniform sampler2D u_Sampler;
 uniform vec4 u_DiffuseColor;
+uniform vec4 u_SpecularColor;
+uniform vec4 u_EmissiveColor;
 uniform float u_Emission;
+uniform float u_Shininess;
 uniform float u_TexWeight;
 uniform float u_FogWeight;
 uniform vec2 u_UvScale;
@@ -126,6 +129,8 @@ smooth in vec4  v_WorldPos;
 layout (location = 0) out vec4 BlendUnitColor[2];
 
 void main() {
+  vec3 surfaceToLight = vec3(0, 0, -1);
+  vec3 surfaceToCamera = normalize(u_CamPos - v_WorldPos.xyz);
 
 #ifdef A_UV
   vec4 TexColor = texture(u_Sampler, v_Uv * u_UvScale);
@@ -133,18 +138,35 @@ void main() {
   vec4 TexColor = vec4(1.0f);
 #endif
 
-  vec4 Color = mix(vec4(1.0f), TexColor, u_TexWeight);
+  vec4 surfaceColor = mix(vec4(1.0f), TexColor, u_TexWeight);
 
 #ifdef A_COLOR
-  Color *= v_Color;
+  surfaceColor *= v_Color;
 #endif
 
-  Color *= u_DiffuseColor;
+    surfaceColor *= u_DiffuseColor;
 
-  vec4 Lighting = LightColor * AmbientLight;
-  Lighting += LightColor * clamp(dot(-vec3(0, 0, -1), v_Normal), 0, 1) * LightIntensity;
-  Lighting.a = 1.0f;
-  Color *= Lighting;
+    vec3 ambient = surfaceColor.rgb * AmbientLight;
+
+    float diffuseCoefficient = clamp(dot(-surfaceToLight, v_Normal), 0, 1);
+    vec3 diffuse = surfaceColor.rgb * diffuseCoefficient * LightIntensity;
+
+	//specular
+	float specularCoefficient = 0.0;
+	if(diffuseCoefficient > 0.0)
+		specularCoefficient = pow(max(0.0, dot(surfaceToCamera, reflect(-surfaceToLight, v_Normal))), u_Shininess);
+	vec3 specular = specularCoefficient * u_SpecularColor.xyz * LightColor.xyz * LightIntensity;
+    
+    //attenuation
+    float distanceToLight = 50;
+    float attenuation = 1.0 / (1.0 + 0.00001f * pow(distanceToLight, 2));
+
+    //linear color (color before gamma correction)
+    vec3 linearColor = ambient + attenuation*(diffuse + specular);
+
+  //final color (after gamma correction)
+  vec3 gamma = vec3(1.0/2.2);
+  vec4 Color = vec4(pow(linearColor, gamma), surfaceColor.a);
 
   float Amount = u_ExplosionLightTimer / 1.0f;
   Color += u_ExplosionLightColor * Amount * 0.5f;
@@ -154,7 +176,7 @@ void main() {
   fog = clamp(fog, 0.0, 1.0);
 
   Color = mix(Color, u_FogColor, (1.0 - fog) * u_FogWeight);
-  vec4 Emit = (Color * u_Emission);
+  vec4 Emit = (u_EmissiveColor * u_Emission);
   BlendUnitColor[0] = Color;
   BlendUnitColor[1] = Emit;
 }

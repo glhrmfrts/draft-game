@@ -4,10 +4,21 @@
 
 #define MY_PI 3.14159265359
 
+#define A_UV 1
+#define A_COLOR 2
+#define A_NORMAL 3
+
 layout (location = 0) in vec3  a_Position;
-layout (location = 1) in vec2  a_Uv;
-layout (location = 2) in vec4  a_Color;
-layout (location = 3) in vec3  a_Normal;
+
+#ifdef A_UV
+layout (location = A_UV) in vec2  a_Uv;
+#endif
+
+#ifdef A_COLOR
+layout (location = A_COLOR) in vec4  a_Color;
+#endif
+
+layout (location = A_NORMAL) in vec3  a_Normal;
 
 uniform mat4 u_ProjectionView;
 uniform mat4 u_Transform;
@@ -16,8 +27,14 @@ uniform int  u_MaterialFlags;
 uniform float u_BendRadius;
 uniform float u_RoadTangentPoint;
 
+#ifdef A_UV
 smooth out vec2 v_Uv;
+#endif
+
+#ifdef A_COLOR
 smooth out vec4 v_Color;
+#endif
+
 smooth out vec3 v_Normal;
 smooth out vec4 v_WorldPos;
 
@@ -61,7 +78,13 @@ void main() {
   gl_Position = u_ProjectionView * worldPos;
 
   v_Normal = (u_NormalTransform * vec4(a_Normal, 1.0)).xyz;
-  v_Uv = a_Uv;
-  v_Color = a_Color;
   v_WorldPos = worldPos;
+
+#ifdef A_UV
+  v_Uv = a_Uv;
+#endif
+
+#ifdef A_COLOR
+  v_Color = a_Color;
+#endif
 }

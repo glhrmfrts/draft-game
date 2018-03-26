@@ -14,6 +14,7 @@ enum level_command_type
 	LevelCommand_SpawnCheckpoint,
 	LevelCommand_SpawnFinish,
     LevelCommand_RoadTangent,
+	LevelCommand_RoadChange,
     LevelCommand_PlayTrack,
     LevelCommand_StopTrack,
 };

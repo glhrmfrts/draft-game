@@ -94,6 +94,38 @@ GEN_FUNC(GenerateAsteroid)
     AddEntity(g->World, ent);
 }
 
+#define SKULL_VEL_X 7
+GEN_FUNC(GenerateEnemySkull)
+{
+	static bool longInterval = false;
+
+	auto ent = CreateEnemySkullEntity(GetEntry(g->World.EnemySkullPool), FindMesh(g->AssetLoader, "skull"));
+	ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
+	ent->Pos().z = SHIP_Z;
+	
+	if (longInterval)
+	{
+		ent->Vel().x = SKULL_VEL_X;
+	}
+	else
+	{
+		ent->Vel().x = -SKULL_VEL_X;
+	}
+	
+	AddFlags(ent, EntityFlag_RemoveOffscreen);
+	AddEntity(g->World, ent);
+
+	if (longInterval)
+	{
+		p->Interval = 0.5f;
+	}
+	else
+	{
+		p->Interval = INITIAL_SHIP_INTERVAL;
+	}
+	longInterval = !longInterval;
+}
+
 GEN_FUNC(GenerateSideTrail)
 {
     // TODO: create the side trail pool
@@ -182,6 +214,11 @@ void InitGenState(gen_state *state)
     gen->Interval = 0.5f;
     gen->RandomOffset = 0.4f;
     gen->Func = GenerateRandomGeometry;
+
+	gen = state->GenParams + GenType_EnemySkull;
+	gen->Flags = GenFlag_BasedOnVelocity;
+	gen->Interval = INITIAL_SHIP_INTERVAL;
+	gen->Func = GenerateEnemySkull;
 
     for (int i = 0; i < ROAD_LANE_COUNT; i++)
     {

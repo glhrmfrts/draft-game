@@ -71,6 +71,15 @@ void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumbe
 		text_group_item(Color_white, textFont),
 		text_group_item(Color_white, smallFont)
 	};
+
+	auto ent = PushStruct<entity>(l->Arena);
+	ent->Pos().x = 0;
+	ent->Pos().y = 250;
+	ent->Pos().z = -0;
+	ent->SetScl(vec3(0.05f));
+	ent->SetRot(vec3(0, 0, -90));
+	ent->Model = CreateModel(&l->Arena, FindMesh(g->AssetLoader, "deer"));
+	AddEntity(g->World, ent);
 }
 
 void RemoveGameplayEntities(entity_world &w)
@@ -854,7 +863,7 @@ void UpdateLevel(game_main *g, float dt)
             ent->SetPos(ent->Pos() + ent->Vel() * dt);
             for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
             {
-                float &alpha = meshPart.Material.DiffuseColor.a;
+                float &alpha = meshPart.Material->DiffuseColor.a;
                 alpha -= 1.0f * dt;
                 alpha = std::max(alpha, 0.0f);
             }
@@ -961,7 +970,7 @@ void UpdateLevel(game_main *g, float dt)
                     }
                     for (auto &meshPart : ent->TrailGroup->Mesh.Parts)
                     {
-                        meshPart.Material.DiffuseColor.a = alpha;
+                        meshPart.Material->DiffuseColor.a = alpha;
                     }
                 }
 
@@ -985,6 +994,22 @@ void UpdateLevel(game_main *g, float dt)
 				ent->Finish->Finished = true;
 				LevelStateToStats(g, l);
 			}
+		}
+		for (auto ent : world.EnemySkullEntities)
+		{
+			if (!ent) continue;
+
+			// horizontal movement
+			if (ent->Vel().x > 0 && ent->Pos().x-1.0f > g->World.RoadState.Right)
+			{
+				ent->Vel().x = -ent->Vel().x;
+			}
+			else if (ent->Vel().x < 0 && ent->Pos().x+1.0f < g->World.RoadState.Left)
+			{
+				ent->Vel().x = -ent->Vel().x;
+			}
+
+			ent->Vel().y = -PLAYER_MIN_VEL * 0.5f;
 		}
 		EndProfileTimer("Game Entities");
 

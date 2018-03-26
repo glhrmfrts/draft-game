@@ -31,6 +31,7 @@ enum gen_type
     GenType_Asteroid,
     GenType_SideTrail,
     GenType_RandomGeometry,
+	GenType_EnemySkull,
     GenType_MAX,
 };
 

@@ -85,13 +85,6 @@ static float *AddQuad(float *buffer, vec3 p1, vec3 p2, vec3 p3, vec3 p4,
 	return buffer;
 }
 
-inline static vec3 GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
-{
-    vec3 v1 = p2 - p1;
-    vec3 v2 = p3 - p1;
-    return glm::normalize(glm::cross(v1, v2));
-}
-
 void AddTriangle(vertex_buffer &Buffer, vec3 p1, vec3 p2, vec3 p3, vec3 n, color c1 = Color_white)
 {
     color c2 = c1;
@@ -153,10 +146,23 @@ inline static void AddPart(mesh *Mesh, const mesh_part &MeshPart)
     Mesh->Parts.push_back(MeshPart);
 }
 
+#if 0
 static void AddSkyboxFace(mesh *Mesh, vec3 p1, vec3 p2, vec3 p3, vec3 p4, texture *Texture, size_t Index)
 {
     AddQuad(Mesh->Buffer, p1, p2, p3, p4, Color_white, vec3(1.0f), true);
     AddPart(Mesh, mesh_part{material{Color_white, 0, 1, Texture}, Index*6, 6, GL_TRIANGLES});
+}
+#endif
+
+static material *CreateMaterial(allocator *alloc, color Color, float Emission, float TexWeight, texture *Texture, uint32 Flags = 0)
+{
+	auto result = PushStruct<material>(alloc);
+	result->DiffuseColor = Color;
+	result->Emission = Emission;
+	result->TexWeight = TexWeight;
+	result->Texture = Texture;
+	result->Flags = Flags;
+	return result;
 }
 
 struct mesh_part_scope
@@ -170,7 +176,7 @@ struct mesh_part_scope
         Offset = m->Buffer.VertexCount;
     }
 
-    void Commit(const material &m, GLuint primType, float lineWidth = DEFAULT_LINE_WIDTH)
+    void Commit(material *m, GLuint primType, float lineWidth = DEFAULT_LINE_WIDTH)
     {
         size_t count = Mesh->Buffer.VertexCount - Offset;
         AddPart(this->Mesh, mesh_part{m, Offset, count, primType, lineWidth});
@@ -190,9 +196,9 @@ mesh *BuildStraightRoadMesh(memory_arena &arena, float l, float r)
 	auto roadMesh = PushStruct<mesh>(arena);
 	InitMeshBuffer(roadMesh->Buffer);
 
-	material roadMaterial = { ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{ 1, 1 } };
-	material borderMaterial = { ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{ 0, 0 } };
-	material laneMaterial = { ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	auto roadMaterial = CreateMaterial(&arena, ROAD_FLOOR_COLOR, 0, 0.0f, NULL);
+	auto borderMaterial = CreateMaterial(&arena, ROAD_BORDER_COLOR, 1.0f, 0, NULL);
+	auto laneMaterial = CreateMaterial(&arena, ROAD_LANE_COLOR, 0.0f, 0, NULL);
 	float width = r - l;
 
 	mesh_part_scope roadScope(roadMesh);
@@ -239,9 +245,9 @@ mesh *BuildVariantRoadMesh(memory_arena &arena, float backLeft, float backRight,
 	InitMeshBuffer(roadMesh->Buffer);
 
 	//auto roadTexture = FindTexture(*w.AssetLoader, "grid");
-	material roadMaterial = { ROAD_FLOOR_COLOR, 0, 0.0f, NULL, 0, vec2{ 1, 1 } };
-	material borderMaterial = { ROAD_BORDER_COLOR, 1.0f, 0, NULL, 0, vec2{ 0, 0 } };
-	material laneMaterial = { ROAD_LANE_COLOR, 0.0f, 0, NULL, 0, vec2{ 0, 0 } };
+	auto roadMaterial = CreateMaterial(&arena, ROAD_FLOOR_COLOR, 0, 0.0f, NULL);
+	auto borderMaterial = CreateMaterial(&arena, ROAD_BORDER_COLOR, 1.0f, 0, NULL);
+	auto laneMaterial = CreateMaterial(&arena, ROAD_LANE_COLOR, 0.0f, 0, NULL);
 	float backWidth = backRight - backLeft;
 	float frontWidth = frontRight - frontLeft;
 	float bl = backLeft;
@@ -434,8 +440,8 @@ mesh *GetShipMesh(entity_world &w)
     AddTriangle(ShipMesh->Buffer, vec3(-1, 0, 0), vec3(0, 0.1f, 0), vec3(0, 0.1f, h));
     AddTriangle(ShipMesh->Buffer, vec3(1, 0, 0), vec3(0, 0.1f, h), vec3(0, 0.1f, 0));
 
-    material shipMaterial = {Color_white, 0, 0, NULL};
-    material shipOutlineMaterial = {Color_white, 1, 0, NULL, MaterialFlag_PolygonLines};
+    auto shipMaterial = CreateMaterial(&w.PersistentArena, Color_white, 0, 0, NULL);
+	auto shipOutlineMaterial = CreateMaterial(&w.PersistentArena, Color_white, 1, 0, NULL, MaterialFlag_PolygonLines);
     AddPart(ShipMesh, {shipMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
     AddPart(ShipMesh, {shipOutlineMaterial, 0, ShipMesh->Buffer.VertexCount, GL_TRIANGLES});
 
@@ -464,7 +470,7 @@ mesh *GetCrystalMesh(entity_world &w)
     AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, 1, 0 }, vec3{ 1, 1, 0 });
     AddTriangle(CrystalMesh->Buffer, vec3{ 0, 0, -1 }, vec3{ -1, -1, 0 }, vec3{ -1, 1, 0 });
 
-    AddPart(CrystalMesh, mesh_part{ material{ CRYSTAL_COLOR, 1.0f, 0, NULL, MaterialFlag_TransformUniform }, 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
+    AddPart(CrystalMesh, mesh_part{ CreateMaterial(&w.PersistentArena, CRYSTAL_COLOR, 1.0f, 0, NULL, MaterialFlag_TransformUniform ), 0, CrystalMesh->Buffer.VertexCount, GL_TRIANGLES });
     EndMesh(CrystalMesh, GL_STATIC_DRAW);
 
     return w.CrystalMesh = CrystalMesh;
@@ -504,7 +510,7 @@ mesh *GetAsteroidMesh(entity_world &w)
         }
     }
 
-    AddPart(astMesh, mesh_part{material{ASTEROID_COLOR, 0.0f, 0, NULL, MaterialFlag_TransformUniform}, 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
+    AddPart(astMesh, mesh_part{CreateMaterial(&w.PersistentArena, ASTEROID_COLOR, 0.0f, 0, NULL, MaterialFlag_TransformUniform), 0, astMesh->Buffer.VertexCount, GL_TRIANGLE_STRIP});
     EndMesh(astMesh, GL_STATIC_DRAW);
     return w.AsteroidMesh = astMesh;
 }
@@ -524,8 +530,8 @@ mesh *GetCheckpointMesh(entity_world &w)
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{-1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{1.0f, 0.0f, 0.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
     PushVertex(cpMesh->Buffer, mesh_vertex{vec3{0.0f, 0.0f, 1.0f}, vec2{0,0}, Color_white, vec3{1,1,1}});
-    AddPart(cpMesh, mesh_part{material{CHECKPOINT_COLOR, 0.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_TRIANGLES});
-    AddPart(cpMesh, mesh_part{material{CHECKPOINT_OUTLINE_COLOR, 1.0f, 0, NULL}, 0, cpMesh->Buffer.VertexCount, GL_LINE_LOOP});
+    AddPart(cpMesh, mesh_part{CreateMaterial(&w.PersistentArena, CHECKPOINT_COLOR, 0.0f, 0, NULL), 0, cpMesh->Buffer.VertexCount, GL_TRIANGLES});
+    AddPart(cpMesh, mesh_part{CreateMaterial(&w.PersistentArena, CHECKPOINT_OUTLINE_COLOR, 1.0f, 0, NULL), 0, cpMesh->Buffer.VertexCount, GL_LINE_LOOP});
     EndMesh(cpMesh, GL_STATIC_DRAW);
     return w.CheckpointMesh = cpMesh;
 }
@@ -555,7 +561,7 @@ mesh *GetFinishMesh(entity_world &w)
 		angle += theta;
 	}
 
-	AddPart(finishMesh, mesh_part{ material{Color_white, 1.0f, 0, NULL}, 0, finishMesh->Buffer.VertexCount, GL_TRIANGLE_FAN });
+	AddPart(finishMesh, mesh_part{ CreateMaterial(&w.PersistentArena, Color_white, 1.0f, 0, NULL), 0, finishMesh->Buffer.VertexCount, GL_TRIANGLE_FAN });
 	EndMesh(finishMesh, GL_STATIC_DRAW);
 
 	return w.FinishMesh = finishMesh;
@@ -569,8 +575,8 @@ mesh *GetBackgroundMesh(entity_world &w)
     }
 
     auto bgMesh = PushStruct<mesh>(w.PersistentArena);
-    auto mat = material{Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background")};
-    mat.FogWeight = 0.0f;
+    auto mat = CreateMaterial(&w.PersistentArena, Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background"));
+    mat->FogWeight = 0.0f;
 
     InitMeshBuffer(bgMesh->Buffer);
     AddQuad(bgMesh->Buffer, vec3{-1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 0.0f}, vec3{1.0f, 0.0f, 1.0f}, vec3{-1.0f, 0.0f, 1.0f});
@@ -602,7 +608,7 @@ mesh *GenerateWallMesh(memory_arena &Arena, const std::vector<vec2> &Points)
                             vec3{glm::length(Dif) + 0.25f, WALL_WIDTH, WALL_HEIGHT},
                             Angle);
     }
-    AddPart(Mesh, mesh_part{BlankMaterial, 0, Mesh->Buffer.VertexCount, GL_TRIANGLES});
+    AddPart(Mesh, mesh_part{&BlankMaterial, 0, Mesh->Buffer.VertexCount, GL_TRIANGLES});
     EndMesh(Mesh, GL_STATIC_DRAW);
     return Mesh;
 }

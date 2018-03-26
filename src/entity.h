@@ -89,6 +89,7 @@ enum collider_type
     ColliderType_Ship,
     ColliderType_TrailPiece,
     ColliderType_Asteroid,
+	ColliderType_EnemySkull,
 };
 struct collider
 {
@@ -124,6 +125,7 @@ enum entity_type
 	EntityType_Asteroid,
 	EntityType_Checkpoint,
 	EntityType_Finish,
+	EntityType_EnemySkull,
 	EntityType_MAX,
 };
 
@@ -269,6 +271,7 @@ struct entity_world
     memory_pool AsteroidPool;
     memory_pool CheckpointPool;
 	memory_pool FinishPool;
+	memory_pool EnemySkullPool;
 	generic_pool<entity_update_args> UpdateArgsPool;
 
     mesh *FloorMesh = NULL;
@@ -303,6 +306,7 @@ struct entity_world
     std::vector<entity *> MovementEntities;
 	std::vector<entity *> RoadPieceEntities;
 	std::vector<entity *> FinishEntities;
+	std::vector<entity *> EnemySkullEntities;
     asset_loader *AssetLoader = NULL;
     camera *Camera = NULL;
     explosion *LastExplosion = NULL;
@@ -317,5 +321,7 @@ struct entity_world
     float RoadTangentPoint = std::numeric_limits<float>::infinity();
     bool ShouldRoadTangent = false;
 };
+
+void RoadChange(entity_world &w, road_change change);
 
 #endif

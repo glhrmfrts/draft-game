@@ -140,7 +140,7 @@ struct asset_loader
 {
     FT_Library FreeTypeLib;
     memory_arena Arena;
-    fixed_array<asset_entry, 64> Entries;
+    fixed_array<asset_entry, 96> Entries;
 
     platform_api *Platform;
     thread_pool Pool;

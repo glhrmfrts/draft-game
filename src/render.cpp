@@ -65,6 +65,7 @@ static void EnsureCapacity(vertex_buffer &Buffer, size_t Size)
 
 inline void SetIndices(vertex_buffer &buf, std::vector<uint32> &indices)
 {
+	buf.IsIndexed = true;
     glGenBuffers(1, &buf.IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf.IBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32), &indices[0], GL_STATIC_DRAW);
@@ -490,7 +491,7 @@ void EndMesh(mesh *Mesh, GLenum Usage, bool ComputeBounds = true)
     vec3 Max(0.0f);
     for (size_t i = 0; i < b.VertexCount; i++)
     {
-        size_t VertexIndex = i * (sizeof(mesh_vertex)/sizeof(float));
+		size_t VertexIndex = i * Mesh->Buffer.VertexSize;
         vec3 Pos = {b.Vertices[VertexIndex], b.Vertices[VertexIndex+1], b.Vertices[VertexIndex+2]};
 
         Min.x = std::min(Min.x, Pos.x);
@@ -548,6 +549,9 @@ static void ModelProgramCallback(shader_asset_param *p)
         program->FogEnd = glGetUniformLocation(program->ID, "u_FogEnd");
 		program->BendRadius = glGetUniformLocation(program->ID, "u_BendRadius");
         program->RoadTangentPoint = glGetUniformLocation(program->ID, "u_RoadTangentPoint");
+		program->SpecularColor = glGetUniformLocation(program->ID, "u_SpecularColor");
+		program->EmissiveColor = glGetUniformLocation(program->ID, "u_EmissiveColor");
+		program->Shininess = glGetUniformLocation(program->ID, "u_Shininess");
 
         Bind(*program);
         SetUniform(program->Sampler, 0);
@@ -661,9 +665,11 @@ model_program *CompileUberModelProgram(allocator *alloc, std::unordered_map<std:
         return shaderCache[key];
     }
 
+	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     auto result = PushStruct<model_program>(alloc);
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	result->VertexShader = vertexShader;
+	result->FragmentShader = fragmentShader;
 
     std::string vertexSource = "#version 330\n";
     std::string fragmentSource = "#version 330\n";
@@ -973,9 +979,9 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
         program = r.Program;
     }
 
+	Bind(*program);
     if (program != previousProgram)
     {
-        Bind(*program);
         previousProgram = program;
     }
 
@@ -1001,13 +1007,36 @@ static void RenderRenderable(render_state &rs, camera &Camera, renderable &r)
     }
     SetUniform(program->MaterialFlags, (int)r.Material->Flags);
     SetUniform(program->DiffuseColor, r.Material->DiffuseColor);
+	SetUniform(program->SpecularColor, r.Material->SpecularColor);
+	SetUniform(program->EmissiveColor, r.Material->EmissiveColor);
     SetUniform(program->TexWeight, r.Material->TexWeight);
     SetUniform(program->FogWeight, r.Material->FogWeight);
     SetUniform(program->Emission, r.Material->Emission);
+	SetUniform(program->Shininess, r.Material->Shininess);
     SetUniform(program->UvScale, r.Material->UvScale);
     SetUniform(program->ExplosionLightColor, rs.ExplosionLightColor);
     SetUniform(program->ExplosionLightTimer, rs.ExplosionLightTimer);
-    glDrawArrays(r.PrimitiveType, r.VertexOffset, r.VertexCount);
+
+	if (r.Material->Flags & MaterialFlag_CullFace)
+	{
+		glEnable(GL_CULL_FACE);
+	}
+
+	if (r.IsIndexed)
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r.IBO);
+		glDrawElements(r.PrimitiveType, r.Count, GL_UNSIGNED_INT, (void *)(r.Offset*sizeof(uint32)));
+	}
+	else
+	{
+		glDrawArrays(r.PrimitiveType, r.Offset, r.Count);
+	}
+
+	if (r.Material->Flags & MaterialFlag_CullFace)
+	{
+		glDisable(GL_CULL_FACE);
+	}
+
     if (r.Material->Flags & MaterialFlag_PolygonLines)
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -1040,8 +1069,8 @@ void RenderEnd(render_state &rs, camera &Camera)
         size_t i = NextRenderable(rs);
         auto &r = rs.Renderables[i];
         r.VAO = rs.DebugBuffer.VAO;
-        r.VertexOffset = 0;
-        r.VertexCount = rs.DebugBuffer.VertexCount;
+        r.Offset = 0;
+        r.Count = rs.DebugBuffer.VertexCount;
         r.Material = &DebugMaterial;
         r.PrimitiveType = GL_LINES;
         r.Transform = transform{};
@@ -1097,14 +1126,16 @@ void DrawMeshPart(render_state &rs, mesh &Mesh, mesh_part &part, const transform
     r.Program = part.Program;
     r.LineWidth = part.LineWidth;
     r.PrimitiveType = part.PrimitiveType;
-    r.VertexOffset = part.Offset;
-    r.VertexCount = part.Count;
+    r.Offset = part.Offset;
+    r.Count = part.Count;
     r.VAO = Mesh.Buffer.VAO;
-    r.Material = &part.Material;
+	r.IBO = Mesh.Buffer.IBO;
+	r.IsIndexed = Mesh.Buffer.IsIndexed;
+    r.Material = part.Material;
     r.Transform = Transform;
     r.Bounds = BoundsFromMinMax(Mesh.Min*Transform.Scale, Mesh.Max*Transform.Scale);
     r.Bounds.Center += Transform.Position;
-    AddRenderable(rs, Index, &part.Material);
+    AddRenderable(rs, Index, part.Material);
 }
 
 void DrawModel(render_state &rs, model &Model, const transform &Transform)
@@ -1113,7 +1144,7 @@ void DrawModel(render_state &rs, model &Model, const transform &Transform)
     for (auto &Part : Mesh->Parts)
     {
         size_t i = &Part - &Mesh->Parts[0];
-        auto Material = &Part.Material;
+        auto Material = Part.Material;
         if (i < Model.Materials.size() && Model.Materials[i])
         {
             Material = Model.Materials[i];
@@ -1133,9 +1164,11 @@ void DrawModel(render_state &rs, model &Model, const transform &Transform)
         r.Program = Part.Program;
         r.LineWidth = Part.LineWidth;
         r.PrimitiveType = Part.PrimitiveType;
-        r.VertexOffset = Part.Offset;
-        r.VertexCount = Part.Count;
+        r.Offset = Part.Offset;
+        r.Count = Part.Count;
         r.VAO = Mesh->Buffer.VAO;
+		r.IBO = Mesh->Buffer.IBO;
+		r.IsIndexed = Mesh->Buffer.IsIndexed;
         r.Material = Material;
         r.Transform = Transform;
         r.Bounds = BoundsFromMinMax(Mesh->Min*Transform.Scale, Mesh->Max*Transform.Scale);

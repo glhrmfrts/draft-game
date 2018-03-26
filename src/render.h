@@ -56,12 +56,12 @@ struct mesh_vertex
 struct vertex_buffer
 {
     std::vector<float> Vertices;
-	std::vector<int> Indices;
     GLuint VAO, VBO, IBO;
     size_t RawIndex;
     size_t VertexCount;
     size_t VertexSize;
 	float *MappedData = NULL;
+	bool IsIndexed = false;
 };
 
 struct vertex_attribute
@@ -169,9 +169,13 @@ struct camera
 #define MaterialFlag_PolygonLines     0x1
 #define MaterialFlag_ForceTransparent 0x2
 #define MaterialFlag_TransformUniform 0x4
+#define MaterialFlag_CullFace         0x8
 struct material
 {
     color DiffuseColor = Color_white;
+	color SpecularColor = Color_white;
+	color EmissiveColor = Color_white;
+	float Shininess = 0;
     float Emission = 0;
     float TexWeight = 0;
     float FogWeight = 1;
@@ -189,15 +193,15 @@ struct model_program;
 
 struct mesh_part
 {
-    material Material;
     size_t Offset;
     size_t Count;
     model_program *Program = NULL;
+	material *Material = NULL;
     GLuint PrimitiveType;
     float LineWidth = DEFAULT_LINE_WIDTH;
 
     mesh_part() {}
-    mesh_part(material m, size_t o, size_t c, GLuint p, float lw = DEFAULT_LINE_WIDTH)
+    mesh_part(material *m, size_t o, size_t c, GLuint p, float lw = DEFAULT_LINE_WIDTH)
         : Material(m), Offset(o), Count(c), PrimitiveType(p), LineWidth(lw) {}
 };
 
@@ -209,6 +213,7 @@ struct mesh_flags
     static constexpr type HasNormals = 0x2;
     static constexpr type HasColors = 0x4;
     static constexpr type HasIndices = 0x8;
+	static constexpr type UpY = 0x10;
 };
 
 struct mesh
@@ -249,9 +254,12 @@ struct model_program : shader_program
     int Transform;
     int NormalTransform;
     int DiffuseColor;
+	int SpecularColor;
+	int EmissiveColor;
     int TexWeight;
     int FogWeight;
     int Emission;
+	int Shininess;
     int UvScale;
     int Sampler;
     int MaterialFlags;
@@ -318,12 +326,14 @@ struct renderable
     bounding_box Bounds;
     model_program *Program;
     material *Material;
-    size_t VertexOffset;
-    size_t VertexCount;
+    size_t Offset;
+    size_t Count;
     int SortNumber;
-    GLint VAO;
+    GLuint VAO;
+	GLuint IBO;
     GLuint PrimitiveType;
     GLfloat LineWidth;
+	bool IsIndexed;
 };
 
 #define BloomBlurPassCount 3
@@ -373,6 +383,13 @@ struct render_state
     vertex_buffer DebugBuffer;
 #endif
 };
+
+inline static vec3 GenerateNormal(vec3 p1, vec3 p2, vec3 p3)
+{
+	vec3 v1 = p2 - p1;
+	vec3 v2 = p3 - p1;
+	return glm::normalize(glm::cross(v1, v2));
+}
 
 static void AddCubeWithRotation(vertex_buffer &Buffer, color c = Color_white,
                                 bool NoLight = false, vec3 Center = vec3(0.0f),
