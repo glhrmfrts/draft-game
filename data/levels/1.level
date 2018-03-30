@@ -17,22 +17,7 @@ checkpoint: {
 	}
 
 	frame_seconds: 5 | {
-		road_change: NARROW_LEFT
-	}
-
-	frame_seconds: 10 | {
-		road_change: WIDENS_RIGHT
-	}
-
-	frame_seconds: 20 | {
-		road_change: NARROW_RIGHT
-	}
-
-	frame_seconds: 25 | {
-		road_change: WIDENS_LEFT
-	}
-
-	frame_seconds: 40 | {
+		disable: SKULLS
 		spawn_finish
 	}
 }

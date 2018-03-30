@@ -1,0 +1,21 @@
+{
+	"bpm": 90,
+	"tracks": [
+		"data/audio/rave/hats.wav",
+		"data/audio/rave/bass1.wav",
+		"data/audio/rave/bass_inst1.wav",
+		"data/audio/rave/bass_inst2.wav",
+		"data/audio/rave/clap.wav",
+		"data/audio/rave/snare.wav",
+		"data/audio/rave/synth.wav"
+	],
+	"names": {
+		"hats": 0,
+		"bass1": 1,
+		"bass_inst1": 2,
+		"bass_inst2": 3,
+		"clap": 4,
+		"snare": 5,
+		"synth": 6
+	}
+}

@@ -4,6 +4,7 @@ static std::unordered_map<hash_string::result_type, color> LevelColors = {
 	{ hash_string()("CRYSTAL_COLOR"), CRYSTAL_COLOR },
 	{ hash_string()("SHIP_BLUE_COLOR"), IntColor(ShipPalette.Colors[SHIP_BLUE]) },
 	{ hash_string()("SHIP_ORANGE_COLOR"), IntColor(ShipPalette.Colors[SHIP_ORANGE]) },
+	{ hash_string()("RED"), Color_red }
 };
 
 static std::unordered_map<hash_string::result_type, gen_type> LevelGenTypes = {
@@ -11,6 +12,13 @@ static std::unordered_map<hash_string::result_type, gen_type> LevelGenTypes = {
 	{ hash_string()("SHIPS"), GenType_Ship },
 	{ hash_string()("RED_SHIPS"), GenType_RedShip },
 	{ hash_string()("SKULLS"), GenType_EnemySkull },
+};
+
+static std::unordered_map<hash_string::result_type, uint32> LevelGenFlags = {
+	{ hash_string()("RESERVE_LANE"), GenFlag_ReserveLane },
+	{ hash_string()("ALTERNATE_LANE"), GenFlag_AlternateLane },
+	{ hash_string()("RANDOMIZE"), GenFlag_Randomize },
+	{ hash_string()("BASED_ON_VELOCITY"), GenFlag_BasedOnVelocity },
 };
 
 static std::unordered_map<hash_string::result_type, int> LevelShipColors = {
@@ -54,6 +62,20 @@ bool ParseGenericCommand(const std::string &cmd, const std::vector<std::string> 
         c->Hash = hash_string()(args[0]);
         return true;
     }
+	else if (cmd == "add_flags")
+	{
+		c->Type = LevelCommand_AddFlags;
+		c->Flags.GenTypeHash = hash_string()(args[0]);
+		c->Flags.FlagsHash = hash_string()(args[1]);
+		return true;
+	}
+	else if (cmd == "remove_flags")
+	{
+		c->Type = LevelCommand_AddFlags;
+		c->Flags.GenTypeHash = hash_string()(args[0]);
+		c->Flags.FlagsHash = hash_string()(args[1]);
+		return true;
+	}
     else if (cmd == "ship_color")
     {
         c->Type = LevelCommand_ShipColor;
@@ -103,6 +125,13 @@ bool ParseGenericCommand(const std::string &cmd, const std::vector<std::string> 
 		}
 		return true;
     }
+	else if (cmd == "set_entity_clip")
+	{
+		c->Type = LevelCommand_SetEntityClip;
+		c->SetEntityClip.GenTypeHash = hash_string()(args[0]);
+		c->SetEntityClip.TrackHash = hash_string()(args[1]);
+		return true;
+	}
 
     return false;
 }
@@ -249,7 +278,7 @@ void ResetLevel(level *l)
 	}
 }
 
-static void RunCommands(game_main *g, level_state *state, const std::vector<level_command> &commands)
+static void RunCommands(level *l, game_main *g, level_state *state, const std::vector<level_command> &commands)
 {
     for (auto &cmd : commands)
     {
@@ -262,6 +291,20 @@ static void RunCommands(game_main *g, level_state *state, const std::vector<leve
         case LevelCommand_Disable:
             Disable(&g->World.GenState->GenParams[LevelGenTypes[cmd.Hash]]);
             break;
+
+		case LevelCommand_AddFlags:
+			AddFlags(
+				&g->World.GenState->GenParams[LevelGenTypes[cmd.Flags.GenTypeHash]],
+				LevelGenFlags[cmd.Flags.FlagsHash]
+			);
+			break;
+
+		case LevelCommand_RemoveFlags:
+			RemoveFlags(
+				&g->World.GenState->GenParams[LevelGenTypes[cmd.Flags.GenTypeHash]],
+				LevelGenFlags[cmd.Flags.FlagsHash]
+			);
+			break;
 
         case LevelCommand_AddIntroText:
             AddIntroText(g, state, cmd.AddIntroText.Text, LevelColors[cmd.AddIntroText.ColorHash]);
@@ -294,6 +337,14 @@ static void RunCommands(game_main *g, level_state *state, const std::vector<leve
 		case LevelCommand_StopTrack:
 			StopTrack(g, state, cmd.Track.TrackHash, cmd.Track.BeatDivisor);
 			break;
+
+		case LevelCommand_SetEntityClip:
+			SetEntityClip(
+				g->World,
+				LevelGenTypes[cmd.SetEntityClip.GenTypeHash],
+				l->Song->Clips[cmd.SetEntityClip.TrackHash]
+			);
+			break;
         }
     }
 }
@@ -303,7 +354,7 @@ void LevelUpdate(level *l, game_main *g, level_state *state, float dt)
     if (state->GameplayState == GameplayState_Stats && !l->HasRunStatsScreenCommands)
     {
         l->HasRunStatsScreenCommands = true;
-        RunCommands(g, state, l->StatsScreenCommands);
+        RunCommands(l, g, state, l->StatsScreenCommands);
     }
     else
     {
@@ -318,7 +369,7 @@ void LevelUpdate(level *l, game_main *g, level_state *state, float dt)
 
         if (cp->Frames[cp->CurrentFrameIndex].Frame == state->CurrentCheckpointFrame)
         {
-            RunCommands(g, state, cp->Frames[cp->CurrentFrameIndex].Commands);
+            RunCommands(l, g, state, cp->Frames[cp->CurrentFrameIndex].Commands);
             cp->CurrentFrameIndex++;
         }
     }

@@ -6,7 +6,7 @@ struct audio_source;
 #define PLAYER_INITIAL_MAX_VEL 70.0f
 
 #define PLAYER_MAX_VEL_INCREASE_FACTOR 0.5f
-#define PLAYER_MAX_VEL_LIMIT           170.0f
+#define PLAYER_MAX_VEL_LIMIT           150.0f
 
 #define PLAYER_MIN_VEL          50.0f
 #define PLAYER_MIN_VEL_BREAKING 20.0f
@@ -90,6 +90,7 @@ struct level_state
 	string_format ScorePercentFormat;
 	string_format ScoreRatioFormat;
 	bool DrawStats = false;
+	bool ChangeSong = false;
 
 	tween_sequence *ExitSequence;
 

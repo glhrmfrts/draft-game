@@ -1,0 +1,124 @@
+name: Dodge
+song: dodge
+next: 1
+
+stats_screen: {
+	
+}
+
+checkpoint: {
+	player_vel: 50|80
+
+	frame_seconds: 0 | {
+		play_track: arpeggio|0
+		set_entity_clip: RED_SHIPS | pad
+	}
+
+	frame_seconds: 3 | {
+		add_intro_text: DODGE | RED
+	}
+
+	frame_seconds: 7 | {
+		enable: RED_SHIPS
+	}
+
+	frame_seconds: 30 | {
+		disable: RED_SHIPS
+	}
+
+	frame_seconds: 33 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 100|150
+
+	frame_seconds: 0 | {
+		add_intro_text: SPEED++ | RED
+	}
+
+	frame_seconds: 2 | {
+		enable: RED_SHIPS
+	}
+
+	frame_seconds: 35 | {
+		disable: RED_SHIPS
+	}
+
+	frame_seconds: 38 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 100|150
+
+	frame_seconds: 0 | {
+		add_intro_text: <<<ROAD | RED
+	}
+
+	frame_seconds: 2 | {
+		road_change: NARROW_LEFT
+		enable: RED_SHIPS
+	}
+
+	frame_seconds: 10 | {
+		road_change: WIDENS_RIGHT
+	}
+
+	frame_seconds: 15 | {
+		road_change: NARROW_RIGHT
+	}
+
+	frame_seconds: 30 | {
+		road_change: WIDENS_LEFT
+	}
+
+	frame_seconds: 35 | {
+		disable: RED_SHIPS
+	}
+
+	frame_seconds: 38 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 150|151
+
+	frame_seconds: 0 | {
+		play_track: arpeggio|0
+		add_intro_text: SPEED++ | RED
+	}
+
+	frame_seconds: 2 | {
+		road_change: NARROW_LEFT
+		add_flags: RED_SHIPS | ALTERNATE_LANE
+		enable: RED_SHIPS
+	}
+
+	frame_seconds: 10 | {
+		road_change: WIDENS_RIGHT
+		remove_flags: RED_SHIPS | ALTERNATE_LANE
+	}
+
+	frame_seconds: 15 | {
+		road_change: NARROW_RIGHT
+		add_flags: RED_SHIPS | ALTERNATE_LANE
+	}
+
+	frame_seconds: 30 | {
+		road_change: WIDENS_LEFT
+		remove_flags: RED_SHIPS | ALTERNATE_LANE
+	}
+
+	frame_seconds: 45 | {
+		disable: RED_SHIPS
+		road_tangent
+	}
+
+	frame_seconds: 48 | {
+		spawn_finish
+	}
+}

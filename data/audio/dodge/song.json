@@ -1,0 +1,13 @@
+{
+	"bpm": 100,
+	"tracks": [
+		"data/audio/dodge/arpeggio.wav"
+	],
+	"clips": {
+		"pad": "data/audio/dodge/pad.wav"
+	},
+	"names": {
+		"arpeggio": 0,
+		"pad": 1
+	}
+}

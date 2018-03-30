@@ -121,8 +121,8 @@ entity *CreateEntity(allocator *alloc)
     return result;
 }
 
-#define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + TRAIL_GROUP_SIZE(1) + sizeof(lane_slot) + (sizeof(material)*2))
-entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, bool isPlayer = false, int colorIndex = 0, int lane = 0)
+#define SHIP_ENTITY_SIZE (sizeof(entity) + sizeof(model) + sizeof(collider) + sizeof(ship) + sizeof(audio_source) + TRAIL_GROUP_SIZE(1) + sizeof(lane_slot) + (sizeof(material)*2))
+entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, audio_clip *clip, bool isPlayer = false, int colorIndex = 0, int lane = 0)
 {
     auto ent = CreateEntity(alloc);
 	ent->Type = EntityType_Ship;
@@ -139,6 +139,11 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
 	ent->LaneSlot = CreateLaneSlot(alloc, lane);
     bool trailRenderOnly = isPlayer || (colorIndex == SHIP_RED);
     ent->TrailGroup = CreateTrailGroup(alloc, ent, outlineColor, 0.5f, trailRenderOnly);
+	if (clip)
+	{
+		ent->AudioSource = CreateAudioSource(alloc, clip);
+		AudioSourcePlay(ent->AudioSource);
+	}
     if (isPlayer)
     {
 		ent->Collider->Active = true;
@@ -397,6 +402,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, 0.5f, 2.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, 0.5f, 2.5f, 0.5f, 2.5f);
+
+			w->RoadState.MinLaneIndex = 3;
+			w->RoadState.MaxLaneIndex = 4;
 			break;
 
 		case RoadChange_NarrowLeft:
@@ -405,6 +413,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, -0.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, -0.5f, -2.5f, -0.5f);
+
+			w->RoadState.MinLaneIndex = 0;
+			w->RoadState.MaxLaneIndex = 1;
 			break;
 
 		case RoadChange_NarrowCenter:
@@ -413,6 +424,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -0.5f, 0.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -0.5f, 0.5f, -0.5f, 0.5f);
+
+			w->RoadState.MinLaneIndex = 2;
+			w->RoadState.MaxLaneIndex = 2;
 			break;
 
 		case RoadChange_WidensLeft:
@@ -421,6 +435,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+
+			w->RoadState.MinLaneIndex = 0;
+			w->RoadState.MaxLaneIndex = 4;
 			break;
 
 		case RoadChange_WidensRight:
@@ -429,6 +446,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+			w->RoadState.MinLaneIndex = 0;
+			w->RoadState.MaxLaneIndex = 4;
+
 			break;
 
 		case RoadChange_WidensCenter:
@@ -437,6 +457,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+
+			w->RoadState.MinLaneIndex = 0;
+			w->RoadState.MaxLaneIndex = 4;
 			break;
 		}
 	}
@@ -748,7 +771,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     w.AssetLoader = loader;
     w.Camera = cam;
-    w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, true);
+    w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, NULL, true);
     w.PlayerEntity->Transform.Position.z = SHIP_Z;
     w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
 	w.PlayerEntity->AudioSource = CreateAudioSource(&w.Arena);
@@ -782,6 +805,12 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.BackgroundState.RandomTexture = FindTexture(*loader, "random");
 	w.BackgroundState.Instances.push_back(background_instance{ color(0, 1, 1, 1), vec2(0.0f) });
 	w.BackgroundState.Instances.push_back(background_instance{ color(1, 0, 1, 1), vec2(1060, 476) });
+}
+
+void SetEntityClip(entity_world &world, gen_type genType, audio_clip *clip)
+{
+	auto gen = world.GenState->GenParams + genType;
+	gen->Clip = clip;
 }
 
 void ResetRoadPieces(entity_world &world, float baseY)
@@ -1010,7 +1039,7 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
         world.GenState->LaneSlots[ent->LaneSlot->Index]++;
     }
 
-    if (world.PlayerEntity->Pos().y)
+    if (world.PlayerEntity->Pos().y < world.RoadTangentPoint)
     {
         float velY = world.PlayerEntity->Vel().y;
         world.BackgroundState.Offset += vec2(0.0f, velY) * dt;
@@ -1085,7 +1114,7 @@ void UpdateLogiclessEntities(entity_world &world, float dt)
 		roadEntity = world.RoadPieceEntities[++world.RoadState.PlayerActiveEntityIndex];
 	}
 
-	float d = (world.PlayerEntity->Pos().y - roadEntity->Pos().y) / ROAD_SEGMENT_SIZE;
+	float d = std::min(1.0f, (world.PlayerEntity->Pos().y - roadEntity->Pos().y) / ROAD_SEGMENT_SIZE);
 	world.RoadState.Left = Lerp(roadEntity->RoadPiece->BackLeft, d, roadEntity->RoadPiece->FrontLeft);
 	world.RoadState.Right = Lerp(roadEntity->RoadPiece->BackRight, d, roadEntity->RoadPiece->FrontRight);
 }

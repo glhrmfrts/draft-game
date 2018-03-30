@@ -464,7 +464,14 @@ static void LoadAssetThreadSafePart(void *Arg)
 		for (auto trackFile : j["tracks"])
 		{
 			result->Files.push_back(trackFile);
-			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Stream, trackFile, trackFile, NULL), true);
+			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Stream, trackFile, trackFile, NULL));
+		}
+
+		for (json::iterator it = j["clips"].begin(); it != j["clips"].end(); ++it)
+		{
+			std::string file = it.value();
+			result->ClipFiles[hash_string()(it.key())] = file;
+			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Sound, file, file, NULL));
 		}
 
 		for (json::iterator it = j["names"].begin(); it != j["names"].end(); ++it)
@@ -958,6 +965,10 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 		for (auto &file : result->Files)
 		{
 			result->Tracks.push_back(FindStream(*Entry->Loader, file));
+		}
+		for (auto it : result->ClipFiles)
+		{
+			result->Clips[it.first] = FindSound(*Entry->Loader, it.second);
 		}
 		break;
 	}

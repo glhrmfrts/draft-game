@@ -9,6 +9,8 @@ enum level_command_type
 {
 	LevelCommand_Enable,
 	LevelCommand_Disable,
+	LevelCommand_AddFlags,
+	LevelCommand_RemoveFlags,
 	LevelCommand_AddIntroText,
 	LevelCommand_ShipColor,
 	LevelCommand_SpawnCheckpoint,
@@ -17,6 +19,7 @@ enum level_command_type
 	LevelCommand_RoadChange,
     LevelCommand_PlayTrack,
     LevelCommand_StopTrack,
+	LevelCommand_SetEntityClip,
 };
 
 struct level_command
@@ -25,6 +28,12 @@ struct level_command
 
 	union
 	{
+		struct
+		{
+			hash_string::result_type GenTypeHash;
+			hash_string::result_type FlagsHash;
+		} Flags;
+
 		struct
 		{
 			hash_string::result_type  ColorHash;
@@ -36,6 +45,12 @@ struct level_command
 			hash_string::result_type TrackHash;
 			int BeatDivisor;
 		} Track;
+
+		struct
+		{
+			hash_string::result_type GenTypeHash;
+			hash_string::result_type TrackHash;
+		} SetEntityClip;
 
 		hash_string::result_type  Hash;
 	};

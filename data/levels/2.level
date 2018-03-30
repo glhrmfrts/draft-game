@@ -1,21 +1,141 @@
 name: WELCOME_2
-song: music
-next: 1
+song: rave
+next: 3
 
 stats_screen: {
 	stop_track: hats
+	stop_track: bass1
+	stop_track: clap
+	stop_track: snare
 }
 
 checkpoint: {
-	player_vel: 50|80
+	player_vel: 80|120
 
 	frame_seconds: 0 | {
-		play_track: hats
-		play_track: pad_chords
-		add_intro_text: DRAFT & BLAST LEVEL 2 | SHIP_BLUE_COLOR
+		play_track: hats|0
+		add_intro_text: DRAFT & BLAST FASTER | SHIP_BLUE_COLOR
 	}
 
 	frame_seconds: 2 | {
+		enable: SHIPS
+		ship_color: BLUE
+	}
+
+	frame_seconds: 15 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 18 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 80|120
+
+	frame_seconds: 0 | {
+		play_track: bass1
+		add_intro_text: DRAFT & MISS FASTER | SHIP_ORANGE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		enable: SHIPS
+		ship_color: ORANGE
+	}
+
+	frame_seconds: 15 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 18 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 80|120
+
+	frame_seconds: 0 | {
+		play_track: clap
+		add_intro_text: DRAFT & BLAST FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		add_intro_text: DRAFT & MISS FASTER | SHIP_ORANGE_COLOR
+
+		enable: SHIPS
+		ship_color: ALL
+	}
+
+	frame_seconds: 15 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 18 | {
+		spawn_checkpoint
+	}
+}
+
+checkpoint: {
+	player_vel: 110|130
+
+	frame_seconds: 0 | {
+		play_track: snare
+		add_intro_text: FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 1 | {
+		add_intro_text: FASTER | SHIP_ORANGE_COLOR
+	}
+
+	frame_seconds: 2 | {
+		enable: SHIPS
+		ship_color: ALL
+		add_intro_text: FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 3 | {
+		add_intro_text: FASTER | SHIP_ORANGE_COLOR
+	}
+
+	frame_seconds: 15 | {
+		add_intro_text: FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 15.5 {
+		add_intro_text: FASTER | SHIP_ORANGE_COLOR
+		play_track: bass_inst1
+	}
+
+	frame_seconds: 30 | {
+		add_intro_text: FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 30.5 {
+		add_intro_text: FASTER | SHIP_ORANGE_COLOR
+		stop_track: bass_inst1 | 4
+		play_track: bass_inst2 | 4
+	}
+
+	frame_seconds: 50 | {
+		add_intro_text: FASTER | SHIP_BLUE_COLOR
+	}
+
+	frame_seconds: 50.5 {
+		add_intro_text: FASTER | SHIP_ORANGE_COLOR
+		play_track: synth | 8
+	}
+
+	frame_seconds: 65 | {
+		disable: SHIPS
+	}
+
+	frame_seconds: 67 | {
+		road_tangent
+	}
+
+	frame_seconds: 70 | {
 		spawn_finish
 	}
 }

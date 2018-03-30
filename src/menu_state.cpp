@@ -124,15 +124,15 @@ void InitMenuState(game_main *g)
 	m->FadeOutSequence = CreateSequence(g->TweenState);
 	m->FadeOutSequence->Tweens.push_back(FadeOutTween(&m->Alpha, FAST_TWEEN_DURATION).SetCallback([g]()
 	{
-		ResetLevelState(g, &g->LevelState, "1");
+		ResetLevelState(g, &g->LevelState, "3");
 	}));
 
 	ResetMenuState(g);
 
-	auto sng = FindSong(g->AssetLoader, "music");
-	MusicMasterLoadSong(g->MusicMaster, sng);
-	MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("bg_amb")]);
-	MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("pad_dmaj")]);
+	//auto sng = FindSong(g->AssetLoader, "music");
+	//MusicMasterLoadSong(g->MusicMaster, sng);
+	//MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("bg_amb")]);
+	//MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("pad_dmaj")]);
 
 	g->Options = FindOptions(g->AssetLoader, "options");
     MusicMasterSetGain(g->MusicMaster, g->Options->Values["audio/music_gain"]->Float);

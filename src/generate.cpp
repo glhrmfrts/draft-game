@@ -54,7 +54,7 @@ GEN_FUNC(GenerateShip)
     int colorIndex = GetNextShipColor(state, l);
     color c = IntColor(ShipPalette.Colors[colorIndex]);
     int lane = GetNextSpawnLane(state, true);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, colorIndex, lane);
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, p->Clip, false, colorIndex, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
@@ -66,18 +66,23 @@ GEN_FUNC(GenerateShip)
 GEN_FUNC(GenerateRedShip)
 {
     color c = IntColor(ShipPalette.Colors[SHIP_RED]);
-    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, false, SHIP_RED);
-    int lane = state->PlayerLaneIndex - 2;
-    if (p->Flags & GenFlag_ReserveLane)
-    {
-        lane = p->ReservedLane;
-    }
+	int lane = glm::clamp(state->PlayerLaneIndex, g->World.RoadState.MinLaneIndex, g->World.RoadState.MaxLaneIndex) - 2;
+	if ((p->Flags & GenFlag_ReserveLane) || (p->Flags & GenFlag_AlternateLane))
+	{
+		lane = p->ReservedLane;
+	}
+    auto ent = CreateShipEntity(GetEntry(g->World.ShipPool), GetShipMesh(g->World), c, c, p->Clip, false, SHIP_RED, lane);
     ent->Pos().x = lane * ROAD_LANE_WIDTH;
     ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
     ent->Pos().z = SHIP_Z;
     ent->Ship->ColorIndex = SHIP_RED;
     AddFlags(ent, EntityFlag_RemoveOffscreen);
     AddEntity(g->World, ent);
+
+	if (p->Clip)
+	{
+		AudioSourceSetPitch(ent->AudioSource, 0.5f + (float(lane+2) / 5.0f)*0.5f);
+	}
 }
 
 #define ASTEROID_Z (SHIP_Z + 80)
@@ -184,38 +189,45 @@ GEN_FUNC(GenerateRandomGeometry)
 void InitGenState(gen_state *state)
 {
     auto gen = state->GenParams + GenType_Crystal;
+	gen->MaxTimerDecrease = 0.92f;
     gen->Flags = GenFlag_Randomize;
     gen->Interval = BASE_CRYSTAL_INTERVAL;
     gen->Func = GenerateCrystal;
 
     gen = state->GenParams + GenType_Ship;
+	gen->MaxTimerDecrease = 0.91f;
     gen->Flags = GenFlag_BasedOnVelocity;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateShip;
 
     gen = state->GenParams + GenType_RedShip;
-    gen->Flags = GenFlag_BasedOnVelocity | GenFlag_ReserveLane;
+	gen->MaxTimerDecrease = 0.9f;
+	gen->Flags = GenFlag_BasedOnVelocity;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateRedShip;
 
     gen = state->GenParams + GenType_Asteroid;
+	gen->MaxTimerDecrease = 0.92f;
     gen->Flags = GenFlag_BasedOnVelocity;// | GenFlag_ReserveLane;
     gen->Interval = INITIAL_SHIP_INTERVAL;
     gen->Func = GenerateAsteroid;
 
     gen = state->GenParams + GenType_SideTrail;
+	gen->MaxTimerDecrease = 0.99f;
     gen->Flags = GenFlag_Enabled | GenFlag_Randomize;
     gen->Interval = 0.5f;
     gen->RandomOffset = 0.4f;
     gen->Func = GenerateSideTrail;
 
     gen = state->GenParams + GenType_RandomGeometry;
+	gen->MaxTimerDecrease = 0.99f;
     gen->Flags = /*GenFlag_Enabled |*/ GenFlag_Randomize;
     gen->Interval = 0.5f;
     gen->RandomOffset = 0.4f;
     gen->Func = GenerateRandomGeometry;
 
 	gen = state->GenParams + GenType_EnemySkull;
+	gen->MaxTimerDecrease = 0.99f;
 	gen->Flags = GenFlag_BasedOnVelocity;
 	gen->Interval = INITIAL_SHIP_INTERVAL;
 	gen->Func = GenerateEnemySkull;
@@ -249,13 +261,53 @@ void UpdateGen(game_main *g, gen_state *state, gen_params *p, void *data, float 
         return;
     }
 
+	if (p->Flags & GenFlag_ReserveLane)
+	{
+		if (p->Timer <= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
+		{
+			const int maxTries = 5;
+			int i = 0;
+			int laneIndex = state->PlayerLaneIndex;
+
+			// get the first non-occupied lane, or give up for this frame
+			while (state->LaneSlots[laneIndex] > 0 && i < maxTries)
+			{
+				laneIndex = RandomBetween(state->Entropy, g->World.RoadState.MinLaneIndex, g->World.RoadState.MaxLaneIndex);
+				i++;
+			}
+			if (i >= maxTries)
+			{
+				p->Timer = GetNextTimer(p, state->Entropy);
+			}
+			else
+			{
+				p->ReservedLane = laneIndex - 2;
+				state->ReservedLanes[laneIndex] = 1;
+			}
+		}
+	}
+
+	if (p->Flags & GenFlag_AlternateLane)
+	{
+		if (p->Timer <= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
+		{
+			int lastLaneIndex = p->ReservedLane + 2;
+			int laneIndex = lastLaneIndex;
+			while (laneIndex == lastLaneIndex)
+			{
+				laneIndex = RandomBetween(state->Entropy, g->World.RoadState.MinLaneIndex, g->World.RoadState.MaxLaneIndex);
+			}
+			p->ReservedLane = laneIndex - 2;
+		}
+	}
+
     if (p->Timer <= 0)
     {
         p->Func(p, g, state, data);
         p->Timer = GetNextTimer(p, state->Entropy);
         if (p->Flags & GenFlag_BasedOnVelocity)
         {
-            p->Timer -= (p->Timer * 0.9f) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
+            p->Timer -= (p->Timer * p->MaxTimerDecrease) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);
         }
 
         if (p->ReservedLane != NO_RESERVED_LANE)
@@ -264,32 +316,6 @@ void UpdateGen(game_main *g, gen_state *state, gen_params *p, void *data, float 
         }
 
         p->ReservedLane = NO_RESERVED_LANE;
-    }
-
-    if (p->Flags & GenFlag_ReserveLane)
-    {
-        if (p->Timer <= p->Interval*0.5f && p->ReservedLane == NO_RESERVED_LANE)
-        {
-            const int maxTries = 5;
-            int i = 0;
-            int laneIndex = state->PlayerLaneIndex;
-
-            // get the first non-occupied lane, or give up for this frame
-            while (state->LaneSlots[laneIndex] > 0 && i < maxTries)
-            {
-                laneIndex = RandomBetween(state->Entropy, 0, 4);
-                i++;
-            }
-            if (i >= maxTries)
-            {
-                p->Timer = GetNextTimer(p, state->Entropy);
-            }
-            else
-            {
-                p->ReservedLane = laneIndex - 2;
-                state->ReservedLanes[laneIndex] = 1;
-            }
-        }
     }
 
     p->Timer -= dt;

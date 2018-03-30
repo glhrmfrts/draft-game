@@ -255,6 +255,8 @@ struct road_state
 	float Left = 0;
 	float Right = 0;
 	int PlayerActiveEntityIndex = 0;
+	int MinLaneIndex = 0;
+	int MaxLaneIndex = 4;
 };
 
 struct entity_world
@@ -322,6 +324,9 @@ struct entity_world
     bool ShouldRoadTangent = false;
 };
 
+enum gen_type;
+
 void RoadChange(entity_world &w, road_change change);
+void SetEntityClip(entity_world &world, gen_type genType, audio_clip *track);
 
 #endif

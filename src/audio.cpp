@@ -361,6 +361,12 @@ void MusicMasterInit(game_main *g, music_master &m)
 
 void MusicMasterLoadSong(music_master &m, song *s)
 {
+	for (int track = 0; track < m.Sources.size(); track++)
+	{
+		m.SourcesState[track] = false;
+		AudioSourceStop(m.Sources[track]);
+	}
+
 	m.Song = s;
 	m.Beat = 0;
 	m.Timer = 0;

@@ -24,6 +24,9 @@ struct song
 	std::vector<audio_clip *> Tracks;
 	std::vector<std::string> Files;
 	std::unordered_map<hash_string::result_type, int> Names;
+
+	std::unordered_map<hash_string::result_type, std::string> ClipFiles;
+	std::unordered_map<hash_string::result_type, audio_clip *> Clips;
 };
 
 struct next_beat_callback

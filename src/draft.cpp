@@ -180,7 +180,7 @@ extern "C"
 			)
 		);
 
-#define NUM_LEVELS 2
+#define NUM_LEVELS 3
 		for (int i = 1; i <= NUM_LEVELS; i++)
 		{
 			g->Assets.push_back(

@@ -48,6 +48,8 @@ void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumbe
     l->Level = FindLevel(g->AssetLoader, levelNumber);
     ResetLevel(l->Level);
 
+	MusicMasterLoadSong(g->MusicMaster, l->Level->Song);
+
     l->PlayerMinVel = l->Level->Checkpoints[0].PlayerMinVel;
     l->PlayerMaxVel = l->Level->Checkpoints[0].PlayerMaxVel;
 
@@ -72,6 +74,10 @@ void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumbe
 		text_group_item(Color_white, smallFont)
 	};
 
+	g->World.PlayerEntity->Vel().y = l->PlayerMinVel;
+	g->World.RoadTangentPoint = std::numeric_limits<float>::infinity();
+
+	/*
 	auto ent = PushStruct<entity>(l->Arena);
 	ent->Pos().x = 0;
 	ent->Pos().y = 250;
@@ -80,6 +86,7 @@ void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumbe
 	ent->SetRot(vec3(0, 0, -90));
 	ent->Model = CreateModel(&l->Arena, FindMesh(g->AssetLoader, "deer"));
 	AddEntity(g->World, ent);
+	*/
 }
 
 void RemoveGameplayEntities(entity_world &w)
@@ -187,7 +194,12 @@ void InitLevelState(game_main *g, level_state *l)
     );
 
     l->ChangeLevelSequence = CreateSequence(g->TweenState);
-    l->ChangeLevelSequence->Tweens.push_back(CallbackTween([l](){ l->GameplayState = GameplayState_ChangingLevel; }));
+    l->ChangeLevelSequence->Tweens.push_back(CallbackTween([g, l]()
+	{
+		l->GameplayState = GameplayState_ChangingLevel;
+		auto nextLevel = FindLevel(g->AssetLoader, l->Level->Next);
+		l->ChangeSong = nextLevel->Song != l->Level->Song;
+	}));
     l->ChangeLevelSequence->Tweens.push_back(FadeInTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([g, l]()
         {
 			l->DrawStats = false;
@@ -196,7 +208,11 @@ void InitLevelState(game_main *g, level_state *l)
             ResetRoadPieces(g->World, g->World.PlayerEntity->Pos().y);
         }));
     l->ChangeLevelSequence->Tweens.push_back(WaitTween(FAST_TWEEN_DURATION));
-    l->ChangeLevelSequence->Tweens.push_back(FadeOutTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([l](){ l->GameplayState = GameplayState_Playing; }));
+    l->ChangeLevelSequence->Tweens.push_back(FadeOutTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([l]()
+	{
+		l->GameplayState = GameplayState_Playing;
+		l->ChangeSong = false;
+	}));
 
 	l->ExitSequence = CreateSequence(g->TweenState);
 	l->ExitSequence->Tweens.push_back(FadeInTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([g, l]()
@@ -626,11 +642,15 @@ void UpdateLevel(game_main *g, float dt)
     updateTime.Begin = g->Platform.GetMilliseconds();
 
 	static float myPitch = 1.0f;
-	float targetPitch = std::max(std::round(playerEntity->Vel().y) / 50.0f * 0.7f, 1.0f);
-	targetPitch = std::min(targetPitch, 2.5f*0.7f);
-
+	float targetPitch = std::min(std::round(playerEntity->Vel().y) / PLAYER_MIN_VEL, 1.0f);
+	targetPitch = std::max(targetPitch, 0.5f);
 	myPitch = Interp(myPitch, targetPitch, 0.5f, dt);
 	MusicMasterSetPitch(g->MusicMaster, myPitch);
+
+	if (l->ChangeSong)
+	{
+		MusicMasterSetGain(g->MusicMaster, g->Options->Values["audio/music_gain"]->Float * (1.0f - g->ScreenRectAlpha));
+	}
 
     if (IsJustPressed(g, Action_pause))
     {
@@ -1194,6 +1214,7 @@ MENU_FUNC(GameOverMenuCallback)
         l->Health = 50;
         RemoveGameplayEntities(g->World);
         AddEntity(g->World, g->World.PlayerEntity);
+		g->World.PlayerEntity->Vel().y = l->PlayerMinVel;
         break;
     }
 

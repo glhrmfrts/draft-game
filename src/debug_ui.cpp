@@ -31,6 +31,7 @@ void DrawDebugUI(game_main *g, float dt)
     ImGui::Text("Checkpoint time: %.2f", float(g->LevelState.CurrentCheckpointFrame) / 60.0f);
     ImGui::Text("Lanes: %d|%d|%d|%d|%d", lanes[0], lanes[1], lanes[2], lanes[3], lanes[4]);
 	ImGui::Text("Road bounds: %.2f|%.2f", g->World.RoadState.Left, g->World.RoadState.Right);
+	ImGui::Text("min/max lanes: %d|%d", g->World.RoadState.MinLaneIndex, g->World.RoadState.MaxLaneIndex);
 	
 	if (ImGui::CollapsingHeader("Music"))
 	{

@@ -15,6 +15,7 @@
 #define GenFlag_Randomize       (1 << 1)
 #define GenFlag_BasedOnVelocity (1 << 2)
 #define GenFlag_ReserveLane     (1 << 3)
+#define GenFlag_AlternateLane   (1 << 4)
 
 struct game_main;
 struct level_state;
@@ -39,7 +40,9 @@ struct gen_params
 {
     uint32 Flags;
     gen_func *Func;
+	audio_clip *Clip = NULL;
     float Interval;
+	float MaxTimerDecrease;
     float Timer = 0;
     float RandomOffset = 1.5f;
     int ReservedLane = NO_RESERVED_LANE;
