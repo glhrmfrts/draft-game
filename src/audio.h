@@ -1,12 +1,6 @@
 #ifndef DRAFT_AUDIO_H
 #define DRAFT_AUDIO_H
 
-enum audio_clip_type
-{
-	AudioClipType_Sound,
-	AudioClipType_Stream,
-};
-
 struct audio_clip
 {
 	audio_clip_type Type;
@@ -36,16 +30,6 @@ struct next_beat_callback
 	func *Func;
 	void *Arg;
 	int Divisor;
-};
-
-enum music_master_message_type
-{
-	MusicMasterMessageType_Tick,
-	MusicMasterMessageType_PlayTrack,
-	MusicMasterMessageType_StopTrack,
-	MusicMasterMessageType_OnNextBeat,
-	MusicMasterMessageType_SetPitch,
-	MusicMasterMessageType_SetGain,
 };
 
 struct music_master_message

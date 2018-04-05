@@ -547,7 +547,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 			};
 
             auto meshData = Entry->Mesh.Data;
-			meshData->Flags = (mesh_flags::type)Entry->Param;
+			meshData->Flags = (unsigned long)Entry->Param;
 			mesh_obj_data data = {};
 			mesh_obj_face_group *currentFaceGroup = NULL;
 			std::vector<mesh_obj_face_group> faceGroups;

@@ -24,18 +24,6 @@ struct gen_params;
 #define GEN_FUNC(name) void name(gen_params *p, game_main *g, gen_state *state, void *data)
 typedef GEN_FUNC(gen_func);
 
-enum gen_type
-{
-    GenType_Crystal,
-    GenType_Ship,
-    GenType_RedShip,
-    GenType_Asteroid,
-    GenType_SideTrail,
-    GenType_RandomGeometry,
-	GenType_EnemySkull,
-    GenType_MAX,
-};
-
 struct gen_params
 {
     uint32 Flags;

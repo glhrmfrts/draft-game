@@ -140,12 +140,6 @@ struct projection_perspective
     float Fov;
 };
 
-enum camera_type
-{
-    Camera_orthographic,
-    Camera_perspective,
-};
-
 struct camera
 {
     mat4 ProjectionView;
@@ -289,13 +283,6 @@ struct perlin_noise_program : shader_program
 	int Time;
 	int Offset;
 	int Color;
-};
-
-enum color_texture_type
-{
-    ColorTextureFlag_SurfaceReflect,
-    ColorTextureFlag_Emit,
-    ColorTextureFlag_Count,
 };
 
 #define FramebufferFlag_HasDepth 0x1

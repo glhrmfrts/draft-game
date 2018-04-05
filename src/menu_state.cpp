@@ -124,7 +124,7 @@ void InitMenuState(game_main *g)
 	m->FadeOutSequence = CreateSequence(g->TweenState);
 	m->FadeOutSequence->Tweens.push_back(FadeOutTween(&m->Alpha, FAST_TWEEN_DURATION).SetCallback([g]()
 	{
-		ResetLevelState(g, &g->LevelState, "3");
+		ResetLevelState(g, &g->LevelState, "2");
 	}));
 
 	ResetMenuState(g);

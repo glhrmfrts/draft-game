@@ -20,28 +20,6 @@ struct bitmap_font
     texture_rect TexRect[MaxCharSupport];
 };
 
-enum asset_entry_type
-{
-    AssetEntryType_Texture,
-	AssetEntryType_Font,
-	AssetEntryType_Shader,
-	AssetEntryType_Sound,
-	AssetEntryType_Stream,
-	AssetEntryType_Song,
-	AssetEntryType_OptionsLoad,
-	AssetEntryType_OptionsSave,
-    AssetEntryType_Level,
-	AssetEntryType_Mesh,
-    AssetEntryType_MaterialLib,
-};
-enum asset_completion
-{
-    AssetCompletion_Incomplete,
-    AssetCompletion_ThreadSafe,
-    AssetCompletion_ThreadUnsafe,
-	AssetCompletion_Done,
-};
-
 struct material;
 
 struct material_lib

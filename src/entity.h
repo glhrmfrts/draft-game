@@ -55,13 +55,6 @@ struct asteroid
     bool Exploded = false;
 };
 
-enum checkpoint_state
-{
-    CheckpointState_Initial,
-    CheckpointState_Drafted,
-    CheckpointState_Active,
-};
-
 #define CHECKPOINT_FADE_OUT_DURATION 4.0f
 struct checkpoint
 {
@@ -79,18 +72,12 @@ struct trail;
 struct trail_group;
 struct trail_piece;
 
-#define EntityFlag_Kinematic        0x1
-#define EntityFlag_IsPlayer         0x2
-#define EntityFlag_RemoveOffscreen  0x4
-#define EntityFlag_UpdateMovement   0x8
-enum collider_type
-{
-    ColliderType_Crystal,
-    ColliderType_Ship,
-    ColliderType_TrailPiece,
-    ColliderType_Asteroid,
-	ColliderType_EnemySkull,
-};
+#define EntityFlag_Kinematic          0x1
+#define EntityFlag_IsPlayer           0x2
+#define EntityFlag_RemoveOffscreen    0x4
+#define EntityFlag_UpdateMovement     0x8
+#define EntityFlag_DestroyAudioSource 0x10
+
 struct collider
 {
     bounding_box Box;
@@ -113,20 +100,6 @@ struct road_piece
 	float BackRight;
 	float FrontLeft;
 	float FrontRight;
-};
-
-enum entity_type
-{
-	EntityType_Invalid,
-	EntityType_Crystal,
-	EntityType_Ship,
-	EntityType_Explosion,
-	EntityType_Powerup,
-	EntityType_Asteroid,
-	EntityType_Checkpoint,
-	EntityType_Finish,
-	EntityType_EnemySkull,
-	EntityType_MAX,
 };
 
 struct entity
@@ -236,16 +209,6 @@ struct road_mesh_manager
 	std::unordered_map<std::string, mesh *> Meshes;
 };
 
-enum road_change
-{
-	RoadChange_NarrowRight,
-	RoadChange_NarrowLeft,
-	RoadChange_NarrowCenter,
-	RoadChange_WidensLeft,
-	RoadChange_WidensRight,
-	RoadChange_WidensCenter,
-};
-
 struct road_state
 {
 	road_piece NextPiece;
@@ -276,6 +239,7 @@ struct entity_world
 	memory_pool EnemySkullPool;
 	generic_pool<entity_update_args> UpdateArgsPool;
 
+    mesh *SphereMesh = NULL;
     mesh *FloorMesh = NULL;
     mesh *ShipMesh = NULL;
     mesh *CrystalMesh = NULL;
@@ -323,8 +287,6 @@ struct entity_world
     float RoadTangentPoint = std::numeric_limits<float>::infinity();
     bool ShouldRoadTangent = false;
 };
-
-enum gen_type;
 
 void RoadChange(entity_world &w, road_change change);
 void SetEntityClip(entity_world &world, gen_type genType, audio_clip *track);

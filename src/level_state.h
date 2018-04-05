@@ -43,15 +43,6 @@ struct track_args
 	hash_string::result_type TrackHash;
 };
 
-enum gameplay_state
-{
-    GameplayState_Playing,
-    GameplayState_Paused,
-    GameplayState_GameOver,
-    GameplayState_Stats,
-    GameplayState_ChangingLevel,
-};
-
 struct level_state
 {
     memory_arena Arena;

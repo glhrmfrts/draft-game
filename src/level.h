@@ -5,23 +5,6 @@
 
 #define FRAME_SECONDS(s)  (s * 60)
 
-enum level_command_type
-{
-	LevelCommand_Enable,
-	LevelCommand_Disable,
-	LevelCommand_AddFlags,
-	LevelCommand_RemoveFlags,
-	LevelCommand_AddIntroText,
-	LevelCommand_ShipColor,
-	LevelCommand_SpawnCheckpoint,
-	LevelCommand_SpawnFinish,
-    LevelCommand_RoadTangent,
-	LevelCommand_RoadChange,
-    LevelCommand_PlayTrack,
-    LevelCommand_StopTrack,
-	LevelCommand_SetEntityClip,
-};
-
 struct level_command
 {
 	level_command_type Type;

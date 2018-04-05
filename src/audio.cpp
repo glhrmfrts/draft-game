@@ -128,6 +128,11 @@ void AudioSourceStop(audio_source *source)
 	}
 }
 
+void AudioSourceDestroy(audio_source *source)
+{
+    alDeleteSources(1, &source->ID);
+}
+
 bool IsPlaying(audio_source *source)
 {
 	ALenum state;

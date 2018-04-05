@@ -8,6 +8,7 @@
 #include <sndfile.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include "enums.h"
 #include "types.h"
 #include "thread_pool.h"
 #include "config.h"
@@ -107,58 +108,11 @@ extern "C"
 	typedef GAME_PROCESS_EVENT(game_process_event_func);
 }
 
-// @TODO: this will probably only work for linux
-enum game_controller_axis_id
-{
-    Axis_Invalid = -1,
-    Axis_LeftX = 0,
-    Axis_LeftY = 1,
-    Axis_LeftTrigger = 2,
-    Axis_RightTrigger = 5,
-    Axis_RightX = 3,
-    Axis_RightY = 4,
-};
-enum game_controller_button_id
-{
-    Button_Invalid = -1,
-
-#ifdef _WIN32
-	XboxButton_A = 10,
-	XboxButton_B = 11,
-	XboxButton_X = 12,
-	XboxButton_Y = 13,
-	XboxButton_Left = 8,
-	XboxButton_Right = 9,
-	XboxButton_Start = 654,
-#else
-    XboxButton_A = 0,
-    XboxButton_B = 1,
-    XboxButton_X = 2,
-    XboxButton_Y = 3,
-    XboxButton_Left = 4,
-    XboxButton_Right = 5,
-    XboxButton_Back = 6,
-    XboxButton_Start = 7,
-#endif
-};
 struct game_controller
 {
     SDL_Joystick *Joystick = NULL;
 };
 
-enum action_type
-{
-    Action_camHorizontal,
-    Action_camVertical,
-    Action_horizontal,
-    Action_vertical,
-    Action_boost,
-	Action_debugUI,
-    Action_debugPause,
-    Action_select,
-    Action_pause,
-    Action_count,
-};
 struct action_state
 {
     int Positive = 0;
@@ -206,12 +160,6 @@ struct game_menu_context
     float ChangeTimer = 0;
 };
 
-enum game_state
-{
-	GameState_LoadingScreen,
-    GameState_Level,
-    GameState_Menu,
-};
 struct game_main
 {
 	game_state State;

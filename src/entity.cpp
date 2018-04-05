@@ -144,10 +144,15 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
 		ent->AudioSource = CreateAudioSource(alloc, clip);
 		AudioSourcePlay(ent->AudioSource);
 	}
+
     if (isPlayer)
     {
 		ent->Collider->Active = true;
         AddFlags(ent, EntityFlag_IsPlayer);
+    }
+    else
+    {
+        AddFlags(ent, EntityFlag_DestroyAudioSource);
     }
     return ent;
 }
@@ -240,7 +245,7 @@ entity *CreateExplosionEntity(allocator *alloc, asset_loader &loader, vec3 pos, 
 }
 
 #define ASTEROID_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_GROUP_SIZE(1)+sizeof(asteroid))
-static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
+entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 {
     auto result = CreateEntity(alloc);
 	result->Type = EntityType_Asteroid;
@@ -252,7 +257,7 @@ static entity *CreateAsteroidEntity(allocator *alloc, mesh *astMesh)
 }
 
 #define CHECKPOINT_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(audio_source)+sizeof(checkpoint)+TRAIL_GROUP_SIZE(1)+(sizeof(material)*2))
-static entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, mesh *checkpointMesh)
+entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, mesh *checkpointMesh)
 {
     auto result = CreateEntity(alloc);
 	result->Type = EntityType_Checkpoint;
@@ -267,7 +272,7 @@ static entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, me
 }
 
 #define FINISH_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(finish))
-static entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *finishMesh)
+entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *finishMesh)
 {
 	auto result = CreateEntity(alloc);
 	result->Type = EntityType_Finish;
@@ -279,7 +284,7 @@ static entity *CreateFinishEntity(allocator *alloc, asset_loader &loader, mesh *
 }
 
 #define ENEMY_SKULL_ENTITY_SIZE (sizeof(entity)+sizeof(model)+sizeof(collider)+TRAIL_GROUP_SIZE(1))
-static entity *CreateEnemySkullEntity(allocator *alloc, mesh *skullMesh)
+entity *CreateEnemySkullEntity(allocator *alloc, mesh *skullMesh)
 {
 	auto result = CreateEntity(alloc);
 	result->Type = EntityType_EnemySkull;
@@ -290,7 +295,7 @@ static entity *CreateEnemySkullEntity(allocator *alloc, mesh *skullMesh)
 	return result;
 }
 
-static float Interp(float c, float t, float a, float dt)
+float Interp(float c, float t, float a, float dt)
 {
     if (c == t)
     {
@@ -446,9 +451,9 @@ void RoadRepeatCallback(entity_world *w, entity *ent)
 
 			w->RoadState.RoadMesh = GetStraightRoadMesh(w->RoadMeshManager, -2.5f, 2.5f);
 			SetRoadPieceBounds(&w->RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
+
 			w->RoadState.MinLaneIndex = 0;
 			w->RoadState.MaxLaneIndex = 4;
-
 			break;
 
 		case RoadChange_WidensCenter:
@@ -642,6 +647,10 @@ void RemoveEntity(entity_world &world, entity *ent)
 	if (ent->AudioSource)
 	{
 		RemoveEntityFromList(world.AudioEntities, ent);
+        if (ent->Flags & EntityFlag_DestroyAudioSource)
+        {
+            AudioSourceDestroy(ent->AudioSource);
+        }
 	}
     if (ent->Model)
     {
@@ -771,7 +780,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
     w.AssetLoader = loader;
     w.Camera = cam;
-    w.PlayerEntity = CreateShipEntity(&w.Arena, GetShipMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, NULL, true);
+    w.PlayerEntity = CreateShipEntity(&w.Arena, GetSphereMesh(w), PLAYER_BODY_COLOR, PLAYER_OUTLINE_COLOR, NULL, true);
     w.PlayerEntity->Transform.Position.z = SHIP_Z;
     w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
 	w.PlayerEntity->AudioSource = CreateAudioSource(&w.Arena);

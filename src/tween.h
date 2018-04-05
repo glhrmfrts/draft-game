@@ -7,12 +7,6 @@
 #define TWEEN_FUNC(name) float name(float t)
 typedef TWEEN_FUNC(tween_func);
 
-enum tween_easing
-{
-    TweenEasing_Linear,
-    TweenEasing_MAX,
-};
-
 struct tween
 {
     std::function<void()> Callback;

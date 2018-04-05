@@ -612,3 +612,37 @@ mesh *GenerateWallMesh(memory_arena &Arena, const std::vector<vec2> &Points)
     EndMesh(Mesh, GL_STATIC_DRAW);
     return Mesh;
 }
+
+mesh *GetSphereMesh(entity_world &w)
+{
+    if (w.SphereMesh)
+    {
+        return w.SphereMesh;
+    }
+
+    auto result = PushStruct<mesh>(w.PersistentArena);
+    InitMeshBuffer(result->Buffer);
+
+    const float rings = 24;
+    const float pointsPerRing = 24;
+    const float deltaTheta = M_PI / rings;
+    const float deltaPhi = 2*M_PI / (pointsPerRing + 2);
+    float theta = 0;
+    float phi = 0;
+    for (int r = 0; r < rings; r++)
+    {
+        theta += deltaTheta;
+        for (int p = 0; p < pointsPerRing; p++)
+        {
+            phi += deltaPhi;
+            float x = std::sin(theta) * std::cos(phi);
+            float y = std::sin(theta) * std::sin(phi);
+            float z = std::cos(theta);
+            PushVertex(result->Buffer, mesh_vertex{vec3{x, y, z}, vec2{}, vec4{1, 1, 1, 1}, vec3{x, y, z}});
+        }
+    }
+
+    AddPart(result, mesh_part{CreateMaterial(&w.PersistentArena, Color_white, 1.0f, 0.0f, NULL), 0, result->Buffer.VertexCount, GL_TRIANGLE_FAN});
+    EndMesh(result, GL_STATIC_DRAW);
+    return w.SphereMesh = result;
+}

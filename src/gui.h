@@ -80,14 +80,6 @@ struct gui
     int Emission;
 };
 
-enum menu_item_type
-{
-    MenuItemType_Text,
-	MenuItemType_SliderFloat,
-	MenuItemType_Switch,
-	MenuItemType_Options,
-};
-
 struct menu_item
 {
     const char *Text;
