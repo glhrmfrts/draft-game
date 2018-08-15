@@ -4,6 +4,11 @@
 #define CharsPerTexture     1024
 #define CharsPerTextureRoot 32
 #define MaxCharSupport      128
+
+struct asset_loader;
+struct asset_job;
+struct material;
+
 struct bitmap_font
 {
     int Size;
@@ -19,8 +24,6 @@ struct bitmap_font
     int          CharHeight[MaxCharSupport];
     texture_rect TexRect[MaxCharSupport];
 };
-
-struct material;
 
 struct material_lib
 {
@@ -38,7 +41,6 @@ struct mesh_asset_data
     size_t VertexSize;
 };
 
-struct asset_loader;
 struct asset_entry
 {
     uint64 LastLoadTime;
@@ -47,8 +49,9 @@ struct asset_entry
     string Filename;
     string ID;
     asset_loader *Loader;
+    asset_job *Job;
     void *Param;
-	bool OneShot;
+	  bool OneShot;
 
     union
     {
@@ -113,17 +116,25 @@ struct asset_entry
 	~asset_entry() {}
 };
 
+struct asset_job
+{
+    bool Finished = false;
+    fixed_array<asset_entry, 64> Entries;
+    std::atomic_int NumLoadedEntries;
+    std::string Name;
+};
+
 struct platform_api;
 struct asset_loader
 {
     FT_Library FreeTypeLib;
     memory_arena Arena;
-    fixed_array<asset_entry, 96> Entries;
-
+    std::vector<asset_entry> Entries;
+    std::atomic_int NumLoadedEntries;
+    asset_job *CurrentJob;
     platform_api *Platform;
     thread_pool Pool;
-    std::atomic_int NumLoadedEntries;
-	bool Active;
+	  bool Active;
 };
 
 #endif

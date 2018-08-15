@@ -8,7 +8,7 @@ enum action_type
     Action_horizontal,
     Action_vertical,
     Action_boost,
-	Action_debugUI,
+	  Action_debugUI,
     Action_debugPause,
     Action_select,
     Action_pause,

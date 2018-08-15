@@ -39,16 +39,16 @@ static song *firstSong;
 // sets the level and it's initial state
 void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumber)
 {
-	g->State = GameState_Level;
+	  g->State = GameState_Level;
 
     l->Health = 50;
     l->CheckpointNum = 0;
     l->CurrentCheckpointFrame = 0;
     l->GameplayState = GameplayState_Playing;
-    l->Level = FindLevel(g->AssetLoader, levelNumber);
+    l->Level = FindLevel(g->AssetLoader, levelNumber, "main_assets");
     ResetLevel(l->Level);
 
-	MusicMasterLoadSong(g->MusicMaster, l->Level->Song);
+	  MusicMasterLoadSong(g->MusicMaster, l->Level->Song);
 
     l->PlayerMinVel = l->Level->Checkpoints[0].PlayerMinVel;
     l->PlayerMaxVel = l->Level->Checkpoints[0].PlayerMaxVel;
@@ -59,11 +59,11 @@ void ResetLevelState(game_main *g, level_state *l, const std::string &levelNumbe
     gen->Flags |= GenFlag_Enabled;
 
 	// get sounds
-	l->DraftBoostSound = FindSound(g->AssetLoader, "boost");
+	l->DraftBoostSound = FindSound(g->AssetLoader, "boost", "main_assets");
 
 	// get fonts to gui
-	static auto smallFont = FindBitmapFont(g->AssetLoader, "vcr_16");
-	static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+	static auto smallFont = FindBitmapFont(g->AssetLoader, "vcr_16", "main_assets");
+	static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32", "main_assets");
 	l->ScoreTextGroup.Items = {
 		text_group_item(Color_white, textFont),
 		text_group_item(Color_white, smallFont)
@@ -137,7 +137,7 @@ void InitLevelState(game_main *g, level_state *l)
     FreeArena(l->Arena);
     ResetPool(l->IntroTextPool);
     ResetPool(l->ScoreTextPool);
-	ResetPool(l->TrackArgsPool);
+	  ResetPool(l->TrackArgsPool);
 
     l->AssetLoader = &g->AssetLoader;
     l->Entropy = RandomSeed(g->Platform.GetMilliseconds());
@@ -164,7 +164,7 @@ void InitLevelState(game_main *g, level_state *l)
 
     l->StatsScreenSequence = CreateSequence(g->TweenState);
 	l->StatsScreenSequence->Tweens.push_back(CallbackTween([l]()
-	{ 
+	{
 		l->StatsAlpha[0] = 0;
 		l->StatsAlpha[1] = 0;
 		l->StatsAlpha[2] = 0;
@@ -197,7 +197,7 @@ void InitLevelState(game_main *g, level_state *l)
     l->ChangeLevelSequence->Tweens.push_back(CallbackTween([g, l]()
 	{
 		l->GameplayState = GameplayState_ChangingLevel;
-		auto nextLevel = FindLevel(g->AssetLoader, l->Level->Next);
+		auto nextLevel = FindLevel(g->AssetLoader, l->Level->Next, "main_assets");
 		l->ChangeSong = nextLevel->Song != l->Level->Song;
 	}));
     l->ChangeLevelSequence->Tweens.push_back(FadeInTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION).SetCallback([g, l]()
@@ -1093,7 +1093,7 @@ void RenderLevel(game_main *g, float dt)
     auto l = &g->LevelState;
     auto &renderTime = g->RenderTime;
     auto &world = g->World;
-    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48", "main_assets");
 
     renderTime.Begin = g->Platform.GetMilliseconds();
     UpdateProjectionView(g->Camera);
@@ -1120,8 +1120,8 @@ void RenderLevel(game_main *g, float dt)
     RenderEnd(g->RenderState, g->FinalCamera);
 
     const float fontSize = GetRealPixels(g, 24);
-    static auto hudFont = FindBitmapFont(g->AssetLoader, "unispace_24");
-    static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+    static auto hudFont = FindBitmapFont(g->AssetLoader, "unispace_24", "main_assets");
+    static auto textFont = FindBitmapFont(g->AssetLoader, "unispace_32", "main_assets");
 
     Begin(g->GUI, g->GUICamera, 1.0f);
     for (auto text : l->IntroTextList)

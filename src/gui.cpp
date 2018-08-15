@@ -483,7 +483,7 @@ static menu_item backItem = {"BACK", MenuItemType_Text, true};
 
 void DrawHeader(game_main *g, const char *text, color c, float alpha = 1.0f)
 {
-    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48", "main_assets");
 
     float halfX = g->Width*0.5f;
     float halfY = g->Height*0.5f;
@@ -521,8 +521,8 @@ void DrawContainerPolygon(game_main *g, color c, rect &r)
 
 void DrawMenu(game_main *g, menu_data &menu, float changeTimer, float alpha = 1.0f, bool drawBackItem = false)
 {
-    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48");
-    static auto menuItemFont = FindBitmapFont(g->AssetLoader, "unispace_24");
+    static auto titleFont = FindBitmapFont(g->AssetLoader, "unispace_48", "main_assets");
+    static auto menuItemFont = FindBitmapFont(g->AssetLoader, "unispace_24", "main_assets");
 
     float halfX = g->Width*0.5f;
     float halfY = g->Height*0.5f;

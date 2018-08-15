@@ -65,7 +65,7 @@ GEN_FUNC(GenerateShip)
 
 GEN_FUNC(GenerateRedShip)
 {
-    color c = IntColor(ShipPalette.Colors[SHIP_RED]);
+  color c = IntColor(ShipPalette.Colors[SHIP_RED]);
 	int lane = glm::clamp(state->PlayerLaneIndex, g->World.RoadState.MinLaneIndex, g->World.RoadState.MaxLaneIndex) - 2;
 	if ((p->Flags & GenFlag_ReserveLane) || (p->Flags & GenFlag_AlternateLane))
 	{
@@ -104,10 +104,10 @@ GEN_FUNC(GenerateEnemySkull)
 {
 	static bool longInterval = false;
 
-	auto ent = CreateEnemySkullEntity(GetEntry(g->World.EnemySkullPool), FindMesh(g->AssetLoader, "skull"));
+	auto ent = CreateEnemySkullEntity(GetEntry(g->World.EnemySkullPool), FindMesh(g->AssetLoader, "skull", "main_assets"));
 	ent->Pos().y = g->World.PlayerEntity->Pos().y + GEN_PLAYER_OFFSET;
 	ent->Pos().z = SHIP_Z;
-	
+
 	if (longInterval)
 	{
 		ent->Vel().x = SKULL_VEL_X;
@@ -116,7 +116,7 @@ GEN_FUNC(GenerateEnemySkull)
 	{
 		ent->Vel().x = -SKULL_VEL_X;
 	}
-	
+
 	AddFlags(ent, EntityFlag_RemoveOffscreen);
 	AddEntity(g->World, ent);
 
@@ -256,10 +256,10 @@ void ResetGen(gen_params *p)
 
 void UpdateGen(game_main *g, gen_state *state, gen_params *p, void *data, float dt)
 {
-    if (!(p->Flags & GenFlag_Enabled))
-    {
-        return;
-    }
+  if (!(p->Flags & GenFlag_Enabled))
+  {
+      return;
+  }
 
 	if (p->Flags & GenFlag_ReserveLane)
 	{
@@ -305,6 +305,7 @@ void UpdateGen(game_main *g, gen_state *state, gen_params *p, void *data, float 
     {
         p->Func(p, g, state, data);
         p->Timer = GetNextTimer(p, state->Entropy);
+
         if (p->Flags & GenFlag_BasedOnVelocity)
         {
             p->Timer -= (p->Timer * p->MaxTimerDecrease) * (g->World.PlayerEntity->Vel().y / PLAYER_MAX_VEL_LIMIT);

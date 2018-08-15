@@ -575,7 +575,7 @@ mesh *GetBackgroundMesh(entity_world &w)
     }
 
     auto bgMesh = PushStruct<mesh>(w.PersistentArena);
-    auto mat = CreateMaterial(&w.PersistentArena, Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background"));
+    auto mat = CreateMaterial(&w.PersistentArena, Color_white, 1.0f, 1.0f, FindTexture(*w.AssetLoader, "background", "main_assets"));
     mat->FogWeight = 0.0f;
 
     InitMeshBuffer(bgMesh->Buffer);

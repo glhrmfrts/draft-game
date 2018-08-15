@@ -134,7 +134,7 @@ void InitMenuState(game_main *g)
 	//MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("bg_amb")]);
 	//MusicMasterPlayTrack(g->MusicMaster, sng->Names[hash_string()("pad_dmaj")]);
 
-	g->Options = FindOptions(g->AssetLoader, "options");
+	g->Options = FindOptions(g->AssetLoader, "options", "main_assets");
     MusicMasterSetGain(g->MusicMaster, g->Options->Values["audio/music_gain"]->Float);
 
 	GraphicsMenu.Items[0].Options.SelectedIndex = g->Options->Values["graphics/resolution"]->Int;
@@ -158,17 +158,14 @@ void InitMenuState(game_main *g)
 
 void SaveOptions(game_main *g)
 {
-	AddAssetEntry(
-		g->AssetLoader,
-		CreateAssetEntry(
-			AssetEntryType_OptionsSave,
-			"options.json",
-			"options",
-			(void *)g->Options
-		),
-		true,
-		true
+	auto saveEntry = CreateAssetEntry(
+		AssetEntryType_OptionsSave,
+		"options.json",
+		"options",
+		(void *)g->Options
 	);
+	saveEntry.Job = g->AssetLoader.CurrentJob;
+	AddAssetEntry(g->AssetLoader, saveEntry);
 }
 
 void UpdateMenuState(game_main *g, float dt)
@@ -245,7 +242,7 @@ void UpdateMenuState(game_main *g, float dt)
 
 void RenderMenuState(game_main *g, float dt)
 {
-    static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32");
+    static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32", "main_assets");
     auto m = &g->MenuState;
 
     UpdateProjectionView(g->Camera);
@@ -289,7 +286,7 @@ void RenderMenuState(game_main *g, float dt)
 	case MenuScreen_OptsGraphics:
 	{
 		float halfX = g->Width*0.5f;
-		static auto font = FindBitmapFont(g->AssetLoader, "unispace_12");
+		static auto font = FindBitmapFont(g->AssetLoader, "unispace_12", "main_assets");
 
 		DrawMenu(g, GraphicsMenu, g->GUI.MenuChangeTimer, m->Alpha, true);
 		DrawTextCentered(g->GUI, font, "Warning: graphics settings need restart to apply", rect{ halfX, GetRealPixels(g, 50), 0,0 }, Color_white);

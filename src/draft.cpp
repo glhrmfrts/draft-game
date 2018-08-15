@@ -34,7 +34,7 @@ extern "C"
         auto g = game;
         int Width = g->Width;
         int Height = g->Height;
-		Global_Platform = &g->Platform;
+		    Global_Platform = &g->Platform;
 
         ImGui_ImplSdlGL3_Init(g->Window);
 
@@ -44,157 +44,18 @@ extern "C"
         MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height, g->ViewportWidth, g->ViewportHeight);
         InitTweenState(g->TweenState);
-		InitGUI(g->GUI, g->TweenState, g->Input);
+	      InitGUI(g->GUI, g->TweenState, g->Input);
         InitEntityWorld(g, g->World);
-		MusicMasterInit(g, g->MusicMaster);
-		InitLevelState(g, &g->LevelState);
+		    MusicMasterInit(g, g->MusicMaster);
+        InitLevelState(g, &g->LevelState);
 
-        g->RenderState.RoadTangentPoint = &g->World.RoadTangentPoint;
+        g->State = GameState_LoadingScreen;
+        auto job = CreateAssetJob(g->AssetLoader, "main_assets");
 
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Texture,
-                "data/textures/grid.png",
-                "grid",
-                (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
-            )
-        );
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Texture,
-                "data/textures/space6.png",
-                "background",
-                (void *)(TextureFlag_WrapRepeat)
-            )
-        );
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Texture,
-				"data/textures/random.png",
-				"random",
-				(void *)(TextureFlag_WrapRepeat | TextureFlag_Nearest)
-			)
-		);
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Font,
-                "data/fonts/vcr.ttf",
-                "vcr_16",
-                (void *)long(GetRealPixels(g, 32.0f))
-            )
-        );
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Font,
-				"data/fonts/unispace.ttf",
-				"unispace_12",
-				(void *)long(GetRealPixels(g, 12.0f))
-			)
-		);
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Font,
-                "data/fonts/unispace.ttf",
-                "unispace_16",
-                (void *)long(GetRealPixels(g, 16.0f))
-            )
-        );
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Font,
-                "data/fonts/unispace.ttf",
-                "unispace_24",
-                (void *)long(GetRealPixels(g, 24.0f))
-            )
-        );
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Font,
-                "data/fonts/unispace.ttf",
-                "unispace_32",
-                (void *)long(GetRealPixels(g, 32.0f))
-            )
-        );
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Font,
-                "data/fonts/unispace.ttf",
-                "unispace_48",
-                (void *)long(GetRealPixels(g, 48.0f))
-            )
-        );
-        g->Assets.push_back(
-            CreateAssetEntry(
-                AssetEntryType_Sound,
-                "data/audio/boost.wav",
-                "boost",
-                NULL
-            )
-        );
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Sound,
-				"data/audio/explosion3.wav",
-				"explosion",
-				NULL
-			)
-		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Sound,
-				"data/audio/checkpoint.wav",
-				"checkpoint",
-				NULL
-			)
-		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Sound,
-				"data/audio/crystal.wav",
-				"crystal",
-				NULL
-			)
-		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_OptionsLoad,
-				"options.json",
-				"options",
-				NULL
-			)
-		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Mesh,
-				"data/models/deer.obj",
-				"deer",
-				(void *)(mesh_flags::UpY)
-			)
-		);
-		g->Assets.push_back(
-			CreateAssetEntry(
-				AssetEntryType_Mesh,
-				"data/models/skull.obj",
-				"skull",
-				(void *)(mesh_flags::UpY)
-			)
-		);
-
-#define NUM_LEVELS 3
-		for (int i = 1; i <= NUM_LEVELS; i++)
-		{
-			g->Assets.push_back(
-				CreateAssetEntry(
-					AssetEntryType_Level,
-					"data/levels/" + std::to_string(i) + ".level",
-					std::to_string(i),
-					NULL
-				)
-			);
-		}
-
-        InitLoadingScreen(g);
-    }
+        AddShadersAssetEntries(g, job);
+        InitAssetLoader(g, g->AssetLoader, g->Platform);
+        StartAssetJob(g->AssetLoader, job);
+  }
 
 	export_func GAME_RELOAD(GameReload)
 	{

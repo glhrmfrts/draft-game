@@ -61,9 +61,9 @@ static trail_group *CreateTrailGroup(allocator *alloc, entity *owner, color c,
     trail_group *result = PushStruct<trail_group>(alloc);
     result->RenderOnly = renderOnly;
     result->Radius = radius;
-	result->Count = count;
-	result->Entities.resize(count);
-	result->PointCache.resize(count);
+    result->Count = count;
+	  result->Entities.resize(count);
+    result->PointCache.resize(count);
 
     InitMeshBuffer(result->Mesh.Buffer);
     result->Model.Mesh = &result->Mesh;
@@ -125,7 +125,7 @@ entity *CreateEntity(allocator *alloc)
 entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlineColor, audio_clip *clip, bool isPlayer = false, int colorIndex = 0, int lane = 0)
 {
     auto ent = CreateEntity(alloc);
-	ent->Type = EntityType_Ship;
+    ent->Type = EntityType_Ship;
     ent->Model = CreateModel(alloc, shipMesh);
     ent->Model->Materials.push_back(CreateMaterial(alloc, vec4(c.r, c.g, c.b, 1), 0, 0, NULL));
     ent->Model->Materials.push_back(CreateMaterial(alloc, outlineColor, 1.0f, 0, NULL, MaterialFlag_PolygonLines));
@@ -136,18 +136,20 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
     ent->Ship = PushStruct<ship>(alloc);
     ent->Ship->Color = c;
     ent->Ship->OutlineColor = outlineColor;
-	ent->LaneSlot = CreateLaneSlot(alloc, lane);
+	  ent->LaneSlot = CreateLaneSlot(alloc, lane);
+
     bool trailRenderOnly = isPlayer || (colorIndex == SHIP_RED);
     ent->TrailGroup = CreateTrailGroup(alloc, ent, outlineColor, 0.5f, trailRenderOnly);
-	if (clip)
-	{
-		ent->AudioSource = CreateAudioSource(alloc, clip);
-		AudioSourcePlay(ent->AudioSource);
-	}
+
+    if (clip)
+    {
+    	ent->AudioSource = CreateAudioSource(alloc, clip);
+    	AudioSourcePlay(ent->AudioSource);
+    }
 
     if (isPlayer)
     {
-		ent->Collider->Active = true;
+		    ent->Collider->Active = true;
         AddFlags(ent, EntityFlag_IsPlayer);
     }
     else
@@ -161,13 +163,13 @@ entity *CreateShipEntity(allocator *alloc, mesh *shipMesh, color c, color outlin
 entity *CreateCrystalEntity(allocator *alloc, asset_loader &loader, mesh *crystalMesh, int lane = 0)
 {
     auto ent = CreateEntity(alloc);
-	ent->Type = EntityType_Crystal;
+	  ent->Type = EntityType_Crystal;
     ent->Flags |= EntityFlag_RemoveOffscreen;
     ent->Model = CreateModel(alloc, crystalMesh);
     ent->Collider = CreateCollider(alloc, ColliderType_Crystal);
     ent->FrameRotation = PushStruct<frame_rotation>(alloc);
     ent->FrameRotation->Rotation.z = 90.0f;
-	ent->AudioSource = CreateAudioSource(alloc, FindSound(loader, "crystal"));
+	ent->AudioSource = CreateAudioSource(alloc, FindSound(loader, "crystal", "main_assets"));
 	ent->LaneSlot = CreateLaneSlot(alloc, lane, false);
     return ent;
 }
@@ -239,7 +241,7 @@ entity *CreateExplosionEntity(allocator *alloc, asset_loader &loader, vec3 pos, 
     result->Transform.Position = pos;
     result->Explosion = exp;
 	result->TrailGroup = tg;
-	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "explosion"));
+	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "explosion", "main_assets"));
 	result->LaneSlot = CreateLaneSlot(alloc, lane, false);
     return result;
 }
@@ -267,7 +269,7 @@ entity *CreateCheckpointEntity(allocator *alloc, asset_loader &loader, mesh *che
     result->Checkpoint = PushStruct<checkpoint>(alloc);
     result->TrailGroup = CreateTrailGroup(alloc, result, CHECKPOINT_OUTLINE_COLOR, ROAD_LANE_COUNT);
     result->SetScl(vec3{ROAD_LANE_COUNT, 1.0f, ROAD_LANE_COUNT*2});
-	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "checkpoint"));
+	result->AudioSource = CreateAudioSource(alloc, FindSound(loader, "checkpoint", "main_assets"));
     return result;
 }
 
@@ -647,10 +649,6 @@ void RemoveEntity(entity_world &world, entity *ent)
 	if (ent->AudioSource)
 	{
 		RemoveEntityFromList(world.AudioEntities, ent);
-        if (ent->Flags & EntityFlag_DestroyAudioSource)
-        {
-            AudioSourceDestroy(ent->AudioSource);
-        }
 	}
     if (ent->Model)
     {
@@ -811,7 +809,7 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 
 	w.DisableRoadRepeat = false;
 
-    w.BackgroundState.RandomTexture = FindTexture(*loader, "random");
+    w.BackgroundState.RandomTexture = FindTexture(*loader, "random", "main_screen");
 	w.BackgroundState.Instances.push_back(background_instance{ color(0, 1, 1, 1), vec2(0.0f) });
 	w.BackgroundState.Instances.push_back(background_instance{ color(1, 0, 1, 1), vec2(1060, 476) });
 }
@@ -1136,7 +1134,7 @@ void WaitUpdate(entity_world &world)
 void RenderBackground(game_main *g, entity_world &w)
 {
     auto &state = w.BackgroundState;
-    static auto tex = FindTexture(*w.AssetLoader, "background");
+    static auto tex = FindTexture(*w.AssetLoader, "background", "main_screen");
     int numHorizontal = int(std::ceil(float(g->Width) / float(tex->Width)));
 
     UpdateProjectionView(g->GUICamera);

@@ -128,6 +128,15 @@ struct fixed_array
 		Data.resize(cap);
 	}
 
+  T *emplace_back()
+  {
+    if (Count+1 >= cap)
+    {
+        throw std::runtime_error(std::string(typeid(T).name()) + " fixed array out of memory");
+    }
+    return &Data[Count++];
+  }
+
     void push_back(T elem)
     {
         if (Count+1 >= cap)

@@ -58,13 +58,13 @@ struct tween_sequence
     bool Complete = false;
     bool Active = false;
     bool Loop = false;
-	bool OneShot = false;
+    bool OneShot = false;
 };
 
 struct tween_state
 {
-	memory_arena Arena;
-	generic_pool<tween_sequence> SequencePool;
+    memory_arena Arena;
+    generic_pool<tween_sequence> SequencePool;
 
     std::vector<tween_sequence *> Sequences;
     tween_func *Funcs[TweenEasing_MAX];

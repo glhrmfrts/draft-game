@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 	if (opts.Values["graphics/fullscreen"]->Bool)
 	{
 		windowFlags |= SDL_WINDOW_FULLSCREEN;
-		
+
 		SDL_DisplayMode displayMode;
 		SDL_GetDisplayMode(0, 0, &displayMode);
 
@@ -123,11 +123,11 @@ int main(int argc, char **argv)
     game.ViewportHeight = vHeight;
     game.Width = Width;
     game.Height = Height;
-	game.Platform.AudioDevice = AudioDevice;
+	  game.Platform.AudioDevice = AudioDevice;
     game.Platform.CompareFileTime = PlatformCompareFileTime;
     game.Platform.GetFileLastWriteTime = PlatformGetFileLastWriteTime;
     game.Platform.GetMilliseconds = PlatformGetMilliseconds;
-	game.Platform.CreateThread = PlatformCreateThread;
+	  game.Platform.CreateThread = PlatformCreateThread;
 
     auto &Input = game.Input;
     if (SDL_NumJoysticks() > 0)
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     }
 
     game_library Lib;
-	game.GameLibrary = &Lib;
+	  game.GameLibrary = &Lib;
 
     std::string LibPath = GameLibraryPath;
     std::string TempPath;
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
                 }
                 break;
             }
-            
+
             case SDL_JOYBUTTONDOWN: {
                 printf("%d\n", Event.jbutton.button);
                 break;

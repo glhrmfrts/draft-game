@@ -19,7 +19,7 @@ void InitAssetLoader(game_main *g, asset_loader &Loader, platform_api &Platform)
     CreateThreadPool(Loader.Pool, g, 1, 32);
     Loader.NumLoadedEntries = 0;
     Loader.Platform = &Platform;
-	Loader.Arena.Free = false;
+    Loader.Arena.Free = false;
 }
 
 void DestroyAssetLoader(asset_loader &Loader)
@@ -27,21 +27,46 @@ void DestroyAssetLoader(asset_loader &Loader)
     FT_Done_FreeType(Loader.FreeTypeLib);
 }
 
-asset_entry CreateAssetEntry(asset_entry_type Type, const string &Filename, const string &ID, void *Param)
+asset_entry CreateAssetEntry(asset_entry_type Type, const string &Filename, const string &ID, void *Param, bool oneShot = false)
 {
     asset_entry Result = {};
     Result.Type = Type;
     Result.Filename = Filename;
     Result.ID = ID;
     Result.Param = Param;
+    Result.OneShot = oneShot;
     return Result;
 }
 
-void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow = true, bool oneShot = false)
+void AddShaderProgramEntries(asset_job *job, shader_program &program)
+{
+    asset_entry VertexEntry = CreateAssetEntry(
+        AssetEntryType_Shader,
+        program.VertexShaderParam.Path,
+        program.VertexShaderParam.Path,
+        (void *)&program.VertexShaderParam
+    );
+    asset_entry FragmentEntry = CreateAssetEntry(
+        AssetEntryType_Shader,
+        program.FragmentShaderParam.Path,
+        program.FragmentShaderParam.Path,
+        (void *)&program.FragmentShaderParam
+    );
+    job->Entries.push_back(VertexEntry);
+    job->Entries.push_back(FragmentEntry);
+}
+
+asset_job *CreateAssetJob(asset_loader &loader, const std::string &name)
+{
+  auto result = PushStruct<asset_job>(loader.Arena);
+  result->Name = name;
+  return result;
+}
+
+void AddAssetEntry(asset_loader &Loader, asset_entry Entry)
 {
     Entry.Completion = AssetCompletion_Incomplete;
     Entry.Loader = &Loader;
-	Entry.OneShot = oneShot;
     switch (Entry.Type)
     {
     case AssetEntryType_Texture:
@@ -71,9 +96,9 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
 
     case AssetEntryType_Sound:
     {
-		auto result = AudioClipCreate(&Loader.Arena, AudioClipType_Sound);
+		    auto result = AudioClipCreate(&Loader.Arena, AudioClipType_Sound);
         Entry.Sound.Result = result;
-		AudioCheckError();
+	      AudioCheckError();
         break;
     }
 
@@ -116,55 +141,44 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry, bool KickLoadingNow 
         break;
     }
     }
-    Loader.Entries.push_back(Entry);
-	Loader.Active = true;
 
-	if (KickLoadingNow)
-	{
-		AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Loader.Entries[Loader.Entries.size() - 1]);
-	}
+  Loader.Entries.push_back(Entry);
+  Loader.Active = true;
+
+	AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Loader.Entries[Loader.Entries.size() - 1]);
 }
 
-inline void
-AddShaderProgramEntries(asset_loader &Loader, shader_program &Program)
+void StartAssetJob(asset_loader &loader, asset_job *job)
 {
-    asset_entry VertexEntry = CreateAssetEntry(
-        AssetEntryType_Shader,
-        Program.VertexShaderParam.Path,
-        Program.VertexShaderParam.Path,
-        (void *)&Program.VertexShaderParam
-    );
-    asset_entry FragmentEntry = CreateAssetEntry(
-        AssetEntryType_Shader,
-        Program.FragmentShaderParam.Path,
-        Program.FragmentShaderParam.Path,
-        (void *)&Program.FragmentShaderParam
-    );
-    AddAssetEntry(Loader, VertexEntry);
-    AddAssetEntry(Loader, FragmentEntry);
+  loader.CurrentJob = job;
+  for (auto &entry : job->Entries)
+  {
+    entry.Job = job;
+    AddAssetEntry(loader, entry);
+  }
 }
 
 inline bitmap_font *
-FindBitmapFont(asset_loader &Loader, const string &ID)
+FindBitmapFont(asset_loader &Loader, const string &ID, const std::string &jobName)
 {
-    for (int i = 0; i < Loader.Entries.size(); i++)
+  for (int i = 0; i < Loader.Entries.size(); i++)
 	{
 		auto &Entry = Loader.Entries[i];
-        if (Entry.Type == AssetEntryType_Font && Entry.ID == ID)
-        {
-            return Entry.Font.Result;
-        }
+    if (Entry.Type == AssetEntryType_Font && Entry.ID == ID && Entry.Job->Name == jobName)
+    {
+        return Entry.Font.Result;
     }
-    return NULL;
+  }
+  return NULL;
 }
 
 inline texture *
-FindTexture(asset_loader &Loader, const string &ID)
+FindTexture(asset_loader &Loader, const string &ID, const std::string &jobName)
 {
 	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
 		auto &Entry = Loader.Entries[i];
-        if (Entry.Type == AssetEntryType_Texture && Entry.ID == ID)
+        if (Entry.Type == AssetEntryType_Texture && Entry.ID == ID && Entry.Job->Name == jobName)
         {
             return Entry.Texture.Result;
         }
@@ -173,12 +187,12 @@ FindTexture(asset_loader &Loader, const string &ID)
 }
 
 inline audio_clip *
-FindSound(asset_loader &Loader, const string &ID)
+FindSound(asset_loader &Loader, const string &ID, const std::string &jobName)
 {
 	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
 		auto &Entry = Loader.Entries[i];
-        if (Entry.Type == AssetEntryType_Sound && Entry.ID == ID)
+        if (Entry.Type == AssetEntryType_Sound && Entry.ID == ID && Entry.Job->Name == jobName)
         {
             return Entry.Sound.Result;
         }
@@ -187,12 +201,12 @@ FindSound(asset_loader &Loader, const string &ID)
 }
 
 inline audio_clip *
-FindStream(asset_loader &Loader, const string &ID)
+FindStream(asset_loader &Loader, const string &ID, const std::string &jobName)
 {
 	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
 		auto &Entry = Loader.Entries[i];
-		if (Entry.Type == AssetEntryType_Stream && Entry.ID == ID)
+		if (Entry.Type == AssetEntryType_Stream && Entry.ID == ID && Entry.Job->Name == jobName)
 		{
 			return Entry.Stream.Result;
 		}
@@ -201,7 +215,7 @@ FindStream(asset_loader &Loader, const string &ID)
 }
 
 inline song *
-FindSong(asset_loader &Loader, const string &ID)
+FindSong(asset_loader &Loader, const string &ID, const std::string &jobName)
 {
 	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
@@ -215,12 +229,12 @@ FindSong(asset_loader &Loader, const string &ID)
 }
 
 inline options *
-FindOptions(asset_loader &loader, const string &id)
+FindOptions(asset_loader &loader, const string &id, const std::string &jobName)
 {
 	for (int i = 0; i < loader.Entries.size(); i++)
 	{
 		auto &entry = loader.Entries[i];
-		if (entry.Type == AssetEntryType_OptionsLoad && entry.ID == id)
+		if (entry.Type == AssetEntryType_OptionsLoad && entry.ID == id && entry.Job->Name == jobName)
 		{
 			return entry.Options.Result;
 		}
@@ -229,12 +243,12 @@ FindOptions(asset_loader &loader, const string &id)
 }
 
 inline level *
-FindLevel(asset_loader &loader, const string &id)
+FindLevel(asset_loader &loader, const string &id, const std::string &jobName)
 {
 	for (int i = 0; i < loader.Entries.size(); i++)
 	{
 		auto &entry = loader.Entries[i];
-		if (entry.Type == AssetEntryType_Level && entry.ID == id)
+		if (entry.Type == AssetEntryType_Level && entry.ID == id && entry.Job->Name == jobName)
 		{
 			return entry.Level.Result;
 		}
@@ -243,12 +257,12 @@ FindLevel(asset_loader &loader, const string &id)
 }
 
 inline mesh *
-FindMesh(asset_loader &loader, const string &id)
+FindMesh(asset_loader &loader, const string &id, const std::string &jobName)
 {
     for (int i = 0; i < loader.Entries.size(); i++)
 	{
 		auto &entry = loader.Entries[i];
-		if (entry.Type == AssetEntryType_Mesh && entry.ID == id)
+		if (entry.Type == AssetEntryType_Mesh && entry.ID == id && entry.Job->Name == jobName)
 		{
 			return entry.Mesh.Result;
 		}
@@ -257,12 +271,12 @@ FindMesh(asset_loader &loader, const string &id)
 }
 
 inline material_lib *
-FindMaterialLib(asset_loader &loader, const string &id)
+FindMaterialLib(asset_loader &loader, const string &id, const std::string &jobName)
 {
     for (int i = 0; i < loader.Entries.size(); i++)
 	{
 		auto &entry = loader.Entries[i];
-		if (entry.Type == AssetEntryType_MaterialLib && entry.ID == id)
+		if (entry.Type == AssetEntryType_MaterialLib && entry.ID == id && entry.Job->Name == jobName)
 		{
 			return entry.MaterialLib.Result;
 		}
@@ -564,7 +578,10 @@ static void LoadAssetThreadSafePart(void *Arg)
 					{
 						iss >> field;
 						std::string path = GetParentPath(Entry->Filename) + "/" + field;
-						AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_MaterialLib, path, path, NULL));
+            auto matEntry = CreateAssetEntry(AssetEntryType_MaterialLib, path, path, NULL);
+            matEntry.Job = Entry->Job;
+            Entry->Job->Entries.push_back(matEntry);
+            AddAssetEntry(*Entry->Loader, matEntry);
 						meshData->MaterialLib = path;
 					}
 					else if (field == "v")
@@ -949,8 +966,8 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
     case AssetEntryType_Sound:
     {
         auto *Result = Entry->Sound.Result;
-		AudioClipSetSoundData(Result, Entry->Sound.Data);
-		AudioCheckError();
+	      AudioClipSetSoundData(Result, Entry->Sound.Data);
+	      AudioCheckError();
         break;
     }
 
@@ -964,11 +981,11 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 		auto result = Entry->Song.Result;
 		for (auto &file : result->Files)
 		{
-			result->Tracks.push_back(FindStream(*Entry->Loader, file));
+			result->Tracks.push_back(FindStream(*Entry->Loader, file, Entry->Job->Name));
 		}
 		for (auto it : result->ClipFiles)
 		{
-			result->Clips[it.first] = FindSound(*Entry->Loader, it.second);
+			result->Clips[it.first] = FindSound(*Entry->Loader, it.second, Entry->Job->Name);
 		}
 		break;
 	}
@@ -976,7 +993,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 	case AssetEntryType_Level:
 	{
 		auto result = Entry->Level.Result;
-		result->Song = FindSong(*Entry->Loader, result->SongName);
+		result->Song = FindSong(*Entry->Loader, result->SongName, Entry->Job->Name);
 		break;
 	}
 
@@ -1026,7 +1043,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 			PushVertex(result->Buffer, data);
 		}
 
-        auto lib = FindMaterialLib(*Entry->Loader, meshData->MaterialLib);
+    auto lib = FindMaterialLib(*Entry->Loader, meshData->MaterialLib, Entry->Job->Name);
 		for (size_t i = 0; i < meshData->Parts.size(); i++)
 		{
 			auto &part = meshData->Parts[i];
@@ -1049,6 +1066,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 
 bool Update(asset_loader &Loader)
 {
+    Loader.CurrentJob->Finished = int(Loader.Pool.NumJobs) == 0;
     if (Loader.Active && !int(Loader.Pool.NumJobs))
     {
 		Loader.Active = false;

@@ -13,29 +13,22 @@ void RegisterInputActions(game_input &input)
     input.Actions[Action_pause] = action_state{ SDL_SCANCODE_ESCAPE, 0, 0, 0, Axis_Invalid, XboxButton_Start };
 }
 
-void InitLoadingScreen(game_main *g)
+void AddShadersAssetEntries(game_main *g, asset_job *job)
 {
-    g->State = GameState_LoadingScreen;
-    InitAssetLoader(g, g->AssetLoader, g->Platform);
-
-    for (auto &Asset : g->Assets)
-    {
-        AddAssetEntry(g->AssetLoader, Asset);
-    }
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.ModelProgram);
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlurHorizontalProgram);
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlurVerticalProgram);
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlendProgram);
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.BlitProgram);
-    AddShaderProgramEntries(g->AssetLoader, g->RenderState.ResolveMultisampleProgram);
-	AddShaderProgramEntries(g->AssetLoader, g->RenderState.PerlinNoiseProgram);
+    AddShaderProgramEntries(job, g->RenderState.ModelProgram);
+    AddShaderProgramEntries(job, g->RenderState.BlurHorizontalProgram);
+    AddShaderProgramEntries(job, g->RenderState.BlurVerticalProgram);
+    AddShaderProgramEntries(job, g->RenderState.BlendProgram);
+    AddShaderProgramEntries(job, g->RenderState.BlitProgram);
+    AddShaderProgramEntries(job, g->RenderState.ResolveMultisampleProgram);
+	  AddShaderProgramEntries(job, g->RenderState.PerlinNoiseProgram);
 }
 
 typedef void init_func(game_main *Game);
 
 void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
 {
-    if (int(g->AssetLoader.Pool.NumJobs) == 0)
+    if (g->AssetLoader.CurrentJob->Finished)
     {
         nextModeInit(g);
     }
@@ -50,7 +43,7 @@ void RenderLoadingScreen(game_main *Game, float DeltaTime)
     float Height = Game->Height * 0.05f;
     float x = (float)Game->Width/2 - Width/2;
     float y = (float)Game->Height/2 - Height/2;
-    float LoadingPercentage = (float)(int)Game->AssetLoader.NumLoadedEntries / (float)Game->AssetLoader.Entries.size();
+    float LoadingPercentage = (float)(int)Game->AssetLoader.CurrentJob->NumLoadedEntries / (float)Game->AssetLoader.CurrentJob->Entries.size();
     float ProgressBarWidth = Width*LoadingPercentage;
 
     UpdateProjectionView(Game->GUICamera);
