@@ -31,10 +31,12 @@ extern "C"
 {
     export_func GAME_INIT(GameInit)
     {
+		Global_DebugLogIdent = 0;
+		DebugLogCall();
         auto g = game;
         int Width = g->Width;
         int Height = g->Height;
-		    Global_Platform = &g->Platform;
+		Global_Platform = &g->Platform;
 
         ImGui_ImplSdlGL3_Init(g->Window);
 
@@ -44,16 +46,161 @@ extern "C"
         MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, 90.0f, 0.1f, 1000.0f);
         InitRenderState(g->RenderState, Width, Height, g->ViewportWidth, g->ViewportHeight);
         InitTweenState(g->TweenState);
-	      InitGUI(g->GUI, g->TweenState, g->Input);
+	    InitGUI(g->GUI, g->TweenState, g->Input);
         InitEntityWorld(g, g->World);
-		    MusicMasterInit(g, g->MusicMaster);
+		MusicMasterInit(g, g->MusicMaster);
         InitLevelState(g, &g->LevelState);
+		InitAssetLoader(g, g->AssetLoader, g->Platform);
 
         g->State = GameState_LoadingScreen;
         auto job = CreateAssetJob(g->AssetLoader, "main_assets");
 
+        g->RenderState.RoadTangentPoint = &g->World.RoadTangentPoint;
+
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Texture,
+                "data/textures/grid.png",
+                "grid",
+                (void *)(TextureFlag_Mipmap | TextureFlag_Anisotropic | TextureFlag_WrapRepeat)
+            )
+        );
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Texture,
+                "data/textures/space6.png",
+                "background",
+                (void *)(TextureFlag_WrapRepeat)
+            )
+        );
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Texture,
+				"data/textures/random.png",
+				"random",
+				(void *)(TextureFlag_WrapRepeat | TextureFlag_Nearest)
+			)
+		);
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Font,
+                "data/fonts/vcr.ttf",
+                "vcr_16",
+                (void *)long(GetRealPixels(g, 32.0f))
+            )
+        );
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Font,
+				"data/fonts/unispace.ttf",
+				"unispace_12",
+				(void *)long(GetRealPixels(g, 12.0f))
+			)
+		);
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_16",
+                (void *)long(GetRealPixels(g, 16.0f))
+            )
+        );
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_24",
+                (void *)long(GetRealPixels(g, 24.0f))
+            )
+        );
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_32",
+                (void *)long(GetRealPixels(g, 32.0f))
+            )
+        );
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Font,
+                "data/fonts/unispace.ttf",
+                "unispace_48",
+                (void *)long(GetRealPixels(g, 48.0f))
+            )
+        );
+        job->Entries.push_back(
+            CreateAssetEntry(
+                AssetEntryType_Sound,
+                "data/audio/boost.wav",
+                "boost",
+                NULL
+            )
+        );
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Sound,
+				"data/audio/explosion3.wav",
+				"explosion",
+				NULL
+			)
+		);
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Sound,
+				"data/audio/checkpoint.wav",
+				"checkpoint",
+				NULL
+			)
+		);
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Sound,
+				"data/audio/crystal.wav",
+				"crystal",
+				NULL
+			)
+		);
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_OptionsLoad,
+				"options.json",
+				"options",
+				NULL
+			)
+		);
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Mesh,
+				"data/models/deer.obj",
+				"deer",
+				(void *)(mesh_flags::UpY)
+			)
+		);
+		job->Entries.push_back(
+			CreateAssetEntry(
+				AssetEntryType_Mesh,
+				"data/models/skull.obj",
+				"skull",
+				(void *)(mesh_flags::UpY)
+			)
+		);
+
+#define NUM_LEVELS 3
+		for (int i = 1; i <= NUM_LEVELS; i++)
+		{
+			job->Entries.push_back(
+				CreateAssetEntry(
+					AssetEntryType_Level,
+					"data/levels/" + std::to_string(i) + ".level",
+					std::to_string(i),
+					NULL
+				)
+			);
+		}
+
+
         AddShadersAssetEntries(g, job);
-        InitAssetLoader(g, g->AssetLoader, g->Platform);
         StartAssetJob(g->AssetLoader, job);
   }
 
@@ -81,6 +228,8 @@ extern "C"
 
     export_func GAME_UPDATE(GameUpdate)
     {
+		Global_DebugLogIdent = 0;
+
         auto g = game;
 		Global_Platform = &game->Platform;
 
@@ -92,21 +241,6 @@ extern "C"
         }
         Update(g->TweenState, dt);
 		Update(g->AssetLoader);
-
-        switch (g->State)
-        {
-        case GameState_LoadingScreen:
-            UpdateLoadingScreen(g, dt, InitMenuState);
-            break;
-
-        case GameState_Level:
-            UpdateLevel(g, dt);
-            break;
-
-        case GameState_Menu:
-            UpdateMenuState(g, dt);
-            break;
-        }
 
 #ifdef DRAFT_DEBUG
         if (g->State != GameState_LoadingScreen)
@@ -128,20 +262,15 @@ extern "C"
         ImGui_ImplSdlGL3_NewFrame(g->Window);
         MakeCameraPerspective(g->Camera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
         MakeCameraPerspective(g->FinalCamera, (float)g->Width, (float)g->Height, Global_Camera_FieldOfView, 0.1f, 1000.0f);
-        switch (g->State)
-        {
-        case GameState_LoadingScreen:
-            RenderLoadingScreen(g, dt);
-            break;
 
-        case GameState_Level:
-            RenderLevel(g, dt);
-            break;
-
-        case GameState_Menu:
-            RenderMenuState(g, dt);
-            break;
-        }
+		if (!(g->AssetLoader.CurrentJob->Finished))
+		{
+			RenderLoadingScreen(g, dt);
+		}
+		else
+		{
+			glClear(GL_COLOR_BUFFER_BIT);
+		}
 
 		if (g->ScreenRectAlpha > 0.0f)
 		{

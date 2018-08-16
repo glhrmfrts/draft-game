@@ -743,6 +743,7 @@ void RemoveEntity(entity_world &world, entity *ent)
 
 void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
 {
+	DebugLogCall();
 	w.RoadMeshManager.Arena.Free = false;
 
     FreeArena(w.Arena);
@@ -773,6 +774,8 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     ResetPool(w.PowerupPool);
 	ResetPool(w.UpdateArgsPool);
 
+	DebugLog("GenState");
+
     w.GenState = PushStruct<gen_state>(w.Arena);
     InitGenState(w.GenState);
 
@@ -783,6 +786,8 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     w.PlayerEntity->Transform.Velocity.y = PLAYER_MIN_VEL;
 	w.PlayerEntity->AudioSource = CreateAudioSource(&w.Arena);
     AddEntity(w, w.PlayerEntity);
+
+	DebugLog("CamPosition");
 
     cam->Position = w.PlayerEntity->Pos() + vec3{0, Global_Camera_OffsetY, Global_Camera_OffsetZ};
 
@@ -807,11 +812,15 @@ void InitWorldCommonEntities(entity_world &w, asset_loader *loader, camera *cam)
     }
 	SetRoadPieceBounds(&w.RoadState.NextPiece, -2.5f, 2.5f, -2.5f, 2.5f);
 
+	DebugLog("SetRoadPieceBounds");
+
 	w.DisableRoadRepeat = false;
 
-    w.BackgroundState.RandomTexture = FindTexture(*loader, "random", "main_screen");
+    w.BackgroundState.RandomTexture = FindTexture(*loader, "random", "main_assets");
 	w.BackgroundState.Instances.push_back(background_instance{ color(0, 1, 1, 1), vec2(0.0f) });
 	w.BackgroundState.Instances.push_back(background_instance{ color(1, 0, 1, 1), vec2(1060, 476) });
+
+	DebugLogCallEnd();
 }
 
 void SetEntityClip(entity_world &world, gen_type genType, audio_clip *clip)
@@ -1035,95 +1044,7 @@ static bool IsInsideRoadPiece(entity *roadEntity, entity *playerEntity)
 
 void UpdateLogiclessEntities(entity_world &world, float dt)
 {
-    for (int i = 0; i < ROAD_LANE_COUNT; i++)
-    {
-        world.GenState->LaneSlots[i] = 0;
-    }
-    for (auto ent : world.LaneSlotEntities)
-    {
-        if (!ent) continue;
-
-        world.GenState->LaneSlots[ent->LaneSlot->Index]++;
-    }
-
-    if (world.PlayerEntity->Pos().y < world.RoadTangentPoint)
-    {
-        float velY = world.PlayerEntity->Vel().y;
-        world.BackgroundState.Offset += vec2(0.0f, velY) * dt;
-    }
-	world.BackgroundState.Time += dt;
-
-	for (auto ent : world.AudioEntities)
-	{
-		if (!ent) continue;
-		AudioSourceSetPosition(ent->AudioSource, ent->Pos());
-	}
-    for (auto ent : world.MovementEntities)
-    {
-        if (!ent) continue;
-        ent->Transform.Position += ent->Transform.Velocity * dt;
-    }
-    for (auto ent : world.RemoveOffscreenEntities)
-    {
-        if (!ent) continue;
-
-        if (ent->Pos().y < world.Camera->Position.y - 50.0f)
-        {
-            RemoveEntity(world, ent);
-        }
-    }
-    for (auto ent : world.RepeatingEntities)
-    {
-		if (!ent) continue;
-
-        auto repeat = ent->Repeat;
-		if (world.Camera->Position.y - ent->Transform.Position.y > repeat->DistanceFromCamera)
-		{
-			if (!(ent->RoadPiece && world.DisableRoadRepeat))
-			{
-				ent->Transform.Position.y += repeat->Size * repeat->Count;
-			}
-			if (repeat->Callback)
-			{
-				repeat->Callback(&world, ent);
-			}
-		}
-
-    }
-    for (auto ent : world.RotatingEntities)
-    {
-        if (!ent) continue;
-
-        ent->Transform.Rotation += ent->FrameRotation->Rotation * dt;
-    }
-
-	for (auto ent : world.TrailGroupEntities)
-	{
-		if (!ent) continue;
-		//AddJob(world.UpdateThreadPool, UpdateTrailGroupEntityJob, (void *)GetUpdateArg(world, ent, dt));
-		UpdateTrailGroupEntityJob((void *)GetUpdateArg(world, ent, dt));
-	}
-
-	for (auto ent : world.ExplosionEntities)
-	{
-		if (!ent) continue;
-		//AddJob(world.UpdateThreadPool, UpdateExplosionEntityJob, (void *)GetUpdateArg(world, ent, dt));
-		UpdateExplosionEntityJob((void *)GetUpdateArg(world, ent, dt));
-	}
-
-	auto roadEntity = world.RoadPieceEntities[world.RoadState.PlayerActiveEntityIndex];
-	while (!IsInsideRoadPiece(roadEntity, world.PlayerEntity))
-	{
-		if (world.RoadState.PlayerActiveEntityIndex >= world.RoadPieceEntities.size() - 1)
-		{
-			world.RoadState.PlayerActiveEntityIndex = -1;
-		}
-		roadEntity = world.RoadPieceEntities[++world.RoadState.PlayerActiveEntityIndex];
-	}
-
-	float d = std::min(1.0f, (world.PlayerEntity->Pos().y - roadEntity->Pos().y) / ROAD_SEGMENT_SIZE);
-	world.RoadState.Left = Lerp(roadEntity->RoadPiece->BackLeft, d, roadEntity->RoadPiece->FrontLeft);
-	world.RoadState.Right = Lerp(roadEntity->RoadPiece->BackRight, d, roadEntity->RoadPiece->FrontRight);
+	
 }
 
 void WaitUpdate(entity_world &world)

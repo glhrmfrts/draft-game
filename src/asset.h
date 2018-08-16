@@ -129,12 +129,12 @@ struct asset_loader
 {
     FT_Library FreeTypeLib;
     memory_arena Arena;
-    std::vector<asset_entry> Entries;
+    fixed_array<asset_entry, 512> Entries;
     std::atomic_int NumLoadedEntries;
     asset_job *CurrentJob;
     platform_api *Platform;
     thread_pool Pool;
-	  bool Active;
+	bool Active;
 };
 
 #endif

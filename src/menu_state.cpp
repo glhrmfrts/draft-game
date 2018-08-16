@@ -105,6 +105,7 @@ void UpdateFinalCamera(game_main *g)
 
 void ResetMenuState(game_main *g)
 {
+	DebugLogCall();
 	g->State = GameState_Menu;
 	InitWorldCommonEntities(g->World, &g->AssetLoader, &g->Camera);
 
@@ -113,10 +114,14 @@ void ResetMenuState(game_main *g)
 	m->Screen = MenuScreen_Main;
 
 	PlaySequence(g->TweenState, m->FadeInSequence);
+	DebugLogCallEnd();
 }
+void UpdateMenuState(game_main *g, float dt);
+
 
 void InitMenuState(game_main *g)
 {
+	DebugLogCall();
     auto m = &g->MenuState;
 	m->FadeInSequence = CreateSequence(g->TweenState);
 	m->FadeInSequence->Tweens.push_back(FadeOutTween(&g->ScreenRectAlpha, FAST_TWEEN_DURATION));
@@ -128,6 +133,7 @@ void InitMenuState(game_main *g)
 	}));
 
 	ResetMenuState(g);
+	UpdateMenuState(g, 0.0f);
 
 	//auto sng = FindSong(g->AssetLoader, "music");
 	//MusicMasterLoadSong(g->MusicMaster, sng);
@@ -154,6 +160,7 @@ void InitMenuState(game_main *g)
 	AudioMenu.Items[1].SliderFloat.Min = 0;
 	AudioMenu.Items[1].SliderFloat.Max = 1;
 	AudioMenu.Items[1].SliderFloat.Value = &g->Options->Values["audio/sfx_gain"]->Float;
+	DebugLogCallEnd();
 }
 
 void SaveOptions(game_main *g)
@@ -170,15 +177,20 @@ void SaveOptions(game_main *g)
 
 void UpdateMenuState(game_main *g, float dt)
 {
+	DebugLogCall();
     auto m = &g->MenuState;
     float moveX = GetMenuAxisValue(g->Input, g->GUI.HorizontalAxis, dt);
     float moveY = GetMenuAxisValue(g->Input, g->GUI.VerticalAxis, dt);
     g->World.PlayerEntity->Vel().y = PLAYER_MIN_VEL;
     g->World.PlayerEntity->Pos().y += g->World.PlayerEntity->Vel().y * dt;
 
+	
+
     UpdateLogiclessEntities(g->World, dt);
+
     UpdateCameraToPlayer(g->Camera, g->World.PlayerEntity, dt);
     UpdateGenState(g, g->World.GenState, NULL, dt);
+	
 
     if (m->Screen == MenuScreen_Main)
     {
@@ -238,10 +250,12 @@ void UpdateMenuState(game_main *g, float dt)
 			m->Screen = MenuScreen_Main;
         }
     }
+	DebugLogCallEnd();
 }
 
 void RenderMenuState(game_main *g, float dt)
 {
+	DebugLogCall();
     static auto mainMenuFont = FindBitmapFont(g->AssetLoader, "unispace_32", "main_assets");
     auto m = &g->MenuState;
 
@@ -303,4 +317,5 @@ void RenderMenuState(game_main *g, float dt)
 	}
 
     End(g->GUI);
+	DebugLogCallEnd();
 }

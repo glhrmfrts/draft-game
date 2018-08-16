@@ -28,10 +28,12 @@ typedef void init_func(game_main *Game);
 
 void UpdateLoadingScreen(game_main *g, float dt, init_func *nextModeInit)
 {
+	DebugLogCall();
     if (g->AssetLoader.CurrentJob->Finished)
     {
         nextModeInit(g);
     }
+	DebugLogCallEnd();
 }
 
 void RenderLoadingScreen(game_main *Game, float DeltaTime)

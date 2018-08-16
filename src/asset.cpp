@@ -16,7 +16,7 @@ void InitAssetLoader(game_main *g, asset_loader &Loader, platform_api &Platform)
         exit(EXIT_FAILURE);
     }
 
-    CreateThreadPool(Loader.Pool, g, 1, 32);
+    CreateThreadPool(Loader.Pool, g, 1, 128);
     Loader.NumLoadedEntries = 0;
     Loader.Platform = &Platform;
     Loader.Arena.Free = false;
@@ -36,6 +36,19 @@ asset_entry CreateAssetEntry(asset_entry_type Type, const string &Filename, cons
     Result.Param = Param;
     Result.OneShot = oneShot;
     return Result;
+}
+
+asset_entry CreateAssetEntry(asset_job *Job, asset_entry_type Type, const string &Filename, const string &ID, void *Param, bool oneShot = false)
+{
+	asset_entry Result = {};
+	Result.Type = Type;
+	Result.Filename = Filename;
+	Result.ID = ID;
+	Result.Param = Param;
+	Result.OneShot = oneShot;
+	Result.Job = Job;
+	Job->Entries.push_back(Result);
+	return Result;
 }
 
 void AddShaderProgramEntries(asset_job *job, shader_program &program)
@@ -58,9 +71,9 @@ void AddShaderProgramEntries(asset_job *job, shader_program &program)
 
 asset_job *CreateAssetJob(asset_loader &loader, const std::string &name)
 {
-  auto result = PushStruct<asset_job>(loader.Arena);
-  result->Name = name;
-  return result;
+	auto result = PushStruct<asset_job>(loader.Arena);
+	result->Name = name;
+	return result;
 }
 
 void AddAssetEntry(asset_loader &Loader, asset_entry Entry)
@@ -142,8 +155,8 @@ void AddAssetEntry(asset_loader &Loader, asset_entry Entry)
     }
     }
 
-  Loader.Entries.push_back(Entry);
-  Loader.Active = true;
+	Loader.Entries.push_back(Entry);
+	Loader.Active = true;
 
 	AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Loader.Entries[Loader.Entries.size() - 1]);
 }
@@ -284,57 +297,70 @@ FindMaterialLib(asset_loader &loader, const string &id, const std::string &jobNa
 	return NULL;
 }
 
+void LoadTextureFromFile(texture *t, std::string &filename, uint32 Flags, vector<uint8> &Data)
+{
+	DebugLogCall();
+	//DebugLog(filename);
+	auto Result = t;
+	Result->Filename = filename;
+	Result->Target = GL_TEXTURE_2D;
+	Result->Filters = { DefaultTextureFilter, DefaultTextureFilter };
+	Result->Wrap = { DefaultTextureWrap, DefaultTextureWrap };
+	Result->Flags = Flags;
+	if (Flags & TextureFlag_WrapRepeat)
+	{
+		Result->Wrap = { GL_REPEAT, GL_REPEAT };
+	}
+	if (Flags & TextureFlag_Mipmap)
+	{
+		Result->Filters.Min = GL_LINEAR_MIPMAP_LINEAR;
+		Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
+	}
+	if (Flags & TextureFlag_Nearest)
+	{
+		Result->Filters.Min = GL_NEAREST;
+		Result->Filters.Mag = GL_NEAREST;
+	}
+
+	uint32 Error = lodepng::decode(Data, Result->Width, Result->Height, filename);
+	if (Error)
+	{
+		std::cout << "texture: " << filename << " " << lodepng_error_text(Error) << std::endl;
+		// generate magenta texture if it's missing
+		Result->Width = 512;
+		Result->Height = 512;
+
+		Data.resize(Result->Width * Result->Height * 4);
+		for (uint32 y = 0; y < Result->Height; y++)
+		{
+			for (uint32 x = 0; x < Result->Width; x++)
+			{
+				uint32 i = (y * Result->Width + x) * 4;
+				Data[i] = 255;
+				Data[i + 1] = 0;
+				Data[i + 2] = 255;
+				Data[i + 3] = 255;
+			}
+		}
+	}
+	DebugLogCallEnd();
+}
+
 static void LoadAssetThreadSafePart(void *Arg)
 {
+	DebugLogCall();
     auto *Entry = (asset_entry *)Arg;
+
 	switch (Entry->Type)
 	{
 	case AssetEntryType_Texture:
 	{
+		DebugLog("Texture");
 		uint32 Flags = (uintptr_t)Entry->Param;
 		auto *Result = Entry->Texture.Result;
-		Result->Filename = Entry->Filename;
-		Result->Target = GL_TEXTURE_2D;
-		Result->Filters = { DefaultTextureFilter, DefaultTextureFilter };
-		Result->Wrap = { DefaultTextureWrap, DefaultTextureWrap };
-		Result->Flags = Flags;
-		if (Flags & TextureFlag_WrapRepeat)
-		{
-			Result->Wrap = { GL_REPEAT, GL_REPEAT };
-		}
-		if (Flags & TextureFlag_Mipmap)
-		{
-			Result->Filters.Min = GL_LINEAR_MIPMAP_LINEAR;
-			Result->Filters.Mag = GL_LINEAR_MIPMAP_LINEAR;
-		}
-		if (Flags & TextureFlag_Nearest)
-		{
-			Result->Filters.Min = GL_NEAREST;
-			Result->Filters.Mag = GL_NEAREST;
-		}
 
 		vector<uint8> Data;
-		uint32 Error = lodepng::decode(Data, Result->Width, Result->Height, Entry->Filename);
-		if (Error)
-		{
-			std::cout << "texture: " << Entry->Filename << " " << lodepng_error_text(Error) << std::endl;
-			// generate magenta texture if it's missing
-			Result->Width = 512;
-			Result->Height = 512;
-
-			Data.resize(Result->Width * Result->Height * 4);
-			for (uint32 y = 0; y < Result->Height; y++)
-			{
-				for (uint32 x = 0; x < Result->Width; x++)
-				{
-					uint32 i = (y * Result->Width + x) * 4;
-					Data[i] = 255;
-					Data[i + 1] = 0;
-					Data[i + 2] = 255;
-					Data[i + 3] = 255;
-				}
-			}
-		}
+		LoadTextureFromFile(Result, Entry->Filename, Flags, Data);
 
 		Entry->Texture.TextureData = (uint8 *)PushSize(Entry->Loader->Arena, Data.size(), "texture data");
 		memcpy(Entry->Texture.TextureData, &Data[0], Data.size());
@@ -343,6 +369,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_Font:
 	{
+		DebugLog("Font");
 		FT_Face Face;
 		int Error = FT_New_Face(Entry->Loader->FreeTypeLib, Entry->Filename.c_str(), 0, &Face);
 		if (Error)
@@ -413,12 +440,14 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_Shader:
 	{
+		DebugLog("Shader");
 		Entry->Shader.Source = ReadFile(Entry->Filename.c_str());
 		break;
 	}
 
 	case AssetEntryType_Sound:
 	{
+		DebugLog("Sound");
 		SF_INFO Info;
 		SNDFILE *SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &Info);
 		if (!SndFile)
@@ -443,6 +472,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_Stream:
 	{
+		DebugLog("Stream");
 		auto result = Entry->Stream.Result;
 		result->SndFile = sf_open(Entry->Filename.c_str(), SFM_READ, &result->Info);
 		if (!result->SndFile)
@@ -458,6 +488,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_Song:
 	{
+		DebugLog("Song");
 		using json = nlohmann::json;
 
 		std::string content(ReadFile(Entry->Filename.c_str()));
@@ -478,14 +509,14 @@ static void LoadAssetThreadSafePart(void *Arg)
 		for (auto trackFile : j["tracks"])
 		{
 			result->Files.push_back(trackFile);
-			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Stream, trackFile, trackFile, NULL));
+			AddAssetEntry(*Entry->Loader, CreateAssetEntry(Entry->Job, AssetEntryType_Stream, trackFile, trackFile, NULL));
 		}
 
 		for (json::iterator it = j["clips"].begin(); it != j["clips"].end(); ++it)
 		{
 			std::string file = it.value();
 			result->ClipFiles[hash_string()(it.key())] = file;
-			AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Sound, file, file, NULL));
+			AddAssetEntry(*Entry->Loader, CreateAssetEntry(Entry->Job, AssetEntryType_Sound, file, file, NULL));
 		}
 
 		for (json::iterator it = j["names"].begin(); it != j["names"].end(); ++it)
@@ -499,6 +530,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_OptionsLoad:
 	{
+		DebugLog("OptionsLoad");
 		std::string content(ReadFile(Entry->Filename.c_str()));
 
 		options *result = Entry->Options.Result;
@@ -508,6 +540,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_OptionsSave:
 	{
+		DebugLog("OptionsSave");
 		using json = nlohmann::json;
 		json j = {};
 		options *opts = (options *)Entry->Param;
@@ -527,18 +560,20 @@ static void LoadAssetThreadSafePart(void *Arg)
 
 	case AssetEntryType_Level:
 	{
+		DebugLog("Level");
 		std::ifstream file(Entry->Filename);
 
 		level *result = Entry->Level.Result;
 		ParseLevel(file, &Entry->Loader->Arena, result);
 
 		std::string songPath = "data/audio/" + result->SongName + "/song.json";
-		AddAssetEntry(*Entry->Loader, CreateAssetEntry(AssetEntryType_Song, songPath, result->SongName, NULL));
+		AddAssetEntry(*Entry->Loader, CreateAssetEntry(Entry->Job, AssetEntryType_Song, songPath, result->SongName, NULL));
 		break;
 	}
 
 	case AssetEntryType_Mesh:
 	{
+		DebugLog("Mesh");
 		std::ifstream file(Entry->Filename);
 		if (Entry->Filename.find(".obj") != std::string::npos)
 		{
@@ -578,10 +613,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 					{
 						iss >> field;
 						std::string path = GetParentPath(Entry->Filename) + "/" + field;
-            auto matEntry = CreateAssetEntry(AssetEntryType_MaterialLib, path, path, NULL);
-            matEntry.Job = Entry->Job;
-            Entry->Job->Entries.push_back(matEntry);
-            AddAssetEntry(*Entry->Loader, matEntry);
+						AddAssetEntry(*Entry->Loader, CreateAssetEntry(Entry->Job, AssetEntryType_MaterialLib, path, path, NULL));
 						meshData->MaterialLib = path;
 					}
 					else if (field == "v")
@@ -820,6 +852,7 @@ static void LoadAssetThreadSafePart(void *Arg)
 
     case AssetEntryType_MaterialLib:
     {
+		DebugLog("MaterialLib");
         std::ifstream file(Entry->Filename);
         std::string line;
 
@@ -896,14 +929,29 @@ static void LoadAssetThreadSafePart(void *Arg)
     }
 	}
 
+	DebugLog("BeforeFinish");
+	if (Entry->Loader == NULL)
+	{
+		DebugLog("ASD");
+	}
+	if (Entry->Loader->Platform == NULL)
+	{
+		DebugLog("QWE");
+	}
+
     Entry->LastLoadTime = Entry->Loader->Platform->GetFileLastWriteTime(Entry->Filename.c_str());
     Entry->Completion = AssetCompletion_ThreadSafe;
     Entry->Loader->NumLoadedEntries++;
+	Entry->Loader->CurrentJob->NumLoadedEntries++;
+
+	DebugLog("AfterFinish");
+	DebugLogCallEnd();
 }
 
 static void
 LoadAssetThreadUnsafePart(asset_entry *Entry)
 {
+	DebugLogCall_(Entry->Filename);
     switch (Entry->Type)
     {
     case AssetEntryType_Texture:
@@ -988,6 +1036,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 			result->Clips[it.first] = FindSound(*Entry->Loader, it.second, Entry->Job->Name);
 		}
 		break;
+		DebugLogCallEnd(Song);
 	}
 
 	case AssetEntryType_Level:
@@ -1043,7 +1092,7 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 			PushVertex(result->Buffer, data);
 		}
 
-    auto lib = FindMaterialLib(*Entry->Loader, meshData->MaterialLib, Entry->Job->Name);
+		auto lib = FindMaterialLib(*Entry->Loader, meshData->MaterialLib, Entry->Job->Name);
 		for (size_t i = 0; i < meshData->Parts.size(); i++)
 		{
 			auto &part = meshData->Parts[i];
@@ -1062,13 +1111,14 @@ LoadAssetThreadUnsafePart(asset_entry *Entry)
 	{
 		Entry->Completion = AssetCompletion_Done;
 	}
+	DebugLogCallEnd();
 }
 
 bool Update(asset_loader &Loader)
 {
-    Loader.CurrentJob->Finished = int(Loader.Pool.NumJobs) == 0;
     if (Loader.Active && !int(Loader.Pool.NumJobs))
     {
+		Loader.CurrentJob->Finished = true;
 		Loader.Active = false;
 		for (int i = 0; i < Loader.Entries.size(); i++)
 		{
@@ -1085,6 +1135,7 @@ bool Update(asset_loader &Loader)
 
 void CheckAssetsChange(asset_loader &Loader)
 {
+	DebugLogCall();
     Update(Loader);
 	for (int i = 0; i < Loader.Entries.size(); i++)
 	{
@@ -1099,4 +1150,5 @@ void CheckAssetsChange(asset_loader &Loader)
             AddJob(Loader.Pool, LoadAssetThreadSafePart, (void *)&Entry);
         }
     }
+	DebugLogCallEnd();
 }

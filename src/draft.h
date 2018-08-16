@@ -240,4 +240,49 @@ inline static rect GetRealPixels(game_main *game, rect r)
     return r * (float(game->Width)/float(GAME_BASE_WIDTH));
 }
 
+#ifdef DRAFT_DEBUG
+static int Global_DebugLogIdent = 0;
+
+#define PrintSpaces(i) { \
+		int myx = i; \
+		while (myx > 0) \
+		{ \
+			std::cerr << "  "; \
+			myx--; \
+		} \
+	}
+
+#define DebugLog(msg) { \
+		int i = Global_DebugLogIdent; \
+		PrintSpaces(i) \
+		std::cerr << "[DEBUG] " << __FUNCTION__ << ": " << msg << std::endl; \
+	}
+
+#define DebugLogCall() { \
+		int i = Global_DebugLogIdent++; \
+		PrintSpaces(i) \
+		std::cerr << "[DEBUG] " << __FUNCTION__ << std::endl; \
+		PrintSpaces(i) \
+		std::cerr << "{" << std::endl; \
+	}
+
+#define DebugLogCall_(msg) { \
+		int i = Global_DebugLogIdent++; \
+		PrintSpaces(i) \
+		std::cerr << "[DEBUG] " << __FUNCTION__ << " " << msg << std::endl; \
+		PrintSpaces(i) \
+		std::cerr << "{" << std::endl; \
+	}
+
+#define DebugLogCallEnd() { \
+		int i = --Global_DebugLogIdent; \
+		PrintSpaces(i) \
+		std::cerr << "}" << std::endl; \
+	}
+#else
+#define DebugLog(msg)
+#define DebugLogCall()
+#define DebugLogCallEnd()
+#endif
+
 #endif
